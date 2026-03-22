@@ -7,7 +7,7 @@ export async function GET() {
 
     return NextResponse.json({
       ok: true,
-      message: "Conexión exitosa a MongoDB",
+      message: "Mongo conectado",
     });
   } catch (error) {
     return NextResponse.json(
