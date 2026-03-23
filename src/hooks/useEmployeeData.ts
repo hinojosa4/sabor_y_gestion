@@ -15,8 +15,8 @@ export function useEmployeeData() {
     const loadData = useCallback(async () => {
         try {
             const [employeesRes, statsRes] = await Promise.all([
-                fetch('/api/employees'),
-                fetch('/api/stats')
+                fetch('/api/employees'), // trabajo del backend
+                fetch('/api/stats') // trabajo del backend
             ]);
             const [employeesData, statsData] = await Promise.all([
                 employeesRes.json(),
@@ -33,7 +33,7 @@ export function useEmployeeData() {
 
     const refreshStats = useCallback(async () => {
         try {
-            const res = await fetch('/api/stats');
+            const res = await fetch('/api/stats'); // trabajo del backend
             const statsData = await res.json();
             setStats(statsData);
         } catch (error) {
@@ -47,7 +47,7 @@ export function useEmployeeData() {
 
     const addEmployee = useCallback(async (employee: Omit<Empleado, '_id' | 'createdAt'>) => {
         try {
-            const res = await fetch('/api/employees', {
+            const res = await fetch('/api/employees', {  // trabajo del backend
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(employee),
@@ -64,7 +64,7 @@ export function useEmployeeData() {
 
     const updateEmployee = useCallback(async (employee: Empleado) => {
         try {
-            const res = await fetch(`/api/employees/${employee._id}`, {
+            const res = await fetch(`/api/employees/${employee._id}`, {     // trabajo del backend
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(employee),
@@ -87,7 +87,7 @@ export function useEmployeeData() {
 
     const deleteEmployee = useCallback(async (id: string) => {
         try {
-            await fetch(`/api/employees/${id}`, { method: 'DELETE' });
+            await fetch(`/api/employees/${id}`, { method: 'DELETE' });      // trabajo del backend
             setEmployees(prev => prev.filter(emp => emp._id !== id));
             await refreshStats();
         } catch (error) {

@@ -26,11 +26,9 @@ export default function PersonalPage() {
     } = useEmployeeData();
 
     const handleSubmitEmployee = async (employee: Omit<Empleado, '_id' | 'createdAt'> | Empleado) => {
-        console.log('Enviando:', employee);
         try {
             if (editingEmployee) {
                 const employeeToUpdate = employee as Empleado;
-                console.log('Actualizando ID:', employeeToUpdate._id);
                 await updateEmployee(employeeToUpdate);
             } else {
                 await addEmployee(employee as Omit<Empleado, '_id' | 'createdAt'>);
@@ -49,7 +47,6 @@ export default function PersonalPage() {
     };
 
     const handleEditEmployee = (employee: Empleado) => {
-        console.log('Editando empleado:', employee._id);
         setEditingEmployee(employee);
         setIsModalOpen(true);
     };
