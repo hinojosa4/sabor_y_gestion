@@ -1,22 +1,212 @@
 "use client";
 
-import { useState } from "react";
+import React, { useState } from "react";
 import { useRouter } from "next/navigation";
+import { SelectRole } from "@/components/UI/SelectRole";
+import { 
+  UtensilsCrossed, 
+  ChefHat, 
+  Users, 
+  CreditCard, 
+  Briefcase,
+  ArrowRight,
+} from 'lucide-react';
+
+const containerStyle = {
+  width: '3rem',           
+  height: '3rem',          
+  backgroundColor: '#ea580c', 
+  borderRadius: '1rem',    
+  display: 'flex',         
+  alignItems: 'center',    
+  justifyContent: 'center',
+  boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -4px rgba(0, 0, 0, 0.1)'
+}
 
 export default function LoginPage() {
-  
+  const router = useRouter();
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [rol, setRol] = useState("");
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [selectedRole, setSelectedRole] = useState(false)
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError("");
+
+    if (!email || !password || !rol) {
+      setError("Completa todos los campos.");
+      return;
+    }
+
+    setLoading(true);
+
+    try {
+      const res = await fetch("/api/auth/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, password }),
+      });
+
+      const data = await res.json();
+
+      if (!res.ok || !data.ok) {
+        setError(data.message || "Credenciales incorrectas.");
+        return;
+      }
+
+      localStorage.setItem("token", data.token);
+      localStorage.setItem("user", JSON.stringify(data.user));
+
+      const routes: Record<string, string> = {
+        admin: "/dashboard",
+        cajero: "/dashboard/cajero",
+        cocinero: "/dashboard/cocinero",
+        mesero: "/dashboard/mesero",
+      };
+
+      router.push(routes[data.user.rol] ?? "/dashboard");
+    } catch {
+      setError("Error de conexión. Intenta de nuevo.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleBackButton = () => {
+    setSelectedRole(false);
+    setError("")
+  }
+
   return (
-    <div>
-      <div>
-        <h1> RestaurantHub </h1>
-        <span> Sistema de Gestión Profesional para Restaurantes </span>
+    <div className="flex flex-col" style={{display: "flex", alignItems: "center", minHeight: "100vh", padding: "1rem" }}>
+      
+      <div style={{alignItems: "start",width: "100%", maxWidth: "100%", textAlign: "center", marginBottom: "2rem"}}>
+        <div className="flex flex-col items-center justify-center">
+          <div style={containerStyle}>
+            <UtensilsCrossed className="size-6 md:size-8 text-white" />
+          </div>
+          <h1 style={{fontSize: "2.5rem"}} > RestaurantHub </h1>
+          <span className="opacity-[50%]"> Sistema de Gestión Profesional para Restaurantes </span>
+        </div>
+        {  !selectedRole && <h2 className="mb-[5px] mt-[50px]"> Selecciona tu tipo de acceso </h2>}
       </div>
-      <div>
-        <h2> Selecciona tu tipo de acceso </h2>
-      </div>
-      <div>
-        
-      </div>
+
+      {
+        !selectedRole ? (
+          <SelectRole setSelectedRole={setSelectedRole} setSelectedRoleButton={setRol}/>
+        ) : (
+          <div className="flex flex-col justify-center items-center" style={{ width: "100%", maxWidth: "380px", border: "1px solid #e5e5e5", borderRadius: "12px", padding: "2rem", background: "#fff", boxShadow: "0 4px 12px rgba(0, 0, 0, 0.1)" }}>
+            
+            {rol === "Admin" && (
+              <div className="flex flex-col justify-center items-center gap-[18]">
+                <div className="flex items-center rounded-full p-[12px]" style={{backgroundColor: " #F5F5F5"}}>
+                  <Briefcase size={50} style={{color: "#8E24AA"}}/>
+                </div>
+                <span> {rol} </span>
+              </div>
+            )}
+            {rol === "Cajero" && (
+              <div className="flex flex-col justify-center items-center gap-[18]">
+                <div className="flex items-center rounded-full p-[12px]" style={{backgroundColor: " #F5F5F5"}}>
+                  <CreditCard size={50} style={{color: "#FB8C00"}}/>
+                </div>
+                <span> {rol} </span>
+              </div>
+            )}
+            {rol === "Cocinero" && (
+              <div className="flex flex-col justify-center items-center gap-[18]">
+                <div className="flex items-center rounded-full p-[12px]" style={{backgroundColor: " #F5F5F5"}}>
+                  <ChefHat size={50} style={{color: "#1E88E5"}}/>
+                </div>
+                <span> {rol} </span>
+              </div>
+            )}
+            {rol === "Mesero" && (
+              <div className="flex flex-col justify-center items-center gap-[18]">
+                <div className="flex items-center rounded-full p-[12px]" style={{backgroundColor: " #F5F5F5"}}>
+                  <Users size={50} style={{color: "#43A047"}}/>
+                </div>
+                <span> {rol} </span>
+              </div>
+            )}
+
+
+            <p style={{ fontSize: "13px", color: "#888", marginBottom: "1.5rem" }}>
+              Sabor &amp; Gestión — Ingresa tus credenciales para continuar
+            </p>
+
+
+            <form onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
+
+              <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
+                <label htmlFor="email" style={{ fontSize: "13px", color: "#555" }}>Correo electrónico</label>
+                <input
+                  id="email"
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder="usuario@restaurante.com"
+                  style={{ padding: "10px 12px", border: "1px solid #ddd", borderRadius: "8px", fontSize: "14px", outline: "none" }}
+                />
+              </div>
+
+              <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
+                <label htmlFor="password" style={{ fontSize: "13px", color: "#555" }}>Contraseña</label>
+                <input
+                  id="password"
+                  type="password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder="••••••••"
+                  style={{ padding: "10px 12px", border: "1px solid #ddd", borderRadius: "8px", fontSize: "14px", outline: "none" }}
+                />
+              </div>
+
+              {/* aqui estaba el menu desplegable para elgir el rol */}
+              {/*<div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
+                <label htmlFor="rol" style={{ fontSize: "13px", color: "#555" }}>Rol</label>
+                <select
+                  id="rol"
+                  value={rol}
+                  onChange={(e) => setRol(e.target.value)}
+                  style={{ padding: "10px 12px", border: "1px solid #ddd", borderRadius: "8px", fontSize: "14px", background: "#fff", outline: "none" }}
+                >
+                  <option value="" disabled>{rol}</option>
+                  <option value="admin">Admin</option>
+                  <option value="cajero">Cajero</option>
+                  <option value="cocinero">Cocinero</option>
+                  <option value="mesero">Mesero</option>
+                </select>
+              </div>*/}
+
+              {error && (
+                <p style={{ fontSize: "13px", color: "#c0392b", background: "#fdf0f0", padding: "10px 12px", borderRadius: "8px", margin: 0 }}>
+                  {error}
+                </p>
+              )}
+
+              <button
+                type="submit"
+                disabled={loading}
+                style={{ padding: "11px", background: "#111", color: "#fff", border: "none", borderRadius: "8px", fontSize: "14px", cursor: loading ? "not-allowed" : "pointer", opacity: loading ? 0.6 : 1, marginTop: "4px" }}
+              >
+                {loading ? "Iniciando sesión..." : "Iniciar sesión"}
+              </button>
+              <button
+                style={{ padding: "11px", background: "#111", color: "#fff", border: "none", borderRadius: "8px", fontSize: "14px", cursor: loading ? "not-allowed" : "pointer", opacity: loading ? 0.6 : 1, marginTop: "4px" }}
+                onClick={handleBackButton}
+              >
+                Volver
+              </button>
+
+            </form>
+        </div>
+        )
+      }
+      
     </div>
-  )
+  );
 }
