@@ -1,5 +1,10 @@
+## git  Arquitectura del Proyecto
+
 El proyecto sigue una arquitectura modular y escalable, separando la lógica de negocio de la interfaz de usuario y las configuraciones del servidor.
 
+## 📁 Estructura
+
+```bash
 src/
 ├─ app/                 # El corazón de Next.js (App Router)
 │  ├─ api/              # Endpoints del Backend (Serverless Functions)
@@ -41,6 +46,7 @@ src/
 └─ tests/               # Suite de pruebas
    ├─ unit/             # Pruebas de funciones aisladas
    └─ integration/      # Pruebas de flujo completo
+
 This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
 
 ## Getting Started
