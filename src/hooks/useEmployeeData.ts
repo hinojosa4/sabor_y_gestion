@@ -1,8 +1,8 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
-import { Empleado } from '../types/empleado';
+import { Employee } from '../types/employee';
 
 export function useEmployeeData() {
-    const [employees, setEmployees] = useState<Empleado[]>([]);
+    const [employees, setEmployees] = useState<Employee[]>([]);
     const [searchQuery, setSearchQuery] = useState('');
     const [stats, setStats] = useState({
         total: 0,
@@ -12,59 +12,61 @@ export function useEmployeeData() {
     });
     const [loading, setLoading] = useState(true);
 
+    const calculateStats = useCallback((emps: Employee[]) => {
+        const active = emps.filter(emp => emp.employmentDetails?.status === 'Activo').length;
+        const onVacation = emps.filter(emp => emp.employmentDetails?.status === 'Vacaciones').length;
+        const monthlyPayroll = emps.reduce((sum, emp) => sum + (emp.employmentDetails?.salary || 0), 0);
+        
+        setStats({
+            total: emps.length,
+            active,
+            onVacation,
+            monthlyPayroll
+        });
+    }, []);
+
     const loadData = useCallback(async () => {
         try {
-            const [employeesRes, statsRes] = await Promise.all([
-                fetch('/api/employees'), // trabajo del backend
-                fetch('/api/stats') // trabajo del backend
-            ]);
-            const [employeesData, statsData] = await Promise.all([
-                employeesRes.json(),
-                statsRes.json()
-            ]);
+            const employeesRes = await fetch('/api/users');
+            const employeesData = await employeesRes.json();
             setEmployees(employeesData);
-            setStats(statsData);
+            calculateStats(employeesData);
         } catch (error) {
             console.error('Error:', error);
         } finally {
             setLoading(false);
         }
-    }, []);
-
-    const refreshStats = useCallback(async () => {
-        try {
-            const res = await fetch('/api/stats'); // trabajo del backend
-            const statsData = await res.json();
-            setStats(statsData);
-        } catch (error) {
-            console.error('Error al recargar stats:', error);
-        }
-    }, []);
+    }, [calculateStats]);
 
     useEffect(() => {
         loadData();
     }, [loadData]);
 
-    const addEmployee = useCallback(async (employee: Omit<Empleado, '_id' | 'createdAt'>) => {
+    const addEmployee = useCallback(async (employee: Omit<Employee, '_id' | 'createdAt' | 'updatedAt'>) => {
         try {
-            const res = await fetch('/api/employees', {  // trabajo del backend
+            const res = await fetch('/api/users', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(employee),
             });
             const newEmployee = await res.json();
-            setEmployees(prev => [...prev, newEmployee]);
-            await refreshStats();
+            
+            setEmployees(prev => {
+                const updated = [...prev, newEmployee];
+                calculateStats(updated);
+                return updated;
+            });
+            
             return newEmployee;
         } catch (error) {
             console.error('Error:', error);
             throw error;
         }
-    }, [refreshStats]);
+    }, [calculateStats]);
 
-    const updateEmployee = useCallback(async (employee: Empleado) => {
+    const updateEmployee = useCallback(async (employee: Employee) => {
         try {
-            const res = await fetch(`/api/employees/${employee._id}`, {     // trabajo del backend
+            const res = await fetch(`/api/users/${employee._id}`, {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(employee),
@@ -76,25 +78,34 @@ export function useEmployeeData() {
             }
 
             const updated = await res.json();
-            setEmployees(prev => prev.map(emp => emp._id === updated._id ? updated : emp));
-            await refreshStats();
+            
+            setEmployees(prev => {
+                const updatedList = prev.map(emp => emp._id === updated._id ? updated : emp);
+                calculateStats(updatedList);
+                return updatedList;
+            });
+            
             return updated;
         } catch (error) {
             console.error('Error:', error);
             throw error;
         }
-    }, [refreshStats]);
+    }, [calculateStats]);
 
     const deleteEmployee = useCallback(async (id: string) => {
         try {
-            await fetch(`/api/employees/${id}`, { method: 'DELETE' });      // trabajo del backend
-            setEmployees(prev => prev.filter(emp => emp._id !== id));
-            await refreshStats();
+            await fetch(`/api/users/${id}`, { method: 'DELETE' });
+            
+            setEmployees(prev => {
+                const updated = prev.filter(emp => emp._id !== id);
+                calculateStats(updated);
+                return updated;
+            });
         } catch (error) {
             console.error('Error:', error);
             throw error;
         }
-    }, [refreshStats]);
+    }, [calculateStats]);
 
     const filteredEmployees = useMemo(() => {
         if (!searchQuery.trim()) return employees;
@@ -103,7 +114,8 @@ export function useEmployeeData() {
             emp =>
                 emp.name.toLowerCase().includes(query) ||
                 emp.role.toLowerCase().includes(query) ||
-                emp.email.toLowerCase().includes(query)
+                emp.email.toLowerCase().includes(query) ||
+                emp.employmentDetails?.phone?.toLowerCase().includes(query)
         );
     }, [employees, searchQuery]);
 

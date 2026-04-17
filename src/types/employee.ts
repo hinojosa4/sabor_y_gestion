@@ -1,21 +1,27 @@
 export type EmployeeStatus = 'Activo' | 'Vacaciones' | 'Inactivo';
 export type WorkShift = 'Turno Mañana' | 'Turno Tarde' | 'Turno Completo';
-export type Role = 'Mesero' | 'Chef' | 'Cajero' | 'Ayudante de Cocina' | 'Barista';
+export type Role = 'admin' | 'manager' | 'waiter' | 'chef' | 'driver';
 
-export interface Empleado {
+export interface Employee {
   _id: string;
+  restaurantId: string;
   name: string;
   email: string;
-  phone: string;
+  password_hash: string;
   role: Role;
-  status: EmployeeStatus;
-  shift: WorkShift;
-  startDate: string;
-  salary: number;
-  createdAt?: Date;
+  isActive: boolean;
+  employmentDetails: {
+    phone: string;
+    shift: WorkShift;
+    startDate: string;
+    salary: number;
+    status: EmployeeStatus;
+  };
+  createdAt: Date;
+  updatedAt: Date;
 }
 
-export interface PersonalStats {
+export interface EmployeeStats {
   total: number;
   active: number;
   onVacation: number;
@@ -28,11 +34,11 @@ export interface ApiResponse<T> {
 }
 
 export const roleColors: Record<Role, { bg: string; text: string }> = {
-  'Mesero': { bg: 'bg-blue-100', text: 'text-blue-700' },
-  'Chef': { bg: 'bg-orange-100', text: 'text-orange-700' },
-  'Cajero': { bg: 'bg-green-100', text: 'text-green-700' },
-  'Ayudante de Cocina': { bg: 'bg-yellow-100', text: 'text-yellow-700' },
-  'Barista': { bg: 'bg-purple-100', text: 'text-purple-700' },
+  'admin': { bg: 'bg-red-100', text: 'text-red-700' },
+  'manager': { bg: 'bg-purple-100', text: 'text-purple-700' },
+  'waiter': { bg: 'bg-blue-100', text: 'text-blue-700' },
+  'chef': { bg: 'bg-orange-100', text: 'text-orange-700' },
+  'driver': { bg: 'bg-green-100', text: 'text-green-700' },
 };
 
 export const statusColors: Record<EmployeeStatus, { bg: string; text: string }> = {

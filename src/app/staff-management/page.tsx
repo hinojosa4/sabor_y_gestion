@@ -1,17 +1,17 @@
 "use client";
 import { Button } from '../../components/ui/Button';
-import { Empleado } from '../../types/empleado';
 import { Input } from '../../components/ui/Input';
 import { EmployeeCard } from '../../components/EmployeeCard';
 import { EmployeeForm } from '../../components/EmployeeForm';
-import { useState } from "react";
 import { Users, Plus, Search, ArrowLeft } from 'lucide-react';
-import { useEmployeeData } from '@/hooks/useEmployeeData';
+import { useState } from "react";
 import Link from 'next/link';
+import { useEmployeeData } from '@/hooks/useEmployeeData';
+import { Employee } from '../../types/employee';
 
-export default function PersonalPage() {
+export default function StaffManagementPage() {
     const [isModalOpen, setIsModalOpen] = useState(false);
-    const [editingEmployee, setEditingEmployee] = useState<Empleado | null>(null);
+    const [editingEmployee, setEditingEmployee] = useState<Employee | null>(null);
     const [activeTab, setActiveTab] = useState('staff');
 
     const {
@@ -25,13 +25,22 @@ export default function PersonalPage() {
         deleteEmployee
     } = useEmployeeData();
 
-    const handleSubmitEmployee = async (employee: Omit<Empleado, '_id' | 'createdAt'> | Empleado) => {
+    const restaurantId = "69e170e941daf8c2b2f76677"; // Obtener del usuario logueado
+
+    const handleSubmitEmployee = async (employee: Omit<Employee, '_id' | 'createdAt' | 'updatedAt'> | Employee) => {
+        console.log('Enviando:', employee);
         try {
             if (editingEmployee) {
-                const employeeToUpdate = employee as Empleado;
+                const employeeToUpdate = employee as Employee;
+                console.log('Actualizando ID:', employeeToUpdate._id);
                 await updateEmployee(employeeToUpdate);
             } else {
-                await addEmployee(employee as Omit<Empleado, '_id' | 'createdAt'>);
+                const newEmployee = employee as Omit<Employee, '_id' | 'createdAt' | 'updatedAt'>;
+                if (!newEmployee.restaurantId) {
+                    console.error('restaurantId faltante');
+                    return;
+                }
+                await addEmployee(newEmployee);
             }
             setIsModalOpen(false);
             setEditingEmployee(null);
@@ -46,7 +55,8 @@ export default function PersonalPage() {
         }
     };
 
-    const handleEditEmployee = (employee: Empleado) => {
+    const handleEditEmployee = (employee: Employee) => {
+        console.log('Editando empleado:', employee._id);
         setEditingEmployee(employee);
         setIsModalOpen(true);
     };
@@ -60,8 +70,7 @@ export default function PersonalPage() {
     }
 
     return (
-        <div className="min-h-screen bg-gray-50"
-            style={{ zoom: 1.25 }}>
+        <div className="min-h-screen bg-gray-50" style={{ zoom: 1.25 }}>
             <header className="bg-white border-b border-gray-200 sticky top-0 z-10">
                 <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3 md:py-4">
                     <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
@@ -94,6 +103,7 @@ export default function PersonalPage() {
             </header>
 
             <main className="max-w-7xl mx-auto px-3 sm:px-4 lg:px-6 py-3 md:py-5">
+                {/* Stats Cards */}
                 <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-6 mb-6 md:mb-8">
                     <div className="rounded-xl border border-gray-200 bg-white shadow">
                         <div className="p-6">
@@ -121,6 +131,7 @@ export default function PersonalPage() {
                     </div>
                 </div>
 
+                {/* Tabs */}
                 <div className="bg-gray-100 h-9 items-center justify-center rounded-xl p-[3px] grid w-full grid-cols-2 mb-4 md:mb-6">
                     <button
                         onClick={() => setActiveTab('staff')}
@@ -142,6 +153,7 @@ export default function PersonalPage() {
                     </button>
                 </div>
 
+                {/* Contenido Personal */}
                 {activeTab === 'staff' && (
                     <>
                         <div className="mb-4 md:mb-6">
@@ -151,7 +163,7 @@ export default function PersonalPage() {
                                     placeholder="Buscar por nombre, rol o email..."
                                     value={searchQuery}
                                     onChange={(e) => setSearchQuery(e.target.value)}
-                                    className="pl-10 text-black font-ligth"
+                                    className="pl-10 text-black font-light"
                                 />
                             </div>
                         </div>
@@ -175,6 +187,7 @@ export default function PersonalPage() {
                     </>
                 )}
 
+                {/* Contenido Horarios */}
                 {activeTab === 'schedule' && (
                     <div className="text-center py-12">
                         <p className="text-gray-500">Vista de horarios en desarrollo</p>
@@ -190,6 +203,7 @@ export default function PersonalPage() {
                 }}
                 onSubmit={handleSubmitEmployee}
                 employee={editingEmployee}
+                restaurantId={restaurantId}
             />
         </div>
     );
