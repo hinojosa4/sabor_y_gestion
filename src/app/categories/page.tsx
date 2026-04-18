@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 
 interface ICategory {
   _id: string;
@@ -74,6 +75,8 @@ const inputStyle: React.CSSProperties = {
 
 // ─── Page principal ───────────────────────────────────────────────────────────
 export default function CategoriesPage() {
+  const router = useRouter();
+
   const [categories, setCategories] = useState<ICategory[]>([]);
   const [dishes, setDishes] = useState<IDish[]>([]);
   const [loading, setLoading] = useState(true);
@@ -86,26 +89,13 @@ export default function CategoriesPage() {
 
   const [catForm, setCatForm] = useState({ nombre: "", descripcion: "", activo: true });
 
-  // Modal nuevo plato
-  const [showDishModal, setShowDishModal] = useState(false);
-  const [dishForm, setDishForm] = useState({
-    name: "", description: "", price: "", isAvailable: true, category_id: "", ingredients: [] as string[],
-  });
-  const [newIngredient, setNewIngredient] = useState("");
-
   // Modal asignar
   const [showAssignModal, setShowAssignModal] = useState(false);
   const [assignTargetCategory, setAssignTargetCategory] = useState<ICategory | null>(null);
 
-  // Modal detalle plato
+  // Modal detalle plato (solo vista)
   const [selectedDish, setSelectedDish] = useState<IDish | null>(null);
   const [showDishDetail, setShowDishDetail] = useState(false);
-  const [detailForm, setDetailForm] = useState<{
-    name: string; description: string; price: string;
-    isAvailable: boolean; category_id: string; ingredients: string[];
-  }>({ name: "", description: "", price: "", isAvailable: true, category_id: "", ingredients: [] });
-  const [detailNewIngredient, setDetailNewIngredient] = useState("");
-  const [detailEditing, setDetailEditing] = useState(false);
 
   // ── fetch ──────────────────────────────────────────────────────────────────
   const fetchData = async () => {
@@ -194,98 +184,7 @@ export default function CategoriesPage() {
     } catch { setError("Error al eliminar"); }
   };
 
-  // ── plato crear ────────────────────────────────────────────────────────────
-  const openDishModal = () => {
-    setDishForm({ name: "", description: "", price: "", isAvailable: true, category_id: "", ingredients: [] });
-    setNewIngredient("");
-    setShowDishModal(true);
-    setError("");
-  };
-
-  const closeDishModal = () => { setShowDishModal(false); setError(""); };
-
-  const handleCreateDish = async () => {
-    if (!dishForm.name.trim()) { setError("El nombre es obligatorio"); return; }
-    if (!dishForm.price || Number(dishForm.price) < 0) { setError("El precio es obligatorio"); return; }
-    setError("");
-    try {
-      const res = await fetch(`${API}/dishes`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          name: dishForm.name.trim(),
-          description: dishForm.description.trim(),
-          price: Number(dishForm.price),
-          isAvailable: dishForm.isAvailable,
-          category_id: dishForm.category_id || null,
-          ingredients: dishForm.ingredients,
-        }),
-      });
-      const data = await res.json();
-      if (!data.ok) { setError(data.message); return; }
-      showSuccess("Plato creado correctamente");
-      closeDishModal();
-      fetchData();
-    } catch { setError("Error al crear el plato"); }
-  };
-
-  // ── plato detalle / editar ─────────────────────────────────────────────────
-  const openDishDetail = (dish: IDish) => {
-    setSelectedDish(dish);
-    setDetailForm({
-      name: dish.name,
-      description: dish.description || "",
-      price: String(dish.price),
-      isAvailable: dish.isAvailable,
-      category_id: getCatId(dish) || "",
-      ingredients: dish.ingredients || [],
-    });
-    setDetailNewIngredient("");
-    setDetailEditing(false);
-    setShowDishDetail(true);
-    setError("");
-  };
-
-  const closeDishDetail = () => { setShowDishDetail(false); setSelectedDish(null); setError(""); setDetailEditing(false); };
-
-  const handleSaveDish = async () => {
-    if (!selectedDish) return;
-    if (!detailForm.name.trim()) { setError("El nombre es obligatorio"); return; }
-    if (!detailForm.price || Number(detailForm.price) < 0) { setError("El precio no puede ser negativo"); return; }
-    setError("");
-    try {
-      const res = await fetch(`${API}/dishes/${selectedDish._id}`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          name: detailForm.name.trim(),
-          description: detailForm.description.trim(),
-          price: Number(detailForm.price),
-          isAvailable: detailForm.isAvailable,
-          category_id: detailForm.category_id || null,
-          ingredients: detailForm.ingredients,
-        }),
-      });
-      const data = await res.json();
-      if (!data.ok) { setError(data.message); return; }
-      showSuccess("Plato actualizado");
-      closeDishDetail();
-      fetchData();
-    } catch { setError("Error al guardar"); }
-  };
-
-  const handleDeleteDish = async (id: string) => {
-    try {
-      const res = await fetch(`${API}/dishes/${id}`, { method: "DELETE" });
-      const data = await res.json();
-      if (!data.ok) { setError(data.message); return; }
-      showSuccess("Plato eliminado");
-      closeDishDetail();
-      fetchData();
-    } catch { setError("Error al eliminar"); }
-  };
-
-  // ── asignar plato ──────────────────────────────────────────────────────────
+  // ── asignar plato a categoría ──────────────────────────────────────────────
   const openAssignModal = (cat: ICategory) => {
     setAssignTargetCategory(cat);
     setShowAssignModal(true);
@@ -338,7 +237,8 @@ export default function CategoriesPage() {
           </div>
         </div>
         <div style={{ display: "flex", gap: 10 }}>
-          <Btn variant="secondary" onClick={openDishModal}>🍴 Nuevo Plato</Btn>
+          {/* ← Navega a /dishes */}
+          <Btn variant="secondary" onClick={() => router.push("/dishes")}>🍴 Gestión de Platos</Btn>
           <Btn variant="primary" onClick={openCreateCat}>+ Nueva Categoría</Btn>
         </div>
       </div>
@@ -354,7 +254,7 @@ export default function CategoriesPage() {
       )}
 
       {/* Error global */}
-      {error && !showCatModal && !showDishModal && !showAssignModal && !showDishDetail && (
+      {error && !showCatModal && !showAssignModal && !showDishDetail && (
         <div style={{
           margin: "16px 40px 0", background: "#fff0ee", border: "1px solid #e85d26",
           borderRadius: 10, padding: "11px 18px", color: "#c0392b", fontSize: 13,
@@ -439,7 +339,7 @@ export default function CategoriesPage() {
                         </p>
                       </div>
                     </div>
-                    <div style={{ display: "flex", gap: 8, flexWrap: "wrap", justifyContent: "flex-end" }}>
+                    <div style={{ display: "flex", gap: 8 }}>
                       <Btn variant="secondary" small onClick={() => openAssignModal(cat)}>＋ Asignar plato</Btn>
                       <Btn variant="secondary" small onClick={() => openEditCat(cat)}>✏️ Editar</Btn>
                       <Btn variant="danger" small onClick={() => { setError(""); setShowDeleteConfirm(cat._id); }}>🗑️</Btn>
@@ -450,7 +350,12 @@ export default function CategoriesPage() {
                     <div style={{ padding: "14px 24px 18px", background: "#fafafa" }}>
                       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))", gap: 12 }}>
                         {catDishes.map((dish) => (
-                          <DishCard key={dish._id} dish={dish} onClick={() => openDishDetail(dish)} onRemove={() => handleAssignDish(dish._id, null)} />
+                          <DishCard
+                            key={dish._id}
+                            dish={dish}
+                            onClick={() => { setSelectedDish(dish); setShowDishDetail(true); }}
+                            onRemove={() => handleAssignDish(dish._id, null)}
+                          />
                         ))}
                       </div>
                     </div>
@@ -464,7 +369,7 @@ export default function CategoriesPage() {
               <div style={{ background: "#fff", borderRadius: 16, border: "2px dashed #ccc", overflow: "hidden" }}>
                 <div style={{
                   padding: "18px 24px",
-                  display: "flex", alignItems: "center", justifyContent: "space-between",
+                  display: "flex", alignItems: "center",
                   borderBottom: "1.5px solid #f0f0f0",
                 }}>
                   <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
@@ -475,7 +380,7 @@ export default function CategoriesPage() {
                     <div>
                       <h2 style={{ margin: 0, fontSize: 17, fontWeight: 700, color: "#888" }}>Sin categoría</h2>
                       <p style={{ margin: "3px 0 0", fontSize: 12, color: "#aaa" }}>
-                        {uncategorizedDishes.length} plato{uncategorizedDishes.length !== 1 ? "s" : ""} sin asignar · Haz click en un plato para editarlo y asignarlo
+                        {uncategorizedDishes.length} plato{uncategorizedDishes.length !== 1 ? "s" : ""} sin asignar · Usa el selector para asignarlos o haz click para ver detalles
                       </p>
                     </div>
                   </div>
@@ -486,7 +391,7 @@ export default function CategoriesPage() {
                       <DishCard
                         key={dish._id}
                         dish={dish}
-                        onClick={() => openDishDetail(dish)}
+                        onClick={() => { setSelectedDish(dish); setShowDishDetail(true); }}
                         categories={categories}
                         onAssign={(catId) => handleAssignDish(dish._id, catId)}
                       />
@@ -524,74 +429,6 @@ export default function CategoriesPage() {
             <Btn variant="primary" onClick={handleCatSubmit}>
               {catModalMode === "create" ? "Crear Categoría" : "Guardar Cambios"}
             </Btn>
-          </div>
-        </Modal>
-      )}
-
-      {/* ── Modal nuevo plato ── */}
-      {showDishModal && (
-        <Modal title="Nuevo Plato" onClose={closeDishModal}>
-          {error && <ErrorBox msg={error} />}
-          <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-            <Field label="Nombre *">
-              <input value={dishForm.name} onChange={(e) => setDishForm({ ...dishForm, name: e.target.value })}
-                placeholder="Ej: Lomo Saltado" style={inputStyle} />
-            </Field>
-            <Field label="Descripción">
-              <textarea value={dishForm.description} onChange={(e) => setDishForm({ ...dishForm, description: e.target.value })}
-                placeholder="Ingredientes o descripción..." rows={2} style={{ ...inputStyle, resize: "none" }} />
-            </Field>
-            <Field label="Precio (Bs.) *">
-              <input type="number" min={0} value={dishForm.price}
-                onChange={(e) => setDishForm({ ...dishForm, price: e.target.value })}
-                placeholder="0.00" style={inputStyle} />
-            </Field>
-            <Field label="Categoría (opcional)">
-              <select value={dishForm.category_id}
-                onChange={(e) => setDishForm({ ...dishForm, category_id: e.target.value })}
-                style={{ ...inputStyle, background: "#fff" }}>
-                <option value="">Sin categoría</option>
-                {categories.map((cat) => (
-                  <option key={cat._id} value={cat._id}>{cat.nombre}</option>
-                ))}
-              </select>
-            </Field>
-            <Field label="Ingredientes">
-              <div style={{ display: "flex", gap: 8, marginBottom: 8 }}>
-                <input value={newIngredient}
-                  onChange={(e) => setNewIngredient(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter" && newIngredient.trim()) {
-                      setDishForm({ ...dishForm, ingredients: [...dishForm.ingredients, newIngredient.trim()] });
-                      setNewIngredient("");
-                    }
-                  }}
-                  placeholder="Escribe y presiona Enter..." style={{ ...inputStyle }} />
-                <button onClick={() => {
-                  if (newIngredient.trim()) {
-                    setDishForm({ ...dishForm, ingredients: [...dishForm.ingredients, newIngredient.trim()] });
-                    setNewIngredient("");
-                  }
-                }} style={{
-                  background: "#e85d26", color: "#fff", border: "none",
-                  borderRadius: 9, padding: "0 16px", fontSize: 18, cursor: "pointer",
-                }}>+</button>
-              </div>
-              <IngredientTags
-                ingredients={dishForm.ingredients}
-                onRemove={(i) => setDishForm({ ...dishForm, ingredients: dishForm.ingredients.filter((_, idx) => idx !== i) })}
-              />
-            </Field>
-            <label style={{ display: "flex", alignItems: "center", gap: 10, cursor: "pointer", fontSize: 14, color: "#333" }}>
-              <input type="checkbox" checked={dishForm.isAvailable}
-                onChange={(e) => setDishForm({ ...dishForm, isAvailable: e.target.checked })}
-                style={{ width: 17, height: 17 }} />
-              Disponible
-            </label>
-          </div>
-          <div style={{ display: "flex", gap: 10, marginTop: 24 }}>
-            <Btn variant="ghost" onClick={closeDishModal}>Cancelar</Btn>
-            <Btn variant="orange" onClick={handleCreateDish}>Crear Plato</Btn>
           </div>
         </Modal>
       )}
@@ -634,131 +471,71 @@ export default function CategoriesPage() {
         </Modal>
       )}
 
-      {/* ── Modal detalle / editar plato ── */}
+      {/* ── Modal detalle plato (solo vista) ── */}
       {showDishDetail && selectedDish && (
-        <Modal title="" onClose={closeDishDetail} wide>
-          {error && <ErrorBox msg={error} />}
-
-          {/* Cabecera del modal */}
+        <Modal title="" onClose={() => { setShowDishDetail(false); setSelectedDish(null); }} wide>
+          {/* Cabecera */}
           <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", marginBottom: 20 }}>
             <div>
-              <h2 style={{ margin: 0, fontSize: 20, fontWeight: 700, color: "#1a1a1a" }}>
-                {detailEditing ? "Editar Plato" : selectedDish.name}
-              </h2>
-              {!detailEditing && (
-                <p style={{ margin: "4px 0 0", fontSize: 13, color: "#888" }}>
-                  {typeof selectedDish.category_id === "object" && selectedDish.category_id
-                    ? selectedDish.category_id.nombre
-                    : "Sin categoría"}
-                </p>
-              )}
+              <h2 style={{ margin: 0, fontSize: 20, fontWeight: 700, color: "#1a1a1a" }}>{selectedDish.name}</h2>
+              <p style={{ margin: "4px 0 0", fontSize: 13, color: "#888" }}>
+                {typeof selectedDish.category_id === "object" && selectedDish.category_id
+                  ? selectedDish.category_id.nombre
+                  : "Sin categoría"}
+              </p>
             </div>
-            {!detailEditing && (
-              <div style={{ display: "flex", gap: 8 }}>
-                <Btn variant="secondary" small onClick={() => setDetailEditing(true)}>✏️ Editar</Btn>
-                <Btn variant="danger" small onClick={() => handleDeleteDish(selectedDish._id)}>🗑️ Eliminar</Btn>
-              </div>
-            )}
+            {/* Sin botones de editar/eliminar */}
           </div>
 
-          {detailEditing ? (
-            /* ── Modo edición ── */
-            <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-              <Field label="Nombre *">
-                <input value={detailForm.name} onChange={(e) => setDetailForm({ ...detailForm, name: e.target.value })}
-                  style={inputStyle} />
-              </Field>
-              <Field label="Descripción">
-                <textarea value={detailForm.description} onChange={(e) => setDetailForm({ ...detailForm, description: e.target.value })}
-                  rows={2} style={{ ...inputStyle, resize: "none" }} />
-              </Field>
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-                <Field label="Precio (Bs.) *">
-                  <input type="number" min={0} value={detailForm.price}
-                    onChange={(e) => setDetailForm({ ...detailForm, price: e.target.value })}
-                    style={inputStyle} />
-                </Field>
-                <Field label="Categoría (opcional)">
-                  <select value={detailForm.category_id}
-                    onChange={(e) => setDetailForm({ ...detailForm, category_id: e.target.value })}
-                    style={{ ...inputStyle, background: "#fff" }}>
-                    <option value="">Sin categoría</option>
-                    {categories.map((cat) => (
-                      <option key={cat._id} value={cat._id}>{cat.nombre}</option>
-                    ))}
-                  </select>
-                </Field>
-              </div>
-              <Field label="Ingredientes">
-                <div style={{ display: "flex", gap: 8, marginBottom: 8 }}>
-                  <input value={detailNewIngredient}
-                    onChange={(e) => setDetailNewIngredient(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter" && detailNewIngredient.trim()) {
-                        setDetailForm({ ...detailForm, ingredients: [...detailForm.ingredients, detailNewIngredient.trim()] });
-                        setDetailNewIngredient("");
-                      }
-                    }}
-                    placeholder="Escribe y presiona Enter..." style={{ ...inputStyle }} />
-                  <button onClick={() => {
-                    if (detailNewIngredient.trim()) {
-                      setDetailForm({ ...detailForm, ingredients: [...detailForm.ingredients, detailNewIngredient.trim()] });
-                      setDetailNewIngredient("");
-                    }
-                  }} style={{
-                    background: "#e85d26", color: "#fff", border: "none",
-                    borderRadius: 9, padding: "0 16px", fontSize: 18, cursor: "pointer",
-                  }}>+</button>
-                </div>
-                <IngredientTags
-                  ingredients={detailForm.ingredients}
-                  onRemove={(i) => setDetailForm({ ...detailForm, ingredients: detailForm.ingredients.filter((_, idx) => idx !== i) })}
-                />
-              </Field>
-              <label style={{ display: "flex", alignItems: "center", gap: 10, cursor: "pointer", fontSize: 14, color: "#333" }}>
-                <input type="checkbox" checked={detailForm.isAvailable}
-                  onChange={(e) => setDetailForm({ ...detailForm, isAvailable: e.target.checked })}
-                  style={{ width: 17, height: 17 }} />
-                Disponible
-              </label>
-              <div style={{ display: "flex", gap: 10, marginTop: 8 }}>
-                <Btn variant="ghost" onClick={() => { setDetailEditing(false); setError(""); }}>Cancelar</Btn>
-                <Btn variant="primary" onClick={handleSaveDish}>Guardar Cambios</Btn>
-              </div>
+          <div style={{ display: "flex", flexDirection: "column", gap: 18 }}>
+            {selectedDish.image_url && (
+              <img src={selectedDish.image_url} alt={selectedDish.name} style={{
+                width: "100%", height: 200, objectFit: "cover", borderRadius: 12,
+              }} />
+            )}
+
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
+              <InfoBlock label="Precio" value={`Bs. ${selectedDish.price.toFixed(2)}`} valueColor="#e85d26" />
+              <InfoBlock
+                label="Estado"
+                value={selectedDish.isAvailable ? "Disponible" : "No disponible"}
+                valueColor={selectedDish.isAvailable ? "#27ae60" : "#999"}
+              />
             </div>
-          ) : (
-            /* ── Modo vista ── */
-            <div style={{ display: "flex", flexDirection: "column", gap: 18 }}>
-              {selectedDish.image_url && (
-                <img src={selectedDish.image_url} alt={selectedDish.name} style={{
-                  width: "100%", height: 200, objectFit: "cover", borderRadius: 12,
-                }} />
-              )}
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
-                <InfoBlock label="Precio" value={`Bs. ${selectedDish.price.toFixed(2)}`} valueColor="#e85d26" />
-                <InfoBlock label="Estado" value={selectedDish.isAvailable ? "Disponible" : "No disponible"} valueColor={selectedDish.isAvailable ? "#27ae60" : "#999"} />
-              </div>
-              {selectedDish.description && (
-                <InfoBlock label="Descripción" value={selectedDish.description} />
-              )}
-              {selectedDish.ingredients && selectedDish.ingredients.length > 0 && (
-                <div>
-                  <p style={{ margin: "0 0 8px", fontSize: 11, fontWeight: 700, color: "#555", letterSpacing: "0.05em", textTransform: "uppercase" }}>Ingredientes</p>
-                  <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
-                    {selectedDish.ingredients.map((ing, i) => (
-                      <span key={i} style={{
-                        background: "#fff8f5", border: "1px solid #e85d26",
-                        color: "#e85d26", borderRadius: 20, padding: "4px 12px", fontSize: 12, fontWeight: 600,
-                      }}>{ing}</span>
-                    ))}
-                  </div>
+
+            {selectedDish.description && (
+              <InfoBlock label="Descripción" value={selectedDish.description} />
+            )}
+
+            {selectedDish.ingredients && selectedDish.ingredients.length > 0 && (
+              <div>
+                <p style={{ margin: "0 0 8px", fontSize: 11, fontWeight: 700, color: "#555", letterSpacing: "0.05em", textTransform: "uppercase" }}>
+                  Ingredientes
+                </p>
+                <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+                  {selectedDish.ingredients.map((ing, i) => (
+                    <span key={i} style={{
+                      background: "#fff8f5", border: "1px solid #e85d26",
+                      color: "#e85d26", borderRadius: 20, padding: "4px 12px", fontSize: 12, fontWeight: 600,
+                    }}>{ing}</span>
+                  ))}
                 </div>
-              )}
-              <div style={{ display: "flex", justifyContent: "flex-end" }}>
-                <Btn variant="ghost" onClick={closeDishDetail}>Cerrar</Btn>
               </div>
+            )}
+
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 4 }}>
+              <p style={{ margin: 0, fontSize: 12, color: "#bbb" }}>
+                Para editar este plato ve a{" "}
+                <span
+                  onClick={() => router.push("/dishes")}
+                  style={{ color: "#e85d26", cursor: "pointer", fontWeight: 600 }}
+                >
+                  Gestión de Platos
+                </span>
+              </p>
+              <Btn variant="ghost" onClick={() => { setShowDishDetail(false); setSelectedDish(null); }}>Cerrar</Btn>
             </div>
-          )}
+          </div>
         </Modal>
       )}
 
@@ -789,8 +566,7 @@ function Modal({ title, children, onClose, wide = false }: {
   return (
     <div style={{
       position: "fixed", inset: 0, background: "rgba(0,0,0,0.45)",
-      display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000,
-      padding: 20,
+      display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000, padding: 20,
     }}>
       <div style={{
         background: "#fff", borderRadius: 18, padding: "32px 36px",
@@ -823,27 +599,6 @@ function InfoBlock({ label, value, valueColor }: { label: string; value: string;
   );
 }
 
-function IngredientTags({ ingredients, onRemove }: { ingredients: string[]; onRemove: (i: number) => void }) {
-  if (ingredients.length === 0) return <p style={{ fontSize: 12, color: "#bbb", margin: 0 }}>Sin ingredientes aún</p>;
-  return (
-    <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
-      {ingredients.map((ing, i) => (
-        <span key={i} style={{
-          background: "#fff8f5", border: "1px solid #e85d26",
-          color: "#e85d26", borderRadius: 20, padding: "4px 10px",
-          fontSize: 12, fontWeight: 600, display: "flex", alignItems: "center", gap: 6,
-        }}>
-          {ing}
-          <button onClick={() => onRemove(i)} style={{
-            background: "none", border: "none", cursor: "pointer",
-            color: "#e85d26", fontSize: 13, padding: 0, lineHeight: 1,
-          }}>✕</button>
-        </span>
-      ))}
-    </div>
-  );
-}
-
 function DishCard({ dish, onClick, categories, onRemove, onAssign }: {
   dish: IDish;
   onClick: () => void;
@@ -857,9 +612,7 @@ function DishCard({ dish, onClick, categories, onRemove, onAssign }: {
     <div style={{
       background: "#fff", borderRadius: 10, border: "1.5px solid #eee",
       padding: "12px 14px", display: "flex", flexDirection: "column", gap: 8,
-      transition: "box-shadow 0.15s",
     }}>
-      {/* Área clickeable */}
       <div onClick={onClick} style={{ display: "flex", alignItems: "center", gap: 10, cursor: "pointer" }}>
         {dish.image_url ? (
           <img src={dish.image_url} alt={dish.name} style={{ width: 42, height: 42, borderRadius: 8, objectFit: "cover", flexShrink: 0 }} />
