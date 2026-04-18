@@ -31,6 +31,7 @@ const CategorySchema = new Schema<ICategory>(
   },
   {
     timestamps: true,
+    versionKey: false, //  esto elimina __v
   }
 );
 
