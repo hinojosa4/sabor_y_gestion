@@ -1,23 +1,56 @@
 import { NextResponse } from 'next/server';
 import { connectDB } from '@/lib/db';
 import User from '@/models/User';
+import { userSchema } from '@/validations/user'; // Para mantener la seguridad
 
-export async function PUT(req: Request, { params }: { params: { id: string } }) {
-  await connectDB();
-  const body = await req.json();
-  
-  const user = await User.findById(params.id);
-  if (!user) return NextResponse.json({ error: "No encontrado" }, { status: 404 });
+export async function PUT(req: Request, { params }: { params: Promise<{ id: string }> }) {
+  try {
+    await connectDB();
+    
+    // 1. IMPORTANTE: Desembalar params con await
+    const { id } = await params;
+    const body = await req.json();
 
-  // Actualizar campos permitidos
-  Object.assign(user, body);
-  await user.save(); // Esto garantiza que si cambias la contraseña, se encripte de nuevo
+    // 2. Buscar al usuario
+    const user = await User.findById(id);
+    if (!user) {
+      return NextResponse.json({ error: "Empleado no encontrado" }, { status: 404 });
+    }
 
-  return NextResponse.json(user);
+    // 3. Opcional pero recomendado: Validar con Zod antes de asignar
+    // Si el esquema de Zod es muy estricto con la contraseña, podrías usar .partial()
+    // const data = userSchema.partial().parse(body);
+
+    // 4. Mapear password_hash a password si viene del form
+    if (body.password_hash) {
+      body.password = body.password_hash;
+      delete body.password_hash;
+    }
+
+    // 5. Actualizar y guardar (dispara el pre-save hook para bcrypt)
+    Object.assign(user, body);
+    await user.save();
+
+    return NextResponse.json(user);
+  } catch (error: any) {
+    console.error("Error en PUT /api/users/[id]:", error);
+    return NextResponse.json({ error: error.message }, { status: 400 });
+  }
 }
 
-export async function DELETE(req: Request, { params }: { params: { id: string } }) {
-  await connectDB();
-  await User.findByIdAndDelete(params.id);
-  return NextResponse.json({ message: "Usuario eliminado con éxito" });
+export async function DELETE(req: Request, { params }: { params: Promise<{ id: string }> }) {
+  try {
+    await connectDB();
+    const { id } = await params;
+
+    const deletedUser = await User.findByIdAndDelete(id);
+    
+    if (!deletedUser) {
+      return NextResponse.json({ error: "Usuario no encontrado" }, { status: 404 });
+    }
+
+    return NextResponse.json({ message: "Usuario eliminado con éxito" });
+  } catch (error: any) {
+    return NextResponse.json({ error: error.message }, { status: 500 });
+  }
 }
