@@ -42,7 +42,9 @@ const inputStyle: React.CSSProperties = {
 };
 
 type BtnVariant = "primary" | "secondary" | "danger" | "ghost" | "orange";
-function Btn({ children, onClick, variant = "secondary", small = false, disabled = false, fullWidth = false }: {
+function Btn({
+  children, onClick, variant = "secondary", small = false, disabled = false, fullWidth = false,
+}: {
   children: React.ReactNode; onClick?: () => void; variant?: BtnVariant;
   small?: boolean; disabled?: boolean; fullWidth?: boolean;
 }) {
@@ -72,7 +74,10 @@ function Btn({ children, onClick, variant = "secondary", small = false, disabled
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div>
-      <label style={{ fontSize: 11, fontWeight: 700, color: "#555", display: "block", marginBottom: 6, letterSpacing: "0.05em", textTransform: "uppercase" }}>
+      <label style={{
+        fontSize: 11, fontWeight: 700, color: "#555", display: "block",
+        marginBottom: 6, letterSpacing: "0.05em", textTransform: "uppercase",
+      }}>
         {label}
       </label>
       {children}
@@ -82,7 +87,11 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
 
 function ErrorBox({ msg }: { msg: string }) {
   return (
-    <div style={{ background: "#fff0ee", border: "1px solid #e85d26", borderRadius: 8, padding: "10px 14px", color: "#c0392b", fontSize: 13, marginBottom: 14 }}>
+    <div style={{
+      background: "#fff0ee", border: "1px solid #e85d26",
+      borderRadius: 8, padding: "10px 14px", color: "#c0392b",
+      fontSize: 13, marginBottom: 14,
+    }}>
       ⚠️ {msg}
     </div>
   );
@@ -92,8 +101,15 @@ function Modal({ title, children, onClose, wide = false }: {
   title?: string; children: React.ReactNode; onClose: () => void; wide?: boolean;
 }) {
   return (
-    <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.45)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000, padding: 20 }}>
-      <div style={{ background: "#fff", borderRadius: 18, padding: "32px 36px", width: wide ? 620 : 480, maxWidth: "100%", maxHeight: "90vh", overflowY: "auto", boxShadow: "0 20px 60px rgba(0,0,0,0.18)" }}>
+    <div style={{
+      position: "fixed", inset: 0, background: "rgba(0,0,0,0.45)",
+      display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000, padding: 20,
+    }}>
+      <div style={{
+        background: "#fff", borderRadius: 18, padding: "32px 36px",
+        width: wide ? 620 : 480, maxWidth: "100%", maxHeight: "90vh",
+        overflowY: "auto", boxShadow: "0 20px 60px rgba(0,0,0,0.18)",
+      }}>
         {title && <h2 style={{ margin: "0 0 22px", fontSize: 19, fontWeight: 700, color: "#1a1a1a" }}>{title}</h2>}
         {children}
       </div>
@@ -101,7 +117,9 @@ function Modal({ title, children, onClose, wide = false }: {
   );
 }
 
-function IngredientTags({ ingredients, onRemove }: { ingredients: string[]; onRemove?: (i: number) => void }) {
+function IngredientTags({ ingredients, onRemove }: {
+  ingredients: string[]; onRemove?: (i: number) => void;
+}) {
   if (ingredients.length === 0) return <p style={{ fontSize: 12, color: "#bbb", margin: 0 }}>Sin ingredientes</p>;
   return (
     <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
@@ -113,7 +131,10 @@ function IngredientTags({ ingredients, onRemove }: { ingredients: string[]; onRe
         }}>
           {ing}
           {onRemove && (
-            <button onClick={() => onRemove(i)} style={{ background: "none", border: "none", cursor: "pointer", color: "#e85d26", fontSize: 12, padding: 0, lineHeight: 1 }}>✕</button>
+            <button onClick={() => onRemove(i)} style={{
+              background: "none", border: "none", cursor: "pointer",
+              color: "#e85d26", fontSize: 12, padding: 0, lineHeight: 1,
+            }}>✕</button>
           )}
         </span>
       ))}
@@ -121,16 +142,14 @@ function IngredientTags({ ingredients, onRemove }: { ingredients: string[]; onRe
   );
 }
 
-// ─── Formulario de plato (create/edit) ───────────────────────────────────────
+// ─── Formulario de plato ──────────────────────────────────────────────────────
 type DishFormData = {
   name: string; description: string; price: string;
   isAvailable: boolean; category_id: string;
   ingredients: string[]; image_url: string;
 };
 
-function DishForm({
-  initial, categories, onSubmit, onCancel, error, submitLabel,
-}: {
+function DishForm({ initial, categories, onSubmit, onCancel, error, submitLabel }: {
   initial: DishFormData;
   categories: ICategory[];
   onSubmit: (data: DishFormData) => void;
@@ -140,6 +159,7 @@ function DishForm({
 }) {
   const [form, setForm] = useState<DishFormData>(initial);
   const [newIng, setNewIng] = useState("");
+  const [uploading, setUploading] = useState(false);
 
   const addIng = () => {
     if (!newIng.trim()) return;
@@ -147,22 +167,49 @@ function DishForm({
     setNewIng("");
   };
 
+  const handleImageUpload = async (file: File) => {
+    setUploading(true);
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+      formData.append("upload_preset", process.env.NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET!);
+      const res = await fetch(
+        `https://api.cloudinary.com/v1_1/${process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME}/image/upload`,
+        { method: "POST", body: formData }
+      );
+      const data = await res.json();
+      if (data.secure_url) {
+        setForm(f => ({ ...f, image_url: data.secure_url }));
+      }
+    } catch {
+      // si falla la subida no actualiza la URL
+    } finally {
+      setUploading(false);
+    }
+  };
+
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
       {error && <ErrorBox msg={error} />}
 
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+
+        {/* Nombre */}
         <div style={{ gridColumn: "1 / -1" }}>
           <Field label="Nombre *">
             <input value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))}
               placeholder="Ej: Lomo Saltado" style={inputStyle} />
           </Field>
         </div>
+
+        {/* Precio */}
         <Field label="Precio (Bs.) *">
           <input type="number" min={0} step="0.01" value={form.price}
             onChange={e => setForm(f => ({ ...f, price: e.target.value }))}
             placeholder="0.00" style={inputStyle} />
         </Field>
+
+        {/* Categoría */}
         <Field label="Categoría (opcional)">
           <select value={form.category_id} onChange={e => setForm(f => ({ ...f, category_id: e.target.value }))}
             style={inputStyle}>
@@ -170,18 +217,61 @@ function DishForm({
             {categories.map(c => <option key={c._id} value={c._id}>{c.nombre}</option>)}
           </select>
         </Field>
+
+        {/* Descripción */}
         <div style={{ gridColumn: "1 / -1" }}>
           <Field label="Descripción">
-            <textarea value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))}
-              placeholder="Descripción del plato..." rows={2} style={{ ...inputStyle, resize: "none" }} />
+            <textarea value={form.description}
+              onChange={e => setForm(f => ({ ...f, description: e.target.value }))}
+              placeholder="Descripción del plato..." rows={2}
+              style={{ ...inputStyle, resize: "none" }} />
           </Field>
         </div>
+
+        {/* Imagen — subida a Cloudinary */}
         <div style={{ gridColumn: "1 / -1" }}>
-          <Field label="URL de imagen (Cloudinary)">
-            <input value={form.image_url} onChange={e => setForm(f => ({ ...f, image_url: e.target.value }))}
-              placeholder="https://res.cloudinary.com/..." style={inputStyle} />
+          <Field label="Imagen del plato">
+            <input
+              type="file"
+              accept="image/*"
+              onChange={(e) => {
+              const file = e.target.files?.[0];
+              if (!file) return;
+
+               // ✅ Validar tipo
+              const allowedTypes = ["image/jpeg", "image/png", "image/webp", "image/gif"];
+              if (!allowedTypes.includes(file.type)) {
+                alert("Solo se permiten imágenes (JPG, PNG, WEBP, GIF)");
+                e.target.value = ""; // limpia el input
+                return;
+                }
+                handleImageUpload(file);
+              }}
+              style={inputStyle}
+            />
+            {uploading && (
+              <p style={{ fontSize: 12, color: "#888", marginTop: 6 }}>⏳ Subiendo imagen...</p>
+            )}
+            {form.image_url && !uploading && (
+              <div style={{ marginTop: 8, position: "relative" }}>
+                <img src={form.image_url} alt="preview" style={{
+                  width: "100%", height: 150, objectFit: "cover", borderRadius: 9,
+                }} />
+                <button
+                  onClick={() => setForm(f => ({ ...f, image_url: "" }))}
+                  style={{
+                    position: "absolute", top: 6, right: 6,
+                    background: "rgba(0,0,0,0.5)", color: "#fff",
+                    border: "none", borderRadius: 6, padding: "3px 8px",
+                    fontSize: 12, cursor: "pointer",
+                  }}
+                >✕ Quitar</button>
+              </div>
+            )}
           </Field>
         </div>
+
+        {/* Ingredientes */}
         <div style={{ gridColumn: "1 / -1" }}>
           <Field label="Ingredientes">
             <div style={{ display: "flex", gap: 8, marginBottom: 8 }}>
@@ -199,6 +289,8 @@ function DishForm({
             />
           </Field>
         </div>
+
+        {/* Disponible */}
         <div style={{ gridColumn: "1 / -1" }}>
           <label style={{ display: "flex", alignItems: "center", gap: 10, cursor: "pointer", fontSize: 14, color: "#333" }}>
             <input type="checkbox" checked={form.isAvailable}
@@ -228,7 +320,6 @@ export default function DishesPage() {
   const [successMsg, setSuccessMsg] = useState("");
   const [error, setError] = useState("");
 
-  // Modales
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [editDish, setEditDish] = useState<IDish | null>(null);
   const [deleteDishId, setDeleteDishId] = useState<string | null>(null);
@@ -263,19 +354,22 @@ export default function DishesPage() {
   // ── filtros ────────────────────────────────────────────────────────────────
   const filtered = useMemo(() => {
     return dishes.filter(d => {
-      const matchSearch = d.name.toLowerCase().includes(search.toLowerCase()) ||
+      const matchSearch =
+        d.name.toLowerCase().includes(search.toLowerCase()) ||
         (d.description || "").toLowerCase().includes(search.toLowerCase());
-      const matchCat = filterCat === "all"
-        ? true
-        : filterCat === "none"
-          ? !getCatId(d)
-          : getCatId(d) === filterCat;
+      const matchCat =
+        filterCat === "all" ? true
+        : filterCat === "none" ? !getCatId(d)
+        : getCatId(d) === filterCat;
       return matchSearch && matchCat;
     });
   }, [dishes, search, filterCat]);
 
   // ── CRUD ───────────────────────────────────────────────────────────────────
-  const emptyForm: DishFormData = { name: "", description: "", price: "", isAvailable: true, category_id: "", ingredients: [], image_url: "" };
+  const emptyForm: DishFormData = {
+    name: "", description: "", price: "", isAvailable: true,
+    category_id: "", ingredients: [], image_url: "",
+  };
 
   const handleCreate = async (form: DishFormData) => {
     if (!form.name.trim()) { setFormError("El nombre es obligatorio"); return; }
@@ -337,8 +431,24 @@ export default function DishesPage() {
 
   // ── stats ──────────────────────────────────────────────────────────────────
   const totalAvailable = dishes.filter(d => d.isAvailable).length;
-  const avgPrice = dishes.length > 0 ? (dishes.reduce((s, d) => s + d.price, 0) / dishes.length) : 0;
+  const avgPrice = dishes.length > 0
+    ? dishes.reduce((s, d) => s + d.price, 0) / dishes.length
+    : 0;
   const uncategorized = dishes.filter(d => !getCatId(d)).length;
+
+  const stats: { label: string; value: string | number; color: string; isText?: boolean }[] = [
+    { label: "Total Platos",     value: dishes.length,                      color: "#1a1a1a" },
+    { label: "Disponibles",      value: totalAvailable,                     color: "#27ae60" },
+    { label: "No disponibles",   value: dishes.length - totalAvailable,     color: "#e85d26" },
+    { label: "Sin categoría",    value: uncategorized,                      color: "#888" },
+    { label: "Precio promedio",  value: `Bs. ${avgPrice.toFixed(2)}`,       color: "#8e44ad", isText: true },
+  ];
+
+  const filterTabs = [
+    { id: "all",  label: "Todos" },
+    { id: "none", label: "Sin categoría" },
+    ...categories.map(c => ({ id: c._id, label: c.nombre })),
+  ];
 
   // ── render ─────────────────────────────────────────────────────────────────
   return (
@@ -374,7 +484,8 @@ export default function DishesPage() {
         <div style={{
           position: "fixed", top: 24, right: 24, zIndex: 9999,
           background: "#1a1a1a", color: "#fff", padding: "13px 22px",
-          borderRadius: 10, fontSize: 14, fontWeight: 600, boxShadow: "0 4px 20px rgba(0,0,0,0.2)",
+          borderRadius: 10, fontSize: 14, fontWeight: 600,
+          boxShadow: "0 4px 20px rgba(0,0,0,0.2)",
         }}>✓ {successMsg}</div>
       )}
 
@@ -383,23 +494,22 @@ export default function DishesPage() {
         <div style={{
           margin: "16px 40px 0", background: "#fff0ee", border: "1px solid #e85d26",
           borderRadius: 10, padding: "11px 18px", color: "#c0392b", fontSize: 13,
-          display: "flex", justifyContent: "space-between",
+          display: "flex", justifyContent: "space-between", alignItems: "center",
         }}>
           <span>⚠️ {error}</span>
-          <button onClick={() => setError("")} style={{ background: "none", border: "none", cursor: "pointer", color: "#c0392b", fontSize: 16 }}>✕</button>
+          <button onClick={() => setError("")} style={{
+            background: "none", border: "none", cursor: "pointer", color: "#c0392b", fontSize: 16,
+          }}>✕</button>
         </div>
       )}
 
       {/* Stats */}
       <div style={{ padding: "24px 40px 0", display: "flex", gap: 14, flexWrap: "wrap" }}>
-        {[
-          { label: "Total Platos", value: dishes.length, color: "#1a1a1a" },
-          { label: "Disponibles", value: totalAvailable, color: "#27ae60" },
-          { label: "No disponibles", value: dishes.length - totalAvailable, color: "#e85d26" },
-          { label: "Sin categoría", value: uncategorized, color: "#888" },
-          { label: "Precio promedio", value: `Bs. ${avgPrice.toFixed(2)}`, color: "#8e44ad", isText: true },
-        ].map((s) => (
-          <div key={s.label} style={{ background: "#fff", border: "1.5px solid #e8e8e8", borderRadius: 14, padding: "16px 24px", minWidth: 130 }}>
+        {stats.map((s) => (
+          <div key={s.label} style={{
+            background: "#fff", border: "1.5px solid #e8e8e8",
+            borderRadius: 14, padding: "16px 24px", minWidth: 130,
+          }}>
             <p style={{ margin: 0, fontSize: 11, color: "#888", marginBottom: 4 }}>{s.label}</p>
             <p style={{ margin: 0, fontSize: s.isText ? 18 : 26, fontWeight: 700, color: s.color }}>{s.value}</p>
           </div>
@@ -408,9 +518,11 @@ export default function DishesPage() {
 
       {/* Búsqueda y filtros */}
       <div style={{ padding: "20px 40px 0", display: "flex", gap: 14, alignItems: "center", flexWrap: "wrap" }}>
-        {/* Buscador */}
         <div style={{ position: "relative", flex: 1, minWidth: 240 }}>
-          <span style={{ position: "absolute", left: 14, top: "50%", transform: "translateY(-50%)", color: "#aaa", fontSize: 16 }}>🔍</span>
+          <span style={{
+            position: "absolute", left: 14, top: "50%",
+            transform: "translateY(-50%)", color: "#aaa", fontSize: 16,
+          }}>🔍</span>
           <input
             value={search}
             onChange={e => setSearch(e.target.value)}
@@ -418,10 +530,8 @@ export default function DishesPage() {
             style={{ ...inputStyle, paddingLeft: 40, borderRadius: 30 }}
           />
         </div>
-
-        {/* Filtros por categoría */}
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-          {[{ id: "all", label: "Todos" }, { id: "none", label: "Sin categoría" }, ...categories.map(c => ({ id: c._id, label: c.nombre }))].map(tab => (
+          {filterTabs.map(tab => (
             <button key={tab.id} onClick={() => setFilterCat(tab.id)} style={{
               padding: "8px 18px", borderRadius: 30, border: "1.5px solid",
               borderColor: filterCat === tab.id ? "#1a1a1a" : "#e0e0e0",
@@ -438,7 +548,10 @@ export default function DishesPage() {
         {loading ? (
           <div style={{ textAlign: "center", padding: 60, color: "#888" }}>Cargando platos...</div>
         ) : filtered.length === 0 ? (
-          <div style={{ textAlign: "center", padding: 60, background: "#fff", borderRadius: 16, border: "2px dashed #ddd" }}>
+          <div style={{
+            textAlign: "center", padding: 60, background: "#fff",
+            borderRadius: 16, border: "2px dashed #ddd",
+          }}>
             <p style={{ fontSize: 36, margin: 0 }}>🍴</p>
             <p style={{ color: "#888", fontSize: 15, marginTop: 10 }}>
               {dishes.length === 0 ? "No hay platos aún" : "Sin resultados para tu búsqueda"}
@@ -455,10 +568,7 @@ export default function DishesPage() {
               <DishCard
                 key={dish._id}
                 dish={dish}
-                onEdit={() => {
-                  setFormError("");
-                  setEditDish(dish);
-                }}
+                onEdit={() => { setFormError(""); setEditDish(dish); }}
                 onDelete={() => setDeleteDishId(dish._id)}
               />
             ))}
@@ -534,15 +644,13 @@ function DishCard({ dish, onEdit, onDelete }: {
       overflow: "hidden", boxShadow: "0 2px 8px rgba(0,0,0,0.04)",
       display: "flex", flexDirection: "column",
     }}>
-      {/* Contenido superior */}
+      {/* Cabecera */}
       <div style={{ padding: "18px 20px 14px" }}>
-        {/* Nombre + disponibilidad */}
         <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", marginBottom: 10 }}>
-          <h3 style={{ margin: 0, fontSize: 16, fontWeight: 700, color: "#1a1a1a", flex: 1, marginRight: 10 }}>{dish.name}</h3>
-          <span title={dish.isAvailable ? "Disponible" : "No disponible"} style={{
-            fontSize: 16, cursor: "default",
-            filter: dish.isAvailable ? "none" : "grayscale(1) opacity(0.4)",
-          }}>👁️</span>
+          <h3 style={{ margin: 0, fontSize: 16, fontWeight: 700, color: "#1a1a1a", flex: 1, marginRight: 10 }}>
+            {dish.name}
+          </h3>
+        
         </div>
 
         {/* Categoría */}
@@ -557,7 +665,11 @@ function DishCard({ dish, onEdit, onDelete }: {
 
         {/* Descripción */}
         {dish.description && (
-          <p style={{ margin: "0 0 12px", fontSize: 13, color: "#777", lineHeight: 1.5, display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>
+          <p style={{
+            margin: "0 0 12px", fontSize: 13, color: "#777", lineHeight: 1.5,
+            display: "-webkit-box", WebkitLineClamp: 2,
+            WebkitBoxOrient: "vertical", overflow: "hidden",
+          }}>
             {dish.description}
           </p>
         )}
@@ -567,17 +679,20 @@ function DishCard({ dish, onEdit, onDelete }: {
       {dish.image_url ? (
         <img src={dish.image_url} alt={dish.name} style={{ width: "100%", height: 180, objectFit: "cover" }} />
       ) : (
-        <div style={{ width: "100%", height: 100, background: "#f5f5f5", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 32, color: "#ddd" }}>
-          🍴
-        </div>
+        <div style={{
+          width: "100%", height: 100, background: "#f5f5f5",
+          display: "flex", alignItems: "center", justifyContent: "center", fontSize: 32, color: "#ddd",
+        }}>🍴</div>
       )}
 
-      {/* Info precio */}
+      {/* Info precio + ingredientes */}
       <div style={{ padding: "14px 20px 0" }}>
         <div style={{ display: "flex", gap: 24, marginBottom: 10 }}>
           <div>
             <p style={{ margin: 0, fontSize: 11, color: "#aaa" }}>Precio</p>
-            <p style={{ margin: 0, fontSize: 20, fontWeight: 700, color: "#e85d26" }}>Bs. {dish.price.toFixed(2)}</p>
+            <p style={{ margin: 0, fontSize: 20, fontWeight: 700, color: "#e85d26" }}>
+              Bs. {dish.price.toFixed(2)}
+            </p>
           </div>
           <div>
             <p style={{ margin: 0, fontSize: 11, color: "#aaa" }}>Estado</p>
@@ -587,7 +702,6 @@ function DishCard({ dish, onEdit, onDelete }: {
           </div>
         </div>
 
-        {/* Ingredientes */}
         {dish.ingredients && dish.ingredients.length > 0 && (
           <div style={{ marginBottom: 12 }}>
             <p style={{ margin: "0 0 6px", fontSize: 11, color: "#aaa" }}>Ingredientes:</p>
@@ -605,23 +719,23 @@ function DishCard({ dish, onEdit, onDelete }: {
 
       {/* Botones */}
       <div style={{
-        padding: "12px 20px 16px",
-        display: "flex", gap: 10, alignItems: "center",
+        padding: "12px 20px 16px", display: "flex", gap: 10, alignItems: "center",
         borderTop: "1.5px solid #f5f5f5", marginTop: "auto",
       }}>
         <button onClick={onEdit} style={{
           flex: 1, padding: "10px", borderRadius: 9,
           border: "1.5px solid #e0e0e0", background: "#fff",
           fontSize: 13, fontWeight: 600, cursor: "pointer",
-          display: "flex", alignItems: "center", justifyContent: "center", gap: 6, color: "#333",
-          fontFamily: "inherit",
+          display: "flex", alignItems: "center", justifyContent: "center", gap: 6,
+          color: "#333", fontFamily: "inherit",
         }}>
           ✏️ Editar
         </button>
         <button onClick={onDelete} style={{
           width: 40, height: 40, borderRadius: 9,
           border: "1.5px solid #e85d26", background: "#fff0ee",
-          fontSize: 16, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center",
+          fontSize: 16, cursor: "pointer",
+          display: "flex", alignItems: "center", justifyContent: "center",
           color: "#e85d26", flexShrink: 0,
         }}>
           🗑️
