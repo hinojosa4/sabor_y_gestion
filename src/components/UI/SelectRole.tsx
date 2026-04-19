@@ -1,12 +1,10 @@
 
 import { LoginUserCard } from "./LoginUserCard";
 import { 
-  UtensilsCrossed, 
   ChefHat, 
   Users, 
   CreditCard, 
   Briefcase,
-  ArrowRight,
 } from 'lucide-react';
 
 const roles = [

@@ -3,7 +3,6 @@ import { connectDB } from "@/lib/db";
 import User from "@/models/User";
 import { signToken } from "@/lib/jwt";
 import { loginSchema } from "@/validations/auth";
-import { ZodError } from "zod";
 
 export async function POST(req: NextRequest) {
   try {
@@ -64,8 +63,8 @@ export async function POST(req: NextRequest) {
     });
 
     // 7. Respuesta exitosa (sin exponer la contraseña)
-    const { password: _pwd, ...userSafe } = user.toObject();
-
+    const userSafe = user.toObject();
+    delete userSafe.password;
     return NextResponse.json(
       {
         ok: true,

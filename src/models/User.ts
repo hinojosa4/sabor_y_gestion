@@ -1,7 +1,7 @@
 import mongoose, { Document, Schema } from "mongoose";
 import bcrypt from "bcryptjs";
 
-export type UserRole = "admin" | "cajero" | "cocinero" | "mesero";
+export type UserRole = "admin" | "cajero" | "cocinero" | "mesero" | "cliente";
 export interface IUser extends Document {
   nombre: string;
   email: string;
@@ -39,7 +39,7 @@ const UserSchema = new Schema<IUser>(
     rol: {
       type: String,
       enum: {
-        values: ["admin", "cajero", "cocinero", "mesero"],
+        values: ["admin", "cajero", "cocinero", "mesero", "cliente"],
         message: "El rol '{VALUE}' no es válido",
       },
       default: "mesero",

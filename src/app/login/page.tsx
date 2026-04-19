@@ -70,6 +70,7 @@ export default function LoginPage() {
         cajero: "/dashboard/cajero",
         cocinero: "/dashboard/cocinero",
         mesero: "/dashboard/mesero",
+        cliente: "/dashboard/cliente",
       };
 
       router.push(routes[data.user.rol] ?? "/dashboard");
@@ -288,7 +289,7 @@ export default function LoginPage() {
                           <input
                             id="telefono"
                             type="tel"
-                            value={newPassword}
+                            value={newPhone}
                             onChange={(e) => setNewPhone(e.target.value)}
                             placeholder="••••••••"
                             style={{ padding: "10px 12px", border: "1px solid #ddd", borderRadius: "8px", fontSize: "14px", outline: "none" }}

@@ -1,5 +1,5 @@
 import { Briefcase, Users } from 'lucide-react'
-import React, { useState } from 'react'
+import React from 'react'
 
 interface SelectUserBlockProps {
   setSelectedRole: React.Dispatch<React.SetStateAction<boolean>>,
@@ -8,7 +8,6 @@ interface SelectUserBlockProps {
 
 export const SelectUserBlock = ({setSelectedRole, setRol}: SelectUserBlockProps) => {
 
-  const [iconSize, setIconSize] = useState('size[40]')
 
   const handleSelectRole = (name: string) => {
     setSelectedRole(true);

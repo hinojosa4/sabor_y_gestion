@@ -1,26 +1,48 @@
 "use client";
 
 import { useState } from "react";
+import { z } from "zod";
+
+// ✅ 1. Definir schema
+const registerSchema = z.object({
+  nombre: z.string(),
+  email: z.string().email(),
+  password: z.string().min(8),
+  rol: z.string(),
+});
+
+// ✅ 2. Inferir tipo automáticamente
+type RegisterForm = z.infer<typeof registerSchema>;
 
 export default function RegisterPage() {
-  const [form, setForm] = useState({
+  const [form, setForm] = useState<RegisterForm>({
     nombre: "",
     email: "",
     password: "",
-    rol: "mesero",
+    rol: "",
   });
 
   const [message, setMessage] = useState("");
 
-  const handleChange = (e: any) => {
+  // ✅ 3. Tipar correctamente el evento
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     setForm({
       ...form,
       [e.target.name]: e.target.value,
     });
   };
 
-  const handleSubmit = async (e: any) => {
+  // ✅ 4. Tipar el submit (NO any)
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
+
+    // ✅ (Opcional pero PRO) validar en frontend
+    const parsed = registerSchema.safeParse(form);
+
+    if (!parsed.success) {
+      setMessage("Datos inválidos");
+      return;
+    }
 
     try {
       const res = await fetch("/api/auth/register", {
@@ -28,29 +50,29 @@ export default function RegisterPage() {
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify(form),
+        body: JSON.stringify(parsed.data),
       });
 
       const data = await res.json();
 
       if (!res.ok) {
-        setMessage(data.error || "Error");
-        return;
+        <pre>{JSON.stringify(data.error, null, 2)}</pre>
       }
 
       setMessage("Usuario creado correctamente ✅");
       console.log(data);
 
     } catch (error) {
+      console.error("Error en register:", error);
       setMessage("Error en la solicitud");
-    }
+      }
   };
 
   return (
     <div style={{ padding: "20px" }}>
       <h2>Registro</h2>
 
-      <form onSubmit={handleSubmit}>
+      <form onSubmit={handleSubmit} method="POST">
         <input
           type="text"
           name="nombre"
@@ -75,11 +97,12 @@ export default function RegisterPage() {
         />
         <br />
 
-        <select name="rol" onChange={handleChange}>
+        <select name="rol" value={form.rol} onChange={handleChange}>
           <option value="admin">Admin</option>
           <option value="cajero">Cajero</option>
           <option value="cocinero">Cocinero</option>
           <option value="mesero">Mesero</option>
+          <option value="cliente">Cliente</option>
         </select>
 
         <br /><br />

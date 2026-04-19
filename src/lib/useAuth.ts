@@ -7,7 +7,7 @@ export interface AuthUser {
   _id: string;
   nombre: string;
   email: string;
-  rol: "admin" | "cajero" | "cocinero" | "mesero";
+  rol: "admin" | "cajero" | "cocinero" | "mesero" | "cliente";
   activo: boolean;
 }
 
@@ -40,6 +40,7 @@ export function useAuth(allowedRoles?: AuthUser["rol"][]) {
           cajero: "/dashboard/cajero",
           cocinero: "/dashboard/cocinero",
           mesero: "/dashboard/mesero",
+          cliente: "/dashboard/cliente",
         };
         router.replace(routes[parsed.rol] ?? "/login");
         return;
@@ -52,7 +53,7 @@ export function useAuth(allowedRoles?: AuthUser["rol"][]) {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [router]);
 
   const logout = () => {
     localStorage.removeItem("token");

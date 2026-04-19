@@ -7,7 +7,7 @@ const registerSchema = z.object({
   nombre: z.string().min(2),
   email: z.string().email(),
   password: z.string().min(8),
-  rol: z.enum(["admin", "cajero", "cocinero", "mesero"]),
+  rol: z.enum(["admin", "cajero", "cocinero", "mesero", "cliente"]),
 });
 
 export async function POST(req: NextRequest) {
@@ -44,8 +44,8 @@ export async function POST(req: NextRequest) {
       activo: true,
     });
 
-    const { password: _, ...userSafe } = user.toObject();
-
+    const userSafe = user.toObject();
+    delete userSafe.password;
     return NextResponse.json(
       {
         message: "Usuario creado",
@@ -54,9 +54,11 @@ export async function POST(req: NextRequest) {
       { status: 201 }
     );
   } catch (error) {
-    return NextResponse.json(
-      { error: "Error del servidor" },
-      { status: 500 }
+  console.error("[POST /api/auth/register]", error);
+
+  return NextResponse.json(
+    { error: "Error del servidor" },
+    { status: 500 }
     );
   }
 }

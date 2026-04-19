@@ -1,6 +1,5 @@
 'use client'
 
-import { useRouter } from 'next/router';
 import React, { useState } from 'react'
 
 // pagina la logearse pero no se usa
@@ -12,15 +11,14 @@ interface role {
 
 export const UserLoginPage = ({rol, SetSelectedRole}:role) => {
 
-    const router = useRouter();
     const [email, setEmail] = useState("")
     const [password, setPassword] = useState("")
-    const [error, setError] = useState("")
-    const [loading, setLoading] = useState(false)
 
     const handleBack = () => {
-        SetSelectedRole && SetSelectedRole("");
-    }
+        if (SetSelectedRole) {
+            SetSelectedRole("");
+        }
+}
 
   return (
     <div>
