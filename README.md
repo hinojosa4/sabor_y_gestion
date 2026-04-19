@@ -1,3 +1,52 @@
+## git  Arquitectura del Proyecto
+
+El proyecto sigue una arquitectura modular y escalable, separando la lógica de negocio de la interfaz de usuario y las configuraciones del servidor.
+
+## 📁 Estructura
+
+```bash
+src/
+├─ app/                 # El corazón de Next.js (App Router)
+│  ├─ api/              # Endpoints del Backend (Serverless Functions)
+│  │  ├─ auth/          # Lógica de autenticación (JWT, Login)
+│  │  ├─ users/         # CRUD de usuarios y empleados
+│  │  ├─ categories/    # Gestión de categorías de la cafetería
+│  │  └─ dishes/        # Gestión del menú de platos
+│  ├─ login/            # Vista de inicio de sesión
+│  ├─ dashboard/        # Panel principal de administración
+│  ├─ layout.tsx        # Estructura base de la aplicación
+│  └─ page.tsx          # Página de inicio (Landing/Root)
+│
+├─ components/          # Componentes de React reutilizables
+│  ├─ ui/               # Botones, inputs, modales (piezas básicas)
+│  ├─ forms/            # Formularios complejos (Login, registro de platos)
+│  └─ layout/           # Barras laterales, navegación, headers
+│
+├─ features/            # Lógica de negocio específica por módulo
+│  ├─ auth/             # Hooks y lógica de autenticación
+│  ├─ users/            # Funcionalidades específicas de usuarios
+│  ├─ categories/       # Operaciones de categorías
+│  └─ dishes/           # Operaciones de platos y menú
+│
+├─ lib/                 # Utilidades y configuraciones externas
+│  ├─ db.ts             # Configuración y conexión a MongoDB (Mongoose)
+│  └─ utils.ts          # Funciones auxiliares generales
+│
+├─ models/              # Esquemas de Mongoose (Base de Datos)
+│  ├─ User.ts           # Modelo de Usuario (Roles, contraseñas)
+│  ├─ Category.ts       # Modelo de Categoría
+│  └─ Dish.ts           # Modelo de Plato/Producto
+│
+├─ validations/         # Esquemas de validación de datos
+│  └─ ...               # Validación de inputs para evitar datos corruptos
+│
+├─ types/               # Definiciones de TypeScript e Interfaces
+│  └─ index.ts          # Centralización de tipos del proyecto
+│
+└─ tests/               # Suite de pruebas
+   ├─ unit/             # Pruebas de funciones aisladas
+   └─ integration/      # Pruebas de flujo completo
+
 This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
 
 ## Getting Started
