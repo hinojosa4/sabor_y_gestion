@@ -2,19 +2,16 @@
 
 import React, { useState } from "react";
 import { useRouter } from "next/navigation";
-import { SelectRole } from "@/components/UI/SelectRole";
 import { 
   UtensilsCrossed, 
-  ChefHat, 
   Users, 
-  CreditCard, 
-  Briefcase,
-  ArrowRight,
 } from 'lucide-react';
+import { RoleCard } from "@/components/UI/RoleCard";
+import { SelectUserBlock } from "@/components/UI/SelectUserBlock";
 
 const containerStyle = {
-  width: '3rem',           
-  height: '3rem',          
+  width: '80px',           
+  height: '80px',          
   backgroundColor: '#ea580c', 
   borderRadius: '1rem',    
   display: 'flex',         
@@ -31,6 +28,14 @@ export default function LoginPage() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [selectedRole, setSelectedRole] = useState(false)
+  const [clientOptions, setClientOptions] = useState(true)
+
+  const [newName, setNewName] = useState("")
+  const [newEmail, setNewEmail] = useState("")
+  const [newPhone, setNewPhone] = useState("")
+  const [newPassword, setNewPassword] = useState("")
+
+  const [active, setActive] = useState<"login" | "register">("login");
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -77,133 +82,322 @@ export default function LoginPage() {
 
   const handleBackButton = () => {
     setSelectedRole(false);
-    setError("")
+    setEmail("");
+    setPassword("");
+    setError("");
+    setRol("");
   }
+
+  const handleClientButton = (condition: boolean) => {
+    if(condition === true){
+      setClientOptions(true);
+      setActive("login");
+    }else {
+      setClientOptions(false);
+      setActive("register");
+    }
+  }
+  console.log("ROL SELECCIONADO: ", rol)
 
   return (
     <div className="flex flex-col" style={{display: "flex", alignItems: "center", minHeight: "100vh", padding: "1rem" }}>
       
-      <div style={{alignItems: "start",width: "100%", maxWidth: "100%", textAlign: "center", marginBottom: "2rem"}}>
-        <div className="flex flex-col items-center justify-center">
-          <div style={containerStyle}>
-            <UtensilsCrossed className="size-6 md:size-8 text-white" />
-          </div>
-          <h1 style={{fontSize: "2.5rem"}} > RestaurantHub </h1>
-          <span className="opacity-[50%]"> Sistema de Gestión Profesional para Restaurantes </span>
-        </div>
-        {  !selectedRole && <h2 className="mb-[5px] mt-[50px]"> Selecciona tu tipo de acceso </h2>}
-      </div>
-
       {
         !selectedRole ? (
-          <SelectRole setSelectedRole={setSelectedRole} setSelectedRoleButton={setRol}/>
+          <div>
+            <div style={{alignItems: "start",width: "100%", maxWidth: "100%", textAlign: "center", marginBottom: "2rem"}}>
+              <div className="flex flex-col items-center justify-center">
+                <div style={containerStyle} className="size-[100]">
+                  <UtensilsCrossed className="size-[50] md:size-8 text-white" />
+                </div>
+                <h1 style={{fontSize: "2.5rem"}} > Bievenido </h1>
+                <span className="opacity-[50%]"> Sistema de Gestión del Restaurante </span>
+              </div>
+            </div>
+            <div>
+              <SelectUserBlock setSelectedRole={setSelectedRole} setRol={setRol}/>
+            </div>
+          </div>
         ) : (
-          <div className="flex flex-col justify-center items-center" style={{ width: "100%", maxWidth: "380px", border: "1px solid #e5e5e5", borderRadius: "12px", padding: "2rem", background: "#fff", boxShadow: "0 4px 12px rgba(0, 0, 0, 0.1)" }}>
+          <div>
+            {/* Seleccion de rol anterior */}
             
-            {rol === "Admin" && (
-              <div className="flex flex-col justify-center items-center gap-[18]">
-                <div className="flex items-center rounded-full p-[12px]" style={{backgroundColor: " #F5F5F5"}}>
-                  <Briefcase size={50} style={{color: "#8E24AA"}}/>
+            {/*
+              {rol === "Admin" && (
+                <div className="flex flex-col justify-center items-center gap-[18]">
+                  <div className="flex items-center rounded-full p-[12px]" style={{backgroundColor: " #F5F5F5"}}>
+                    <Briefcase size={50} style={{color: "#8E24AA"}}/>
+                  </div>
+                  <span> {rol} </span>
                 </div>
-                <span> {rol} </span>
-              </div>
-            )}
-            {rol === "Cajero" && (
-              <div className="flex flex-col justify-center items-center gap-[18]">
-                <div className="flex items-center rounded-full p-[12px]" style={{backgroundColor: " #F5F5F5"}}>
-                  <CreditCard size={50} style={{color: "#FB8C00"}}/>
-                </div>
-                <span> {rol} </span>
-              </div>
-            )}
-            {rol === "Cocinero" && (
-              <div className="flex flex-col justify-center items-center gap-[18]">
-                <div className="flex items-center rounded-full p-[12px]" style={{backgroundColor: " #F5F5F5"}}>
-                  <ChefHat size={50} style={{color: "#1E88E5"}}/>
-                </div>
-                <span> {rol} </span>
-              </div>
-            )}
-            {rol === "Mesero" && (
-              <div className="flex flex-col justify-center items-center gap-[18]">
-                <div className="flex items-center rounded-full p-[12px]" style={{backgroundColor: " #F5F5F5"}}>
-                  <Users size={50} style={{color: "#43A047"}}/>
-                </div>
-                <span> {rol} </span>
-              </div>
-            )}
-
-
-            <p style={{ fontSize: "13px", color: "#888", marginBottom: "1.5rem" }}>
-              Sabor &amp; Gestión — Ingresa tus credenciales para continuar
-            </p>
-
-
-            <form onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
-
-              <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
-                <label htmlFor="email" style={{ fontSize: "13px", color: "#555" }}>Correo electrónico</label>
-                <input
-                  id="email"
-                  type="email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  placeholder="usuario@restaurante.com"
-                  style={{ padding: "10px 12px", border: "1px solid #ddd", borderRadius: "8px", fontSize: "14px", outline: "none" }}
-                />
-              </div>
-
-              <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
-                <label htmlFor="password" style={{ fontSize: "13px", color: "#555" }}>Contraseña</label>
-                <input
-                  id="password"
-                  type="password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  placeholder="••••••••"
-                  style={{ padding: "10px 12px", border: "1px solid #ddd", borderRadius: "8px", fontSize: "14px", outline: "none" }}
-                />
-              </div>
-
-              {/* aqui estaba el menu desplegable para elgir el rol */}
-              {/*<div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
-                <label htmlFor="rol" style={{ fontSize: "13px", color: "#555" }}>Rol</label>
-                <select
-                  id="rol"
-                  value={rol}
-                  onChange={(e) => setRol(e.target.value)}
-                  style={{ padding: "10px 12px", border: "1px solid #ddd", borderRadius: "8px", fontSize: "14px", background: "#fff", outline: "none" }}
-                >
-                  <option value="" disabled>{rol}</option>
-                  <option value="admin">Admin</option>
-                  <option value="cajero">Cajero</option>
-                  <option value="cocinero">Cocinero</option>
-                  <option value="mesero">Mesero</option>
-                </select>
-              </div>*/}
-
-              {error && (
-                <p style={{ fontSize: "13px", color: "#c0392b", background: "#fdf0f0", padding: "10px 12px", borderRadius: "8px", margin: 0 }}>
-                  {error}
-                </p>
               )}
+              {rol === "Cajero" && (
+                <div className="flex flex-col justify-center items-center gap-[18]">
+                  <div className="flex items-center rounded-full p-[12px]" style={{backgroundColor: " #F5F5F5"}}>
+                    <CreditCard size={50} style={{color: "#FB8C00"}}/>
+                  </div>
+                  <span> {rol} </span>
+                </div>
+              )}
+              {rol === "Cocinero" && (
+                <div className="flex flex-col justify-center items-center gap-[18]">
+                  <div className="flex items-center rounded-full p-[12px]" style={{backgroundColor: " #F5F5F5"}}>
+                    <ChefHat size={50} style={{color: "#1E88E5"}}/>
+                  </div>
+                  <span> {rol} </span>
+                </div>
+              )}
+              {rol === "Mesero" && (
+                <div className="flex flex-col justify-center items-center gap-[18]">
+                  <div className="flex items-center rounded-full p-[12px]" style={{backgroundColor: " #F5F5F5"}}>
+                    <Users size={50} style={{color: "#43A047"}}/>
+                  </div>
+                  <span> {rol} </span>
+                </div>
+              )}
+            */}
+            {
+              rol === "cliente" ? (
+                <div className="flex flex-col justify-center items-center" style={{ width: "100%", maxWidth: "380px", border: "1px solid #e5e5e5", borderRadius: "12px", padding: "2rem", background: "#fff", boxShadow: "0 4px 12px rgba(0, 0, 0, 0.1)" }}>
+                  <div className="flex justify-center items-center size-[100] bg-[#ea580c]  rounded-[20px] mb-[20px]">
+                    <Users className="size-[50] text-[white]"/>
+                  </div>   
+                  <h1> Inicio de sesion </h1>
+                  <span> Acceso de clientes </span>
 
-              <button
-                type="submit"
-                disabled={loading}
-                style={{ padding: "11px", background: "#111", color: "#fff", border: "none", borderRadius: "8px", fontSize: "14px", cursor: loading ? "not-allowed" : "pointer", opacity: loading ? 0.6 : 1, marginTop: "4px" }}
-              >
-                {loading ? "Iniciando sesión..." : "Iniciar sesión"}
-              </button>
-              <button
-                style={{ padding: "11px", background: "#111", color: "#fff", border: "none", borderRadius: "8px", fontSize: "14px", cursor: loading ? "not-allowed" : "pointer", opacity: loading ? 0.6 : 1, marginTop: "4px" }}
-                onClick={handleBackButton}
-              >
-                Volver
-              </button>
+                  <span> Inicia sesión o crea una cuenta nueva </span>
 
-            </form>
-        </div>
+                  <div className="flex flex-row justify-center mt-[1rem] mb-[1rem] bg-[#EEEEEE] rounded-full h-[40px] p-[5px] w-[100%]">
+                    <button 
+                      onClick={() => handleClientButton(true)}
+                      className={`border-[white] h-[100%] size-full px-6 py-[2px] rounded-full transition-all duration-200
+                        ${
+                          active === "login"
+                            ? "bg-[white] shadow text-[black]"
+                            : "text-[#9E9E9E]"
+                        }`}
+                      >
+                    Iniciar sesion
+                    </button>
+                    <button 
+                      onClick={() => handleClientButton(false)}
+                      className={`border-[white] size-full px-6 py-[2px] rounded-full transition-all duration-200
+                        ${
+                          active === "register"
+                            ? "bg-[white] shadow text-[black]"
+                            : "text-[#9E9E9E]"
+                        }`}
+                      >
+                    Registrarse
+                    </button>
+                  </div>
+
+                  {
+                    clientOptions ? (
+                      <form onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
+                        <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
+                          <label htmlFor="email" style={{ fontSize: "13px", color: "#555" }}>Correo electrónico</label>
+                          <input
+                            id="email"
+                            type="email"
+                            value={email}
+                            onChange={(e) => setEmail(e.target.value)}
+                            placeholder="usuario@restaurante.com"
+                            style={{ padding: "10px 12px", border: "1px solid #ddd", borderRadius: "8px", fontSize: "14px", outline: "none" }}
+                          />
+                        </div>
+
+                        <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
+                          <label htmlFor="password" style={{ fontSize: "13px", color: "#555" }}>Contraseña</label>
+                          <input
+                            id="password"
+                            type="password"
+                            value={password}
+                            onChange={(e) => setPassword(e.target.value)}
+                            placeholder="••••••••"
+                            style={{ padding: "10px 12px", border: "1px solid #ddd", borderRadius: "8px", fontSize: "14px", outline: "none" }}
+                          />
+                        </div>
+
+                        {/* aqui estaba el menu desplegable para elgir el rol */}
+                        {/*<div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
+                          <label htmlFor="rol" style={{ fontSize: "13px", color: "#555" }}>Rol</label>
+                          <select
+                            id="rol"
+                            value={rol}
+                            onChange={(e) => setRol(e.target.value)}
+                            style={{ padding: "10px 12px", border: "1px solid #ddd", borderRadius: "8px", fontSize: "14px", background: "#fff", outline: "none" }}
+                          >
+                            <option value="" disabled>{rol}</option>
+                            <option value="admin">Admin</option>
+                            <option value="cajero">Cajero</option>
+                            <option value="cocinero">Cocinero</option>
+                            <option value="mesero">Mesero</option>
+                          </select>
+                        </div>*/}
+
+                        {error && (
+                          <p style={{ fontSize: "13px", color: "#c0392b", background: "#fdf0f0", padding: "10px 12px", borderRadius: "8px", margin: 0 }}>
+                            {error}
+                          </p>
+                        )}
+
+                        <button
+                          type="submit"
+                          disabled={loading}
+                          style={{ padding: "11px", background: "#111", color: "#fff", border: "none", borderRadius: "8px", fontSize: "14px", cursor: loading ? "not-allowed" : "pointer", opacity: loading ? 0.6 : 1, marginTop: "4px" }}
+                        >
+                          {loading ? "Iniciando sesión..." : "Iniciar sesión"}
+                        </button>
+                        <button
+                          style={{ padding: "11px", background: "#111", color: "#fff", border: "none", borderRadius: "8px", fontSize: "14px", cursor: loading ? "not-allowed" : "pointer", opacity: loading ? 0.6 : 1, marginTop: "4px" }}
+                          onClick={handleBackButton}
+                        >
+                          Volver
+                        </button>
+
+                      </form>
+                    ) : (
+                      <form onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
+                        <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
+                          <label htmlFor="newName" style={{ fontSize: "13px", color: "#555" }}>Nombre completo</label>
+                          <input
+                            id="newName"
+                            type="text"
+                            value={newName}
+                            onChange={(e) => setNewName(e.target.value)}
+                            placeholder="Juan Perez"
+                            style={{ padding: "10px 12px", border: "1px solid #ddd", borderRadius: "8px", fontSize: "14px", outline: "none" }}
+                          />
+                        </div>
+
+                        <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
+                          <label htmlFor="email" style={{ fontSize: "13px", color: "#555" }}>Correo electrónico</label>
+                          <input
+                            id="email"
+                            type="email"
+                            value={newEmail}
+                            onChange={(e) => setNewEmail(e.target.value)}
+                            placeholder="usuario@restaurante.com"
+                            style={{ padding: "10px 12px", border: "1px solid #ddd", borderRadius: "8px", fontSize: "14px", outline: "none" }}
+                          />
+                        </div>
+
+                        <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
+                          <label htmlFor="telefono" style={{ fontSize: "13px", color: "#555" }}>Teléfono</label>
+                          <input
+                            id="telefono"
+                            type="tel"
+                            value={newPassword}
+                            onChange={(e) => setNewPhone(e.target.value)}
+                            placeholder="••••••••"
+                            style={{ padding: "10px 12px", border: "1px solid #ddd", borderRadius: "8px", fontSize: "14px", outline: "none" }}
+                          />
+                        </div>
+
+                        <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
+                          <label htmlFor="password" style={{ fontSize: "13px", color: "#555" }}>Contraseña</label>
+                          <input
+                            id="password"
+                            type="password"
+                            value={newPassword}
+                            onChange={(e) => setNewPassword(e.target.value)}
+                            placeholder="••••••••"
+                            style={{ padding: "10px 12px", border: "1px solid #ddd", borderRadius: "8px", fontSize: "14px", outline: "none" }}
+                          />
+                        </div>
+
+                        {error && (
+                          <p style={{ fontSize: "13px", color: "#c0392b", background: "#fdf0f0", padding: "10px 12px", borderRadius: "8px", margin: 0 }}>
+                            {error}
+                          </p>
+                        )}
+
+                        <button
+                          type="submit"
+                          disabled={loading}
+                          style={{ padding: "11px", background: "#111", color: "#fff", border: "none", borderRadius: "8px", fontSize: "14px", cursor: loading ? "not-allowed" : "pointer", opacity: loading ? 0.6 : 1, marginTop: "4px" }}
+                        >
+                          {loading ? "Iniciando sesión..." : "Iniciar sesión"}
+                        </button>
+                        <button
+                          style={{ padding: "11px", background: "#111", color: "#fff", border: "none", borderRadius: "8px", fontSize: "14px", cursor: loading ? "not-allowed" : "pointer", opacity: loading ? 0.6 : 1, marginTop: "4px" }}
+                          onClick={handleBackButton}
+                        >
+                          Volver
+                        </button>
+
+                      </form>
+                    )
+                  } 
+                  
+                  
+                </div>
+              ) : (
+                <div className="flex flex-col justify-center items-center" style={{ width: "100%", maxWidth: "380px", border: "1px solid #e5e5e5", borderRadius: "12px", padding: "2rem", background: "#fff", boxShadow: "0 4px 12px rgba(0, 0, 0, 0.1)" }}>
+                  <div className="flex justify-center items-center size-[100] bg-[purple] rounded-[20px] mb-[20px]">
+                    <Users className="size-[50] text-[white]"/>
+                  </div>   
+                  <h1> Inicio de sesion </h1>
+                  <span> Acceso para personal del restaurante </span>
+
+                  <span> Selecciona tu Rol </span>
+
+                  <RoleCard setRole={setRol}/>
+                  
+                  <form onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
+
+                    <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
+                      <label htmlFor="email" style={{ fontSize: "13px", color: "#555" }}>Correo electrónico</label>
+                      <input
+                        id="email"
+                        type="email"
+                        value={email}
+                        onChange={(e) => setEmail(e.target.value)}
+                        placeholder="usuario@restaurante.com"
+                        style={{ padding: "10px 12px", border: "1px solid #ddd", borderRadius: "8px", fontSize: "14px", outline: "none" }}
+                      />
+                    </div>
+
+                    <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
+                      <label htmlFor="password" style={{ fontSize: "13px", color: "#555" }}>Contraseña</label>
+                      <input
+                        id="password"
+                        type="password"
+                        value={password}
+                        onChange={(e) => setPassword(e.target.value)}
+                        placeholder="••••••••"
+                        style={{ padding: "10px 12px", border: "1px solid #ddd", borderRadius: "8px", fontSize: "14px", outline: "none" }}
+                      />
+                    </div>
+
+                    {error && (
+                      <p style={{ fontSize: "13px", color: "#c0392b", background: "#fdf0f0", padding: "10px 12px", borderRadius: "8px", margin: 0 }}>
+                        {error}
+                      </p>
+                    )}
+
+                    <button
+                      type="submit"
+                      disabled={loading}
+                      style={{ padding: "11px", background: "#111", color: "#fff", border: "none", borderRadius: "8px", fontSize: "14px", cursor: loading ? "not-allowed" : "pointer", opacity: loading ? 0.6 : 1, marginTop: "4px" }}
+                    >
+                      {loading ? "Iniciando sesión..." : "Iniciar sesión"}
+                    </button>
+                    <button
+                      style={{ padding: "11px", background: "#111", color: "#fff", border: "none", borderRadius: "8px", fontSize: "14px", cursor: loading ? "not-allowed" : "pointer", opacity: loading ? 0.6 : 1, marginTop: "4px" }}
+                      onClick={handleBackButton}
+                    >
+                      Volver
+                    </button>
+
+                  </form>
+                </div>
+              )
+            }
+          </div>
+          
+            
         )
       }
       
