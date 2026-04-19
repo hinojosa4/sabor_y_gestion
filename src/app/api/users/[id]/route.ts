@@ -32,10 +32,11 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
     await user.save();
 
     return NextResponse.json(user);
-  } catch (error: any) {
-    console.error("Error en PUT /api/users/[id]:", error);
-    return NextResponse.json({ error: error.message }, { status: 400 });
-  }
+  } catch (error: unknown) {
+  const errorMessage = error instanceof Error ? error.message : "Error desconocido";
+  console.error("❌ API Error:", errorMessage);
+  return NextResponse.json({ error: errorMessage }, { status: 400 });
+}
 }
 
 export async function DELETE(req: Request, { params }: { params: Promise<{ id: string }> }) {
@@ -50,7 +51,9 @@ export async function DELETE(req: Request, { params }: { params: Promise<{ id: s
     }
 
     return NextResponse.json({ message: "Usuario eliminado con éxito" });
-  } catch (error: any) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
-  }
+  } catch (error: unknown) {
+  const errorMessage = error instanceof Error ? error.message : "Error desconocido";
+  console.error("❌ API Error:", errorMessage);
+  return NextResponse.json({ error: errorMessage }, { status: 400 });
+}
 }

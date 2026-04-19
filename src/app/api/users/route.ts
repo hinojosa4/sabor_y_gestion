@@ -15,23 +15,34 @@ export async function POST(req: Request) {
   try {
     await connectDB();
     const body = await req.json();
-
-    // 1. Validamos con Zod
     const data = userSchema.parse(body);
 
-    // 2. IMPORTANTE: Mapear para que Mongoose lo entienda
-    const userData = {
+    const newUser = new User({
       ...data,
-      // Si el form envía password_hash, pero el modelo usa password
-      password: data.password_hash || data.password 
-    };
+      password: data.password_hash 
+    });
 
-    const newUser = new User(userData);
-    await newUser.save(); 
-
+    await newUser.save();
     return NextResponse.json(newUser, { status: 201 });
-  } catch (error: any) {
-    console.error("❌ ERROR:", error);
-    return NextResponse.json({ error: error.message }, { status: 400 });
+
+  } catch (error: unknown) {
+    // Verificamos si es el error 11000 de MongoDB (Duplicado)
+    const isDuplicateError = 
+      typeof error === 'object' && 
+      error !== null && 
+      'code' in error && 
+      (error as { code: number }).code === 11000;
+
+    if (isDuplicateError) {
+      return NextResponse.json(
+        { error: "El correo electrónico ya está registrado. Intenta con otro." }, 
+        { status: 400 }
+      );
+    }
+
+    const errorMessage = error instanceof Error ? error.message : "Error inesperado";
+    console.error("❌ Error Detallado:", errorMessage);
+    
+    return NextResponse.json({ error: errorMessage }, { status: 400 });
   }
 }

@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { Employee, Role, EmployeeStatus, WorkShift } from '../types/employee';
 import { Button } from './ui/Button';
 import { X } from 'lucide-react';
@@ -31,17 +31,23 @@ interface FormErrors {
 }
 
 export function EmployeeForm({ isOpen, onClose, onSubmit, employee, restaurantId }: EmployeeFormProps) {
+  // Inicializamos el estado usando los datos del 'employee' si existe (Edición)
+  // o valores vacíos si es null (Creación).
   const [formData, setFormData] = useState({
-    name: '',
-    email: '',
+    name: employee?.name || '',
+    email: employee?.email || '',
     password: '',
-    role: 'waiter' as Role,
+    role: (employee?.role as Role) || 'waiter',
     employmentDetails: {
-      phone: '',
-      shift: 'Turno Mañana' as WorkShift,
-      startDate: new Date().toLocaleDateString('en-CA'),
-      salary: 0,
-      status: 'Activo' as EmployeeStatus
+      phone: employee?.employmentDetails?.phone || '',
+      shift: (employee?.employmentDetails?.shift as WorkShift) || 'Turno Mañana',
+      startDate: employee?.employmentDetails?.startDate 
+        ? (typeof employee.employmentDetails.startDate === 'string' 
+            ? employee.employmentDetails.startDate.split('T')[0] 
+            : new Date(employee.employmentDetails.startDate).toISOString().split('T')[0])
+        : new Date().toISOString().split('T')[0],
+      salary: employee?.employmentDetails?.salary || 0,
+      status: (employee?.employmentDetails?.status as EmployeeStatus) || 'Activo'
     }
   });
 
@@ -93,41 +99,44 @@ export function EmployeeForm({ isOpen, onClose, onSubmit, employee, restaurantId
     return Object.keys(newErrors).length === 0;
   };
 
-  useEffect(() => {
-    if (employee) {
-      setFormData({
-        name: employee.name,
-        email: employee.email,
-        password: '',
-        role: employee.role,
-        employmentDetails: {
-          phone: employee.employmentDetails.phone,
-          shift: employee.employmentDetails.shift,
-          startDate: typeof employee.employmentDetails.startDate === 'string'
-            ? employee.employmentDetails.startDate.split('T')[0]
-            : new Date(employee.employmentDetails.startDate).toISOString().split('T')[0],
-          salary: employee.employmentDetails.salary,
-          status: employee.employmentDetails.status
-        }
-      });
-    } else {
-      setFormData({
-        name: '',
-        email: '',
-        password: '',
-        role: 'waiter',
-        employmentDetails: {
-          phone: '',
-          shift: 'Turno Mañana',
-          startDate: new Date().toLocaleDateString('en-CA'),
-          salary: 0,
-          status: 'Activo'
-        }
-      });
-    }
-    setErrors({});
-    setTouched({});
-  }, [employee, isOpen]);
+  /*useEffect(() => {
+  // Solo ejecutamos la lógica si el modal está abierto
+  if (!isOpen) return;
+
+  if (employee) {
+    setFormData({
+      name: employee.name,
+      email: employee.email,
+      password: '',
+      role: employee.role,
+      employmentDetails: {
+        phone: employee.employmentDetails.phone,
+        shift: employee.employmentDetails.shift,
+        startDate: typeof employee.employmentDetails.startDate === 'string'
+          ? employee.employmentDetails.startDate.split('T')[0]
+          : new Date(employee.employmentDetails.startDate).toISOString().split('T')[0],
+        salary: employee.employmentDetails.salary,
+        status: employee.employmentDetails.status
+      }
+    });
+  } else {
+    // Resetear a valores iniciales si no hay empleado (creación nueva)
+    setFormData({
+      name: '',
+      email: '',
+      password: '',
+      role: 'waiter',
+      employmentDetails: {
+        phone: '',
+        shift: 'Turno Mañana',
+        startDate: new Date().toISOString().split('T')[0],
+        salary: 0,
+        status: 'Activo'
+      }
+    });
+  }
+  
+}, [employee, isOpen]);*/
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
