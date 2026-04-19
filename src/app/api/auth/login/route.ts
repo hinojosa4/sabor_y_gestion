@@ -32,7 +32,7 @@ export async function POST(req: NextRequest) {
     if (!user) {
       // Respuesta genérica para no revelar si el email existe
       return NextResponse.json(
-        { ok: false, message: "Credenciales incorrectas" },
+        { ok: false, message: "No se encuentra registrado" },
         { status: 401 }
       );
     }

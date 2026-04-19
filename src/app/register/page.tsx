@@ -56,7 +56,9 @@ export default function RegisterPage() {
       const data = await res.json();
 
       if (!res.ok) {
-        <pre>{JSON.stringify(data.error, null, 2)}</pre>
+        console.error(data);
+        setMessage(data.error || "Error al registrar ❌");
+      return;
       }
 
       setMessage("Usuario creado correctamente ✅");
@@ -98,6 +100,7 @@ export default function RegisterPage() {
         <br />
 
         <select name="rol" value={form.rol} onChange={handleChange}>
+          <option value="">Selecciona un rol</option>
           <option value="admin">Admin</option>
           <option value="cajero">Cajero</option>
           <option value="cocinero">Cocinero</option>
