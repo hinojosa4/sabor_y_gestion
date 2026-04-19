@@ -1,7 +1,6 @@
 import { NextResponse } from 'next/server';
 import { connectDB } from '@/lib/db';
 import User from '@/models/User';
-import { userSchema } from '@/validations/user'; // Para mantener la seguridad
 
 export async function PUT(req: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
