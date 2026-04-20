@@ -1,9 +1,10 @@
 // src/app/dashboard/cliente/page.tsx
 "use client";
 import { useAuth } from "@/lib/useAuth";
+import { CLIENTE } from "@/lib/roles";
 
 export default function ClienteDashboard() {
-  const { user, loading } = useAuth(["cliente"]);
+  const { user, loading } = useAuth(CLIENTE);
   if (loading) return null;
   if (!user) return null;
   return (

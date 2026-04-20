@@ -53,7 +53,8 @@ export function useAuth(allowedRoles?: AuthUser["rol"][]) {
     } finally {
       setLoading(false);
     }
-  }, [router]);
+  
+  }, [allowedRoles, router]);
 
   const logout = () => {
     localStorage.removeItem("token");

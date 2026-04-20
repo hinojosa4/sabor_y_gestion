@@ -1,9 +1,10 @@
 // src/app/dashboard/cocinero/page.tsx
 "use client";
 import { useAuth } from "@/lib/useAuth";
+import { COCINERO } from "@/lib/roles";
 
 export default function CocineroPage() {
-  const { user, loading } = useAuth(["cocinero"]);
+  const { user, loading } = useAuth(COCINERO);
   if (loading) return null;
   if (!user) return null;
   return (

@@ -1,9 +1,10 @@
 // src/app/dashboard/mesero/page.tsx
 "use client";
 import { useAuth } from "@/lib/useAuth";
+import { MESERO } from "@/lib/roles";
 
 export default function MeseroDashboard() {
-  const { user, loading } = useAuth(["mesero"]);
+  const { user, loading } = useAuth(MESERO);
   if (loading) return null;
   if (!user) return null;
   return (
