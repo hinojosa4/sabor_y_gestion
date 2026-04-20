@@ -1,0 +1,26 @@
+name: CI Pipeline
+
+on:
+  pull_request:
+    branches: ["dev", "main"]
+  push:
+    branches: ["dev", "main"]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Clonar repo
+        uses: actions/checkout@v4
+
+      - name: Instalar Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20  # <--- Aquí está el cambio clave
+
+      - name: Instalar dependencias
+        run: npm install
+
+      - name: Verificación completa
+        run: npm run check
