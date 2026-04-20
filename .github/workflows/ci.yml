@@ -17,10 +17,18 @@ jobs:
       - name: Instalar Node
         uses: actions/setup-node@v4
         with:
-          node-version: 20  # <--- Aquí está el cambio clave
+          node-version: 20
 
       - name: Instalar dependencias
         run: npm install
 
       - name: Verificación completa
+        # Aquí inyectamos todas las variables necesarias para el build
         run: npm run check
+        env:
+          MONGO_URI: ${{ secrets.MONGO_URI }}
+          JWT_SECRET: ${{ secrets.JWT_SECRET }}
+          NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME: ${{ secrets.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME }}
+          NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET: ${{ secrets.NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET }}
+          # Si tienes URL de base de datos u otras claves, agrégalas aquí:
+          
