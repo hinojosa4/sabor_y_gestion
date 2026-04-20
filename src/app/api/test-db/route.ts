@@ -1,13 +1,15 @@
 import { NextResponse } from "next/server";
 import { connectDB } from "@/lib/db";
 
+export const dynamic = 'force-dynamic'; 
+
 export async function GET() {
   try {
     await connectDB();
 
     return NextResponse.json({
       ok: true,
-      message: "Mongo conectado",
+      message: "Mongo conectado correctamente desde la API",
     });
   } catch (error) {
     return NextResponse.json(
