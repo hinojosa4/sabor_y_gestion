@@ -1,8 +1,15 @@
-export default function Page() {
+// src/app/dashboard/page.tsx
+"use client";
+import { useAuth } from "@/lib/useAuth";
+import { ADMIN } from "@/lib/roles";
+
+export default function AdminDashboard() {
+  const { user, loading } = useAuth(ADMIN);
+  if (loading) return null;
+  if (!user) return null;
   return (
-    <div className="p-8">
-      <h1 className="text-2xl font-bold">Módulo en construcción</h1>
-      <p>Pronto verás el contenido de Sabor y Gestión aquí.</p>
-    </div>
+    <main style={{ padding: "2rem" }}>
+      <p>Aquí tiene que estar la vista del rol Admin</p>
+    </main>
   );
 }
