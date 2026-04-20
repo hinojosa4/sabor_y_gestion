@@ -9,7 +9,6 @@ export default function Home() {
         <p className="text-xl text-gray-600 mb-8">
           Sistema de Gestión para un restaurante 
         </p>
-        
       </div>
     </main>
   )
