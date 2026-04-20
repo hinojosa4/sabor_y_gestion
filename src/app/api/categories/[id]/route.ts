@@ -83,7 +83,7 @@ export async function PUT(req: NextRequest, { params }: Params) {
         descripcion: descripcion?.trim() || "",
         activo: activo ?? true,
       },
-      { new: true, runValidators: true }
+      { returnDocument: "after", runValidators: true }
     );
 
     if (!updatedCategory) {

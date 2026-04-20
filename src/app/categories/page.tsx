@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
+import Image from "next/image";
 
 interface ICategory {
   _id: string;
@@ -449,7 +450,13 @@ export default function CategoriesPage() {
                 }}>
                   <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
                     {dish.image_url ? (
-                      <img src={dish.image_url} alt={dish.name} style={{ width: 40, height: 40, borderRadius: 8, objectFit: "cover" }} />
+                      <Image
+                        src={dish.image_url}
+                        alt={dish.name}
+                        width={40}
+                        height={40}
+                        style={{ borderRadius: 8, objectFit: "cover" }}
+                      />
                     ) : (
                       <div style={{ width: 40, height: 40, borderRadius: 8, background: "#eee", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18 }}>🍴</div>
                     )}
@@ -489,9 +496,18 @@ export default function CategoriesPage() {
 
           <div style={{ display: "flex", flexDirection: "column", gap: 18 }}>
             {selectedDish.image_url && (
-              <img src={selectedDish.image_url} alt={selectedDish.name} style={{
-                width: "100%", height: 200, objectFit: "cover", borderRadius: 12,
-              }} />
+              <Image
+                src={selectedDish.image_url}
+                alt={selectedDish.name}
+                width={600} // ancho base requerido
+                height={200}
+                style={{
+                  width: "100%",
+                  height: 200,
+                  objectFit: "cover",
+                  borderRadius: 12,
+                }}
+              />
             )}
 
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
@@ -564,16 +580,61 @@ function Modal({ title, children, onClose, wide = false }: {
   title: string; children: React.ReactNode; onClose: () => void; wide?: boolean;
 }) {
   return (
-    <div style={{
-      position: "fixed", inset: 0, background: "rgba(0,0,0,0.45)",
-      display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000, padding: 20,
-    }}>
-      <div style={{
-        background: "#fff", borderRadius: 18, padding: "32px 36px",
-        width: wide ? 600 : 460, maxWidth: "100%", maxHeight: "90vh",
-        overflowY: "auto", boxShadow: "0 20px 60px rgba(0,0,0,0.18)",
-      }}>
-        {title && <h2 style={{ margin: "0 0 20px", fontSize: 19, fontWeight: 700, color: "#1a1a1a" }}>{title}</h2>}
+    <div
+      onClick={onClose} // 👈 cerrar al hacer click fuera
+      style={{
+        position: "fixed",
+        inset: 0,
+        background: "rgba(0,0,0,0.45)",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        zIndex: 1000,
+        padding: 20,
+      }}
+    >
+      <div
+        onClick={(e) => e.stopPropagation()} // 👈 evita que se cierre al hacer click dentro
+        style={{
+          position: "relative", // 👈 necesario para el botón X
+          background: "#fff",
+          borderRadius: 18,
+          padding: "32px 36px",
+          width: wide ? 600 : 460,
+          maxWidth: "100%",
+          maxHeight: "90vh",
+          overflowY: "auto",
+          boxShadow: "0 20px 60px rgba(0,0,0,0.18)",
+        }}
+      >
+        {/* ❌ Botón cerrar */}
+        <button
+          onClick={onClose}
+          style={{
+            position: "absolute",
+            top: 12,
+            right: 16,
+            background: "none",
+            border: "none",
+            fontSize: 18,
+            cursor: "pointer",
+            color: "#888",
+          }}
+        >
+          ✕
+        </button>
+
+        {title && (
+          <h2 style={{
+            margin: "0 0 20px",
+            fontSize: 19,
+            fontWeight: 700,
+            color: "#1a1a1a"
+          }}>
+            {title}
+          </h2>
+        )}
+
         {children}
       </div>
     </div>
@@ -615,7 +676,13 @@ function DishCard({ dish, onClick, categories, onRemove, onAssign }: {
     }}>
       <div onClick={onClick} style={{ display: "flex", alignItems: "center", gap: 10, cursor: "pointer" }}>
         {dish.image_url ? (
-          <img src={dish.image_url} alt={dish.name} style={{ width: 42, height: 42, borderRadius: 8, objectFit: "cover", flexShrink: 0 }} />
+          <Image
+            src={dish.image_url}
+            alt={dish.name}
+            width={42}
+            height={42}
+            style={{ borderRadius: 8, objectFit: "cover", flexShrink: 0 }}
+          />
         ) : (
           <div style={{ width: 42, height: 42, borderRadius: 8, background: "#f0f0f0", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18, flexShrink: 0 }}>🍴</div>
         )}

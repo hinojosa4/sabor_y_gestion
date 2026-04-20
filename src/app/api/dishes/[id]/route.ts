@@ -65,7 +65,7 @@ export async function PUT(req: NextRequest, { params }: Params) {
         image_url: image_url || "",
         ingredients: ingredients || [],       // ← nuevo campo
       },
-      { new: true, runValidators: true }
+      { returnDocument: "after", runValidators: true }
     ).populate("category_id", "nombre");
 
     if (!updatedDish) {

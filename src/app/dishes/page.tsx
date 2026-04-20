@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useMemo } from "react";
 import { useRouter } from "next/navigation";
-
+import Image from "next/image";
 interface ICategory {
   _id: string;
   nombre: string;
@@ -101,16 +101,61 @@ function Modal({ title, children, onClose, wide = false }: {
   title?: string; children: React.ReactNode; onClose: () => void; wide?: boolean;
 }) {
   return (
-    <div style={{
-      position: "fixed", inset: 0, background: "rgba(0,0,0,0.45)",
-      display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000, padding: 20,
-    }}>
-      <div style={{
-        background: "#fff", borderRadius: 18, padding: "32px 36px",
-        width: wide ? 620 : 480, maxWidth: "100%", maxHeight: "90vh",
-        overflowY: "auto", boxShadow: "0 20px 60px rgba(0,0,0,0.18)",
-      }}>
-        {title && <h2 style={{ margin: "0 0 22px", fontSize: 19, fontWeight: 700, color: "#1a1a1a" }}>{title}</h2>}
+    <div
+      onClick={onClose} // 👈 cerrar al hacer click fuera
+      style={{
+        position: "fixed",
+        inset: 0,
+        background: "rgba(0,0,0,0.45)",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        zIndex: 1000,
+        padding: 20,
+      }}
+    >
+      <div
+        onClick={(e) => e.stopPropagation()} // 👈 evita que se cierre al hacer click dentro
+        style={{
+          position: "relative", // 👈 para posicionar la X
+          background: "#fff",
+          borderRadius: 18,
+          padding: "32px 36px",
+          width: wide ? 620 : 480,
+          maxWidth: "100%",
+          maxHeight: "90vh",
+          overflowY: "auto",
+          boxShadow: "0 20px 60px rgba(0,0,0,0.18)",
+        }}
+      >
+        {/* Botón cerrar */}
+        <button
+          onClick={onClose}
+          style={{
+            position: "absolute",
+            top: 12,
+            right: 16,
+            background: "none",
+            border: "none",
+            fontSize: 18,
+            cursor: "pointer",
+            color: "#888",
+          }}
+        >
+          ✕
+        </button>
+
+        {title && (
+          <h2 style={{
+            margin: "0 0 22px",
+            fontSize: 19,
+            fontWeight: 700,
+            color: "#1a1a1a"
+          }}>
+            {title}
+          </h2>
+        )}
+
         {children}
       </div>
     </div>
@@ -254,9 +299,14 @@ function DishForm({ initial, categories, onSubmit, onCancel, error, submitLabel 
             )}
             {form.image_url && !uploading && (
               <div style={{ marginTop: 8, position: "relative" }}>
-                <img src={form.image_url} alt="preview" style={{
-                  width: "100%", height: 150, objectFit: "cover", borderRadius: 9,
-                }} />
+                <div style={{ position: "relative", width: "100%", height: 150 }}>
+                    <Image
+                      src={form.image_url}
+                      alt="preview"
+                      fill
+                      style={{ objectFit: "cover", borderRadius: 9 }}
+                    />
+                  </div>
                 <button
                   onClick={() => setForm(f => ({ ...f, image_url: "" }))}
                   style={{
@@ -677,7 +727,14 @@ function DishCard({ dish, onEdit, onDelete }: {
 
       {/* Imagen */}
       {dish.image_url ? (
-        <img src={dish.image_url} alt={dish.name} style={{ width: "100%", height: 180, objectFit: "cover" }} />
+        <div style={{ position: "relative", width: "100%", height: 180 }}>
+          <Image
+            src={dish.image_url}
+            alt={dish.name}
+            fill
+            style={{ objectFit: "cover" }}
+          />
+        </div>
       ) : (
         <div style={{
           width: "100%", height: 100, background: "#f5f5f5",
