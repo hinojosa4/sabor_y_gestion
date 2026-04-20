@@ -1,10 +1,16 @@
 import './globals.css'
 import type { Metadata } from 'next'
+import { Inter } from 'next/font/google'
 
 export const metadata: Metadata = {
   title: 'Sabor & Gestión',
   description: 'Sistema Integral de Gestión Gastronómica',
 }
+
+const inter = Inter({ 
+  subsets: ['latin'],
+  display: 'swap',
+})
 
 export default function RootLayout({
   children,
@@ -12,7 +18,7 @@ export default function RootLayout({
   children: React.ReactNode
 }) {
   return (
-    <html lang="es">
+    <html className={inter.className} lang="es">
       <body className="antialiased">
         {children}
       </body>
