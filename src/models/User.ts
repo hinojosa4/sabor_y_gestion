@@ -65,6 +65,7 @@ UserSchema.pre("save", async function () {
 
 // --- Método de instancia para comparar contraseñas ---
 UserSchema.methods.comparePassword = async function (
+  this: IUser,
   candidatePassword: string
 ): Promise<boolean> {
   return bcrypt.compare(candidatePassword, this.password);
