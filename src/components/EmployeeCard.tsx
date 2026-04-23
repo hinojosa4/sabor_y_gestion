@@ -1,5 +1,5 @@
 import { Employee, roleColors, statusColors } from '../types/employee';
-import { Button } from './ui/Button';
+import { Button } from './UI/Button';
 import { Mail, Phone, Clock, Calendar, Pencil, Trash2 } from 'lucide-react';
 
 interface EmployeeCardProps {
