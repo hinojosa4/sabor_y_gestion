@@ -1,9 +1,9 @@
 "use client";
 // src/app/auth/google/success/page.tsx
-import { useEffect } from "react";
+import { Suspense, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 
-export default function GoogleSuccessPage() {
+function GoogleSuccessHandler() {
   const router = useRouter();
   const searchParams = useSearchParams();
 
@@ -49,5 +49,28 @@ export default function GoogleSuccessPage() {
     >
       Iniciando sesión con Google...
     </div>
+  );
+}
+
+export default function GoogleSuccessPage() {
+  return (
+    <Suspense
+      fallback={
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            minHeight: "100vh",
+            fontSize: "14px",
+            color: "#6b7280",
+          }}
+        >
+          Iniciando sesión con Google...
+        </div>
+      }
+    >
+      <GoogleSuccessHandler />
+    </Suspense>
   );
 }
