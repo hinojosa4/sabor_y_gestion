@@ -1,10 +1,10 @@
 "use client";
 // src/app/reset-password/page.tsx
-import React, { useState, useEffect } from "react";
+import { Suspense, useState, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { UtensilsCrossed, Eye, EyeOff } from "lucide-react";
 
-export default function ResetPasswordPage() {
+function ResetPasswordHandler() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const token = searchParams.get("token");
@@ -17,9 +17,7 @@ export default function ResetPasswordPage() {
   const [error, setError] = useState("");
 
   useEffect(() => {
-    if (!token) {
-      router.replace("/login");
-    }
+    if (!token) router.replace("/login");
   }, [token, router]);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -30,7 +28,6 @@ export default function ResetPasswordPage() {
       setError("La contraseña debe tener al menos 8 caracteres.");
       return;
     }
-
     if (password !== confirm) {
       setError("Las contraseñas no coinciden.");
       return;
@@ -100,7 +97,6 @@ export default function ResetPasswordPage() {
         </div>
 
         {done ? (
-          // Estado: contraseña cambiada
           <div style={{ textAlign: "center" }}>
             <div
               style={{
@@ -141,7 +137,6 @@ export default function ResetPasswordPage() {
             </button>
           </div>
         ) : (
-          // Estado: formulario
           <>
             <h1 style={{ fontSize: "20px", fontWeight: 600, textAlign: "center", margin: "0 0 4px" }}>
               Nueva contraseña
@@ -151,7 +146,6 @@ export default function ResetPasswordPage() {
             </p>
 
             <form onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
-              {/* Campo contraseña con ojo */}
               <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
                 <label htmlFor="password" style={{ fontSize: "13px", color: "#555" }}>
                   Nueva contraseña
@@ -194,7 +188,6 @@ export default function ResetPasswordPage() {
                 </div>
               </div>
 
-              {/* Confirmar contraseña */}
               <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
                 <label htmlFor="confirm" style={{ fontSize: "13px", color: "#555" }}>
                   Confirmar contraseña
@@ -256,5 +249,28 @@ export default function ResetPasswordPage() {
         )}
       </div>
     </div>
+  );
+}
+
+const LoadingFallback = () => (
+  <div
+    style={{
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+      minHeight: "100vh",
+      fontSize: "14px",
+      color: "#6b7280",
+    }}
+  >
+    Cargando...
+  </div>
+);
+
+export default function ResetPasswordPage() {
+  return (
+    <Suspense fallback={<LoadingFallback />}>
+      <ResetPasswordHandler />
+    </Suspense>
   );
 }
