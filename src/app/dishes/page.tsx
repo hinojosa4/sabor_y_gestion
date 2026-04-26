@@ -300,12 +300,13 @@ function DishForm({ initial, categories, onSubmit, onCancel, error, submitLabel 
             {form.image_url && !uploading && (
               <div style={{ marginTop: 8, position: "relative" }}>
                 <div style={{ position: "relative", width: "100%", height: 150 }}>
-                    <Image
-                      src={form.image_url}
-                      alt="preview"
-                      fill
-                      style={{ objectFit: "cover", borderRadius: 9 }}
-                    />
+                  <Image
+                    src={form.image_url}
+                    alt="preview"
+                    fill
+                    sizes="100vw"
+                    style={{ objectFit: "cover", borderRadius: 9 }}
+                  />
                   </div>
                 <button
                   onClick={() => setForm(f => ({ ...f, image_url: "" }))}
@@ -732,6 +733,7 @@ function DishCard({ dish, onEdit, onDelete }: {
             src={dish.image_url}
             alt={dish.name}
             fill
+            sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
             style={{ objectFit: "cover" }}
           />
         </div>
