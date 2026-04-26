@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Employee, Role, EmployeeStatus, WorkShift } from '../types/employee';
-import { Button } from './UI/Button';
+import { Button } from './ui/Button';
 import { X } from 'lucide-react';
 
 interface EmployeeFormProps {

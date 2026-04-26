@@ -6,8 +6,8 @@ import {
   UtensilsCrossed, 
   Users, 
 } from 'lucide-react';
-import { RoleCard } from "@/components/UI/RoleCard";
-import { SelectUserBlock } from "@/components/UI/SelectUserBlock";
+import { RoleCard } from "@/components/ui/RoleCard";
+import { SelectUserBlock } from "@/components/ui/SelectUserBlock";
 
 const containerStyle = {
   width: '80px',           

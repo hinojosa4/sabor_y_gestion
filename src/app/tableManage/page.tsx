@@ -6,43 +6,34 @@ import {
   ArrowLeft,
   LayoutGrid,
   List,
-  MapPin,
   Plus,
   Search,
   X,
 } from "lucide-react";
 
-import { Button } from "../../components/UI/Button";
-import { Input } from "../../components/UI/Input";
+import { Button } from "../../components/ui/Button";
+import { Input } from "../../components/ui/Input";
 import { TableCard } from "../../components/TableCard";
 import { TableFormModal } from "../../components/TableFormModal";
 import { useTableData } from "@/hooks/useTableData";
+import { Table } from "@/types/table";
+import { SubmitTableData } from "../../components/TableFormModal";
 
 type ViewMode = "list" | "floorplan";
 
-type TableType = {
-  _id: string;
-  number: number;
-  capacity: number;
-  location: string;
-  status: string;
-  xPosition?: number;
-  yPosition?: number;
-};
-
-type TableFormData = {
+/*type TableFormData = {
   number: number;
   seats: number;
   location: string;
-  status: string;
+  status: Table["status"]; // ✅ reutiliza el tipo correcto
   xPosition?: number;
   yPosition?: number;
-};
+};*/
 
 type OrderModalProps = {
   isOpen: boolean;
   onClose: () => void;
-  table: TableType | null;
+  table: Table | null; // ✅ ya no TableType
 };
 
 function OrderModal({ isOpen, onClose, table }: OrderModalProps) {
@@ -66,7 +57,9 @@ function OrderModal({ isOpen, onClose, table }: OrderModalProps) {
             Mesa {table.number} - {table.status}
           </h2>
 
-          <p className="text-sm text-gray-500 mt-1">Detalles de la orden</p>
+          <p className="text-sm text-gray-500 mt-1">
+            Detalles de la orden
+          </p>
         </div>
 
         <div className="p-6 flex flex-col items-center justify-center min-h-[200px]">
@@ -92,8 +85,8 @@ function OrderModal({ isOpen, onClose, table }: OrderModalProps) {
 export default function TableManagementPage() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isOrderModalOpen, setIsOrderModalOpen] = useState(false);
-  const [editingTable, setEditingTable] = useState<TableType | null>(null);
-  const [selectedTable, setSelectedTable] = useState<TableType | null>(null);
+  const [editingTable, setEditingTable] = useState<Table | null>(null);
+  const [selectedTable, setSelectedTable] = useState<Table | null>(null);
   const [viewMode, setViewMode] = useState<ViewMode>("list");
 
   const restaurantId = "69e170e941daf8c2b2f76677";
@@ -113,24 +106,36 @@ export default function TableManagementPage() {
     deleteTable,
   } = useTableData(restaurantId);
 
-  const handleSubmitTable = async (tableData: TableFormData) => {
-    try {
-      if (editingTable) {
-        await updateTable(editingTable._id, tableData);
-      } else {
-        await addTable({
-          ...tableData,
-          restaurantId,
-        });
-      }
-
-      setIsModalOpen(false);
-      setEditingTable(null);
-    } catch (error) {
-      console.error(error);
-      alert("Error al guardar la mesa");
+  const handleSubmitTable = async (tableData: SubmitTableData) => {
+  try {
+    if (editingTable) {
+      await updateTable(editingTable._id, {
+        number: tableData.number,
+        capacity: tableData.capacity, // ✅ ya no seats
+        location: tableData.location,
+        status: tableData.status,
+        xPosition: tableData.xPosition,
+        yPosition: tableData.yPosition,
+      });
+    } else {
+      await addTable({
+        number: tableData.number,
+        capacity: tableData.capacity, // ✅ aquí también
+        location: tableData.location,
+        status: tableData.status,
+        xPosition: tableData.xPosition,
+        yPosition: tableData.yPosition,
+        restaurantId,
+      });
     }
-  };
+
+    setIsModalOpen(false);
+    setEditingTable(null);
+  } catch (error) {
+    console.error(error);
+    alert("Error al guardar la mesa");
+  }
+};
 
   const handleDeleteTable = async (id: string) => {
     if (!confirm("¿Eliminar esta mesa?")) return;
@@ -143,7 +148,7 @@ export default function TableManagementPage() {
     }
   };
 
-  const handleTableClick = (table: TableType) => {
+  const handleTableClick = (table: Table) => {
     if (table.status === "Libre" || table.status === "Reservada") {
       setEditingTable(table);
       setIsModalOpen(true);
@@ -157,7 +162,9 @@ export default function TableManagementPage() {
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="font-semibold text-gray-700">Cargando mesas...</div>
+        <div className="font-semibold text-gray-700">
+          Cargando mesas...
+        </div>
       </div>
     );
   }
@@ -174,7 +181,9 @@ export default function TableManagementPage() {
             </Link>
 
             <div>
-              <h1 className="font-semibold text-black">Gestión de Mesas</h1>
+              <h1 className="font-semibold text-black">
+                Gestión de Mesas
+              </h1>
               <p className="text-sm text-gray-500">
                 Administra tu restaurante
               </p>
@@ -194,7 +203,6 @@ export default function TableManagementPage() {
       </header>
 
       <main className="max-w-7xl mx-auto px-4 py-6">
-        {/* toggle */}
         <div className="grid grid-cols-2 bg-gray-100 rounded-xl p-1 max-w-xs mb-6">
           <button
             onClick={() => setViewMode("list")}
@@ -223,7 +231,6 @@ export default function TableManagementPage() {
 
         {viewMode === "list" ? (
           <>
-            {/* filtros */}
             <div className="bg-white rounded-xl border p-4 mb-6">
               <div className="flex gap-4 flex-col md:flex-row">
                 <div className="flex-1 relative">
@@ -232,7 +239,9 @@ export default function TableManagementPage() {
                     className="pl-10"
                     placeholder="Buscar..."
                     value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
+                    onChange={(e) =>
+                      setSearchQuery(e.target.value)
+                    }
                   />
                 </div>
 
@@ -254,9 +263,8 @@ export default function TableManagementPage() {
               </div>
             </div>
 
-            {/* cards */}
             <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {filteredTables.map((table: TableType) => (
+              {filteredTables.map((table) => (
                 <TableCard
                   key={table._id}
                   table={{
@@ -272,14 +280,16 @@ export default function TableManagementPage() {
                     setEditingTable(table);
                     setIsModalOpen(true);
                   }}
-                  onDelete={() => handleDeleteTable(table._id)}
+                  onDelete={() =>
+                    handleDeleteTable(table._id)
+                  }
                 />
               ))}
             </div>
           </>
         ) : (
           <div className="bg-white rounded-xl border p-6 relative min-h-[600px]">
-            {filteredTables.map((table: TableType) => (
+            {filteredTables.map((table) => (
               <button
                 key={table._id}
                 onClick={() => handleTableClick(table)}

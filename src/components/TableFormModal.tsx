@@ -1,7 +1,7 @@
-import { useEffect, useState } from "react";
+import { useState, useEffect } from "react";
 import { X } from "lucide-react";
 
-import { Button } from "./UI/Button";
+import { Button } from "./ui/Button";
 import { TableStatus, statusColors } from "@/types/table";
 
 type ExistingTable = {
@@ -16,7 +16,7 @@ type ExistingTable = {
   yPosition?: number;
 };
 
-type SubmitTableData = {
+export type SubmitTableData = {
   id?: string;
   _id?: string;
   number: number;
