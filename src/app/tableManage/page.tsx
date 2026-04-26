@@ -11,8 +11,8 @@ import {
   X,
 } from "lucide-react";
 
-import { Button } from "../../components/ui/Button";
-import { Input } from "../../components/ui/Input";
+import { Button } from "../../components/UI/Button";
+import { Input } from "../../components/UI/Input";
 import { TableCard } from "../../components/TableCard";
 import { TableFormModal } from "../../components/TableFormModal";
 import { useTableData } from "@/hooks/useTableData";
@@ -93,7 +93,7 @@ export default function TableManagementPage() {
 
   const {
     tables,
-    stats,
+    //stats,
     loading,
     locations,
     searchQuery,

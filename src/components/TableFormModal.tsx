@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { X } from "lucide-react";
 
-import { Button } from "./ui/Button";
+import { Button } from "./UI/Button";
 import { TableStatus, statusColors } from "@/types/table";
 
 type ExistingTable = {
@@ -90,55 +90,51 @@ export function TableFormModal({
   const [errors, setErrors] = useState<FormErrors>({});
   const [touched, setTouched] = useState<Record<string, boolean>>({});
 
-  const getNextTableNumber = (): number => {
-    if (existingTables.length === 0) return 1;
-
-    const numbers = existingTables
-      .map((item) => Number(item.number))
-      .filter((n) => !Number.isNaN(n))
-      .sort((a, b) => a - b);
-
-    let next = 1;
-
-    for (const num of numbers) {
-      if (num > next) break;
-      next = num + 1;
-    }
-
-    return next;
-  };
-
   useEffect(() => {
-  if (!isOpen) return;
+    if (!isOpen) return;
 
-  const loadData = () => {
-    if (table) {
-      setFormData({
-        number: String(table.number ?? ""),
-        seats: table.capacity ?? table.seats ?? 2,
-        location: locationOptions.includes(table.location)
-          ? table.location
-          : "",
-        customLocation: locationOptions.includes(table.location)
-          ? ""
-          : table.location,
-        status: table.status ?? "Libre",
-        xPosition: table.xPosition ?? 50,
-        yPosition: table.yPosition ?? 50,
-      });
-    } else {
-      setFormData({
-        ...defaultFormData,
-        number: String(getNextTableNumber()),
-      });
-    }
+    const loadData = () => {
+      let next = 1;
 
-    setErrors({});
-    setTouched({});
-  };
+      if (existingTables.length > 0) {
+        const numbers = existingTables
+          .map((item) => Number(item.number))
+          .filter((n) => !Number.isNaN(n))
+          .sort((a, b) => a - b);
 
-  queueMicrotask(loadData);
-}, [isOpen, table, existingTables, getNextTableNumber]);
+        for (const num of numbers) {
+          if (num > next) break;
+          next = num + 1;
+        }
+      }
+
+      if (table) {
+        setFormData({
+          number: String(table.number ?? ""),
+          seats: table.capacity ?? table.seats ?? 2,
+          location: locationOptions.includes(table.location)
+            ? table.location
+            : "",
+          customLocation: locationOptions.includes(table.location)
+            ? ""
+            : table.location,
+          status: table.status ?? "Libre",
+          xPosition: table.xPosition ?? 50,
+          yPosition: table.yPosition ?? 50,
+        });
+      } else {
+        setFormData({
+          ...defaultFormData,
+          number: String(next),
+        });
+      }
+
+      setErrors({});
+      setTouched({});
+    };
+
+    queueMicrotask(loadData);
+  }, [isOpen, table, existingTables]);
 
   const validateForm = (): boolean => {
     const newErrors: FormErrors = {};

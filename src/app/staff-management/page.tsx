@@ -1,6 +1,6 @@
 "use client";
-import { Button } from '../../components/ui/Button'
-import { Input } from '../../components/ui/Input';
+import { Button } from '../../components/UI/Button'
+import { Input } from '../../components/UI/Input';
 import { EmployeeCard } from "../../components/EmployeeCard";
 import { EmployeeForm } from "../../components/EmployeeForm";
 import { Users, Plus, Search, ArrowLeft } from "lucide-react";

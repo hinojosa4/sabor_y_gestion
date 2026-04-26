@@ -1,4 +1,4 @@
-import { Button } from "./ui/Button";
+import { Button } from "./UI/Button";
 import { Users, MapPin, Pencil, Trash2 } from "lucide-react";
 
 type TableCardItem = {
