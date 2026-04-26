@@ -86,8 +86,7 @@ export default function TableManagementPage() {
     filteredTables,
     addTable,
     updateTable,
-    deleteTable,
-    refreshTables  // ✅ Mantener aunque no se use (puede usarse luego)
+    deleteTable
   } = useTableData(restaurantId);
 
   // ✅ Tipar tableData con Partial<Table>
