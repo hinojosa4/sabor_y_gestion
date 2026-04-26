@@ -1,12 +1,13 @@
 "use client";
 import React, { useState } from "react";
 import { useRouter } from "next/navigation";
-import { UtensilsCrossed } from "lucide-react";
+import { UtensilsCrossed, Eye, EyeOff } from "lucide-react";
 
 export default function LoginPage() {
   const router = useRouter();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
@@ -54,7 +55,6 @@ export default function LoginPage() {
   };
 
   const handleGoogleLogin = () => {
-    // TODO: implementar Google OAuth
     window.location.href = "/api/auth/google";
   };
 
@@ -81,13 +81,7 @@ export default function LoginPage() {
         }}
       >
         {/* Logo */}
-        <div
-          style={{
-            display: "flex",
-            justifyContent: "center",
-            marginBottom: "1.25rem",
-          }}
-        >
+        <div style={{ display: "flex", justifyContent: "center", marginBottom: "1.25rem" }}>
           <div
             style={{
               width: "72px",
@@ -105,29 +99,16 @@ export default function LoginPage() {
         </div>
 
         {/* Título */}
-        <h1
-          style={{
-            fontSize: "20px",
-            fontWeight: 600,
-            textAlign: "center",
-            margin: "0 0 4px",
-          }}
-        >
+        <h1 style={{ fontSize: "20px", fontWeight: 600, textAlign: "center", margin: "0 0 4px" }}>
           Sistema de Gestión
         </h1>
-        <p
-          style={{
-            fontSize: "13px",
-            color: "#6b7280",
-            textAlign: "center",
-            marginBottom: "1.5rem",
-          }}
-        >
+        <p style={{ fontSize: "13px", color: "#6b7280", textAlign: "center", marginBottom: "1.5rem" }}>
           Inicia sesión para continuar
         </p>
 
         {/* Formulario */}
         <form onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
+          {/* Email */}
           <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
             <label htmlFor="email" style={{ fontSize: "13px", color: "#555" }}>
               Correo electrónico
@@ -148,24 +129,47 @@ export default function LoginPage() {
             />
           </div>
 
+          {/* Contraseña con ojo */}
           <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
             <label htmlFor="password" style={{ fontSize: "13px", color: "#555" }}>
               Contraseña
             </label>
-            <input
-              id="password"
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              placeholder="••••••••"
-              style={{
-                padding: "10px 12px",
-                border: "1px solid #ddd",
-                borderRadius: "8px",
-                fontSize: "14px",
-                outline: "none",
-              }}
-            />
+            <div style={{ position: "relative" }}>
+              <input
+                id="password"
+                type={showPassword ? "text" : "password"}
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder="••••••••"
+                style={{
+                  width: "100%",
+                  padding: "10px 40px 10px 12px",
+                  border: "1px solid #ddd",
+                  borderRadius: "8px",
+                  fontSize: "14px",
+                  outline: "none",
+                  boxSizing: "border-box",
+                }}
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassword((v) => !v)}
+                style={{
+                  position: "absolute",
+                  right: "10px",
+                  top: "50%",
+                  transform: "translateY(-50%)",
+                  background: "none",
+                  border: "none",
+                  cursor: "pointer",
+                  color: "#9ca3af",
+                  padding: 0,
+                  display: "flex",
+                }}
+              >
+                {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+              </button>
+            </div>
           </div>
 
           {error && (
@@ -203,14 +207,7 @@ export default function LoginPage() {
         </form>
 
         {/* Divider */}
-        <div
-          style={{
-            display: "flex",
-            alignItems: "center",
-            gap: "10px",
-            margin: "1.25rem 0",
-          }}
-        >
+        <div style={{ display: "flex", alignItems: "center", gap: "10px", margin: "1.25rem 0" }}>
           <div style={{ flex: 1, height: "1px", background: "#e5e7eb" }} />
           <span style={{ fontSize: "12px", color: "#9ca3af", whiteSpace: "nowrap" }}>
             o continúa con
@@ -246,13 +243,16 @@ export default function LoginPage() {
           Continuar con Google
         </button>
 
-        {/* Olvidaste contraseña */}
+        {/* Olvidaste contraseña + Registro */}
         <div
           style={{
             textAlign: "center",
             marginTop: "1.25rem",
             paddingTop: "1.25rem",
             borderTop: "1px solid #f0f0f0",
+            display: "flex",
+            flexDirection: "column",
+            gap: "8px",
           }}
         >
           <a
@@ -261,6 +261,15 @@ export default function LoginPage() {
           >
             ¿Olvidaste tu contraseña?
           </a>
+          <span style={{ fontSize: "13px", color: "#6b7280" }}>
+            ¿No tienes cuenta?{" "}
+            <a
+              href="/register"
+              style={{ color: "#ea580c", textDecoration: "none", fontWeight: 500 }}
+            >
+              Regístrate
+            </a>
+          </span>
         </div>
       </div>
     </div>
