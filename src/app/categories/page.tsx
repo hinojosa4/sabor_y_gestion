@@ -228,6 +228,11 @@ export default function CategoriesPage() {
         padding: "18px 40px", display: "flex", alignItems: "center", justifyContent: "space-between",
       }}>
         <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
+          <button onClick={() => router.push("/dashboard")} style={{
+            background: "#f4f4f4", border: "1.5px solid #e0e0e0", borderRadius: 9,
+            width: 38, height: 38, display: "flex", alignItems: "center", justifyContent: "center",
+            cursor: "pointer", fontSize: 16,
+          }}>←</button>
           <div style={{
             width: 44, height: 44, borderRadius: 12, background: "#e85d26",
             display: "flex", alignItems: "center", justifyContent: "center", fontSize: 22,
