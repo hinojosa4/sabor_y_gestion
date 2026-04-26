@@ -1,7 +1,7 @@
 // app/tableManage/page.tsx
 "use client";
-import { Button } from '../../components/UI/Button';
-import { Input } from '../../components/UI/Input';
+import { Button } from '../../components/ui/Button';
+import { Input } from '../../components/ui/Input';
 import { TableCard } from '../../components/TableCard';
 import { TableFormModal } from '../../components/TableFormModal';
 import { LayoutGrid, List, Plus, Search, ArrowLeft, MapPin, X } from 'lucide-react';

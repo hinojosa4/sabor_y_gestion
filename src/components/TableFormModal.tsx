@@ -2,7 +2,7 @@
 /* eslint-disable react-hooks/set-state-in-effect */  // ✅ Agregar al inicio
 
 import { useState, useEffect, useCallback } from 'react';  // ✅ Agregar useCallback
-import { Button } from './UI/Button';
+import { Button } from './ui/Button';
 import { X } from 'lucide-react';
 import { TableStatus, statusColors, Table } from '@/types/table';
 

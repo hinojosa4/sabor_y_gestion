@@ -1,5 +1,5 @@
 // components/TableCard.tsx
-import { Button } from './UI/Button';
+import { Button } from './ui/Button';
 import { Users, MapPin, Pencil, Trash2 } from 'lucide-react';
 
 // ✅ Definir el tipo Table para usarlo en lugar de any
