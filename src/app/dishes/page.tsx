@@ -3,6 +3,7 @@
 import { useState, useEffect, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
+
 interface ICategory {
   _id: string;
   nombre: string;
@@ -21,6 +22,18 @@ interface IDish {
 }
 
 const API = "/api";
+
+// ─── Hook responsive ──────────────────────────────────────────────────────────
+function useIsMobile() {
+  const [isMobile, setIsMobile] = useState(false);
+  useEffect(() => {
+    const check = () => setIsMobile(window.innerWidth < 640);
+    check();
+    window.addEventListener("resize", check);
+    return () => window.removeEventListener("resize", check);
+  }, []);
+  return isMobile;
+}
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 function getCatId(d: IDish): string | null {
@@ -97,38 +110,37 @@ function ErrorBox({ msg }: { msg: string }) {
   );
 }
 
-function Modal({ title, children, onClose, wide = false }: {
-  title?: string; children: React.ReactNode; onClose: () => void; wide?: boolean;
+function Modal({ title, children, onClose, wide = false, isMobile = false }: {
+  title?: string; children: React.ReactNode; onClose: () => void; wide?: boolean; isMobile?: boolean;
 }) {
   return (
     <div
-      onClick={onClose} // 👈 cerrar al hacer click fuera
+      onClick={onClose}
       style={{
         position: "fixed",
         inset: 0,
         background: "rgba(0,0,0,0.45)",
         display: "flex",
-        alignItems: "center",
+        alignItems: isMobile ? "flex-end" : "center",
         justifyContent: "center",
         zIndex: 1000,
-        padding: 20,
+        padding: isMobile ? 0 : 20,
       }}
     >
       <div
-        onClick={(e) => e.stopPropagation()} // 👈 evita que se cierre al hacer click dentro
+        onClick={(e) => e.stopPropagation()}
         style={{
-          position: "relative", // 👈 para posicionar la X
+          position: "relative",
           background: "#fff",
-          borderRadius: 18,
-          padding: "32px 36px",
-          width: wide ? 620 : 480,
+          borderRadius: isMobile ? "18px 18px 0 0" : 18,
+          padding: isMobile ? "28px 20px 32px" : "32px 36px",
+          width: isMobile ? "100%" : wide ? 620 : 480,
           maxWidth: "100%",
-          maxHeight: "90vh",
+          maxHeight: isMobile ? "92vh" : "90vh",
           overflowY: "auto",
           boxShadow: "0 20px 60px rgba(0,0,0,0.18)",
         }}
       >
-        {/* Botón cerrar */}
         <button
           onClick={onClose}
           style={{
@@ -150,7 +162,8 @@ function Modal({ title, children, onClose, wide = false }: {
             margin: "0 0 22px",
             fontSize: 19,
             fontWeight: 700,
-            color: "#1a1a1a"
+            color: "#1a1a1a",
+            paddingRight: 24,
           }}>
             {title}
           </h2>
@@ -194,13 +207,14 @@ type DishFormData = {
   ingredients: string[]; image_url: string;
 };
 
-function DishForm({ initial, categories, onSubmit, onCancel, error, submitLabel }: {
+function DishForm({ initial, categories, onSubmit, onCancel, error, submitLabel, isMobile }: {
   initial: DishFormData;
   categories: ICategory[];
   onSubmit: (data: DishFormData) => void;
   onCancel: () => void;
   error: string;
   submitLabel: string;
+  isMobile?: boolean;
 }) {
   const [form, setForm] = useState<DishFormData>(initial);
   const [newIng, setNewIng] = useState("");
@@ -237,7 +251,12 @@ function DishForm({ initial, categories, onSubmit, onCancel, error, submitLabel 
     <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
       {error && <ErrorBox msg={error} />}
 
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+      <div style={{
+        display: "grid",
+        // En mobile todo en una columna, en desktop 2 columnas
+        gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr",
+        gap: 12,
+      }}>
 
         {/* Nombre */}
         <div style={{ gridColumn: "1 / -1" }}>
@@ -273,11 +292,9 @@ function DishForm({ initial, categories, onSubmit, onCancel, error, submitLabel 
           </Field>
         </div>
 
-        {/* Imagen — subida a Cloudinary */}
+        {/* Imagen */}
         <div style={{ gridColumn: "1 / -1" }}>
           <Field label="Imagen del plato">
-            
-            {/* Zona de subida personalizada */}
             <label style={{
               display: "flex", alignItems: "center", gap: 12,
               padding: "12px 16px", borderRadius: 9,
@@ -304,7 +321,7 @@ function DishForm({ initial, categories, onSubmit, onCancel, error, submitLabel 
               <input
                 type="file"
                 accept="image/*"
-                style={{ display: "none" }}  
+                style={{ display: "none" }}
                 onChange={(e) => {
                   const file = e.target.files?.[0];
                   if (!file) return;
@@ -324,7 +341,6 @@ function DishForm({ initial, categories, onSubmit, onCancel, error, submitLabel 
               />
             </label>
 
-            {/* Loading */}
             {uploading && (
               <div style={{ marginTop: 8, display: "flex", alignItems: "center", gap: 8 }}>
                 <div style={{
@@ -339,7 +355,6 @@ function DishForm({ initial, categories, onSubmit, onCancel, error, submitLabel 
               </div>
             )}
 
-            {/* Preview */}
             {form.image_url && !uploading && (
               <div style={{ marginTop: 8, position: "relative" }}>
                 <div style={{ position: "relative", width: "100%", height: 150 }}>
@@ -347,7 +362,7 @@ function DishForm({ initial, categories, onSubmit, onCancel, error, submitLabel 
                     src={form.image_url}
                     alt="preview"
                     fill
-                    sizes="(max-width: 620px) 100vw, 620px"
+                    sizes="(max-width: 640px) 100vw, 620px"
                     style={{ objectFit: "cover", borderRadius: 9 }}
                   />
                 </div>
@@ -396,9 +411,9 @@ function DishForm({ initial, categories, onSubmit, onCancel, error, submitLabel 
         </div>
       </div>
 
-      <div style={{ display: "flex", gap: 10, marginTop: 8 }}>
-        <Btn variant="ghost" onClick={onCancel}>Cancelar</Btn>
-        <Btn variant="orange" onClick={() => onSubmit(form)}>{submitLabel}</Btn>
+      <div style={{ display: "flex", gap: 10, marginTop: 8, flexDirection: isMobile ? "column-reverse" : "row" }}>
+        <Btn variant="ghost" onClick={onCancel} fullWidth={isMobile}>Cancelar</Btn>
+        <Btn variant="orange" onClick={() => onSubmit(form)} fullWidth={isMobile}>{submitLabel}</Btn>
       </div>
     </div>
   );
@@ -407,6 +422,8 @@ function DishForm({ initial, categories, onSubmit, onCancel, error, submitLabel 
 // ─── Page principal ───────────────────────────────────────────────────────────
 export default function DishesPage() {
   const router = useRouter();
+  const isMobile = useIsMobile();
+
   const [dishes, setDishes] = useState<IDish[]>([]);
   const [categories, setCategories] = useState<ICategory[]>([]);
   const [loading, setLoading] = useState(true);
@@ -532,11 +549,11 @@ export default function DishesPage() {
   const uncategorized = dishes.filter(d => !getCatId(d)).length;
 
   const stats: { label: string; value: string | number; color: string; isText?: boolean }[] = [
-    { label: "Total Platos",     value: dishes.length,                      color: "#1a1a1a" },
-    { label: "Disponibles",      value: totalAvailable,                     color: "#27ae60" },
-    { label: "No disponibles",   value: dishes.length - totalAvailable,     color: "#e85d26" },
-    { label: "Sin categoría",    value: uncategorized,                      color: "#888" },
-    { label: "Precio promedio",  value: `Bs. ${avgPrice.toFixed(2)}`,       color: "#8e44ad", isText: true },
+    { label: "Total Platos",    value: dishes.length,                  color: "#1a1a1a" },
+    { label: "Disponibles",     value: totalAvailable,                 color: "#27ae60" },
+    { label: "No disponibles",  value: dishes.length - totalAvailable, color: "#e85d26" },
+    { label: "Sin categoría",   value: uncategorized,                  color: "#888" },
+    { label: "Precio promedio", value: `Bs. ${avgPrice.toFixed(2)}`,   color: "#8e44ad", isText: true },
   ];
 
   const filterTabs = [
@@ -545,39 +562,69 @@ export default function DishesPage() {
     ...categories.map(c => ({ id: c._id, label: c.nombre })),
   ];
 
+  // ─── Padding lateral responsive ────────────────────────────────────────────
+  const px = isMobile ? "16px" : "40px";
+
   // ── render ─────────────────────────────────────────────────────────────────
   return (
     <div style={{ minHeight: "100vh", background: "#f8f7f4", fontFamily: "'Georgia', serif" }}>
 
       {/* Header */}
       <div style={{
-        background: "#fff", borderBottom: "2px solid #1a1a1a",
-        padding: "18px 40px", display: "flex", alignItems: "center", justifyContent: "space-between",
+        background: "#fff",
+        borderBottom: "2px solid #1a1a1a",
+        padding: isMobile ? "14px 16px" : "18px 40px",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "space-between",
+        gap: 10,
       }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
-          <button onClick={() => router.push("/categories")} style={{
+        <div style={{ display: "flex", alignItems: "center", gap: isMobile ? 10 : 14, minWidth: 0 }}>
+          <button onClick={() => router.push("/dashboard")} style={{
             background: "#f4f4f4", border: "1.5px solid #e0e0e0", borderRadius: 9,
-            width: 38, height: 38, display: "flex", alignItems: "center", justifyContent: "center",
+            width: 38, height: 38, flexShrink: 0,
+            display: "flex", alignItems: "center", justifyContent: "center",
             cursor: "pointer", fontSize: 16,
           }}>←</button>
           <div style={{
-            width: 44, height: 44, borderRadius: 12, background: "#e85d26",
-            display: "flex", alignItems: "center", justifyContent: "center", fontSize: 22,
+            width: 40, height: 40, borderRadius: 12, background: "#e85d26",
+            flexShrink: 0,
+            display: "flex", alignItems: "center", justifyContent: "center",
+            fontSize: isMobile ? 18 : 22,
           }}>🍴</div>
-          <div>
-            <h1 style={{ margin: 0, fontSize: 20, fontWeight: 700, color: "#1a1a1a" }}>Gestión de Platos</h1>
-            <p style={{ margin: 0, fontSize: 12, color: "#888" }}>Administra los platos y precios del menú</p>
-          </div>
+          {isMobile ? (
+            <h1 style={{ margin: 0, fontSize: 15, fontWeight: 700, color: "#1a1a1a", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+              Gestión de Platos
+            </h1>
+          ) : (
+            <div>
+              <h1 style={{ margin: 0, fontSize: 20, fontWeight: 700, color: "#1a1a1a" }}>Gestión de Platos</h1>
+              <p style={{ margin: 0, fontSize: 12, color: "#888" }}>Administra los platos y precios del menú</p>
+            </div>
+          )}
         </div>
-        <Btn variant="primary" onClick={() => { setFormError(""); setShowCreateModal(true); }}>
-          + Agregar Plato
-        </Btn>
+
+        {isMobile ? (
+          <button onClick={() => { setFormError(""); setShowCreateModal(true); }} style={{
+            background: "#1a1a1a", border: "none", borderRadius: 9,
+            width: 38, height: 38, flexShrink: 0,
+            display: "flex", alignItems: "center", justifyContent: "center",
+            cursor: "pointer", fontSize: 18, color: "#fff",
+          }}>+</button>
+        ) : (
+          <Btn variant="primary" onClick={() => { setFormError(""); setShowCreateModal(true); }}>
+            + Agregar Plato
+          </Btn>
+        )}
       </div>
 
       {/* Toast */}
       {successMsg && (
         <div style={{
-          position: "fixed", top: 24, right: 24, zIndex: 9999,
+          position: "fixed", top: 24,
+          right: isMobile ? 12 : 24,
+          left: isMobile ? 12 : "auto",
+          zIndex: 9999,
           background: "#1a1a1a", color: "#fff", padding: "13px 22px",
           borderRadius: 10, fontSize: 14, fontWeight: 600,
           boxShadow: "0 4px 20px rgba(0,0,0,0.2)",
@@ -587,7 +634,7 @@ export default function DishesPage() {
       {/* Error global */}
       {error && (
         <div style={{
-          margin: "16px 40px 0", background: "#fff0ee", border: "1px solid #e85d26",
+          margin: `16px ${px} 0`, background: "#fff0ee", border: "1px solid #e85d26",
           borderRadius: 10, padding: "11px 18px", color: "#c0392b", fontSize: 13,
           display: "flex", justifyContent: "space-between", alignItems: "center",
         }}>
@@ -599,21 +646,38 @@ export default function DishesPage() {
       )}
 
       {/* Stats */}
-      <div style={{ padding: "24px 40px 0", display: "flex", gap: 14, flexWrap: "wrap" }}>
+      <div style={{
+        padding: `24px ${px} 0`,
+        display: "flex",
+        gap: isMobile ? 8 : 14,
+        flexWrap: "wrap",
+        overflowX: isMobile ? "auto" : "visible",
+      }}>
         {stats.map((s) => (
           <div key={s.label} style={{
             background: "#fff", border: "1.5px solid #e8e8e8",
-            borderRadius: 14, padding: "16px 24px", minWidth: 130,
+            borderRadius: 14,
+            padding: isMobile ? "12px 16px" : "16px 24px",
+            minWidth: isMobile ? 100 : 130,
+            flexShrink: 0,
           }}>
-            <p style={{ margin: 0, fontSize: 11, color: "#888", marginBottom: 4 }}>{s.label}</p>
-            <p style={{ margin: 0, fontSize: s.isText ? 18 : 26, fontWeight: 700, color: s.color }}>{s.value}</p>
+            <p style={{ margin: 0, fontSize: isMobile ? 10 : 11, color: "#888", marginBottom: 4 }}>{s.label}</p>
+            <p style={{ margin: 0, fontSize: s.isText ? (isMobile ? 14 : 18) : (isMobile ? 22 : 26), fontWeight: 700, color: s.color }}>{s.value}</p>
           </div>
         ))}
       </div>
 
       {/* Búsqueda y filtros */}
-      <div style={{ padding: "20px 40px 0", display: "flex", gap: 14, alignItems: "center", flexWrap: "wrap" }}>
-        <div style={{ position: "relative", flex: 1, minWidth: 240 }}>
+      <div style={{
+        padding: `20px ${px} 0`,
+        display: "flex",
+        flexDirection: isMobile ? "column" : "row",
+        gap: isMobile ? 10 : 14,
+        alignItems: isMobile ? "stretch" : "center",
+        flexWrap: "wrap",
+      }}>
+        {/* Buscador */}
+        <div style={{ position: "relative", flex: 1, minWidth: isMobile ? "auto" : 240 }}>
           <span style={{
             position: "absolute", left: 14, top: "50%",
             transform: "translateY(-50%)", color: "#aaa", fontSize: 16,
@@ -625,7 +689,15 @@ export default function DishesPage() {
             style={{ ...inputStyle, paddingLeft: 40, borderRadius: 30 }}
           />
         </div>
-        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+
+        {/* Filtros — scroll horizontal en mobile */}
+        <div style={{
+          display: "flex",
+          gap: 8,
+          flexWrap: isMobile ? "nowrap" : "wrap",
+          overflowX: isMobile ? "auto" : "visible",
+          paddingBottom: isMobile ? 4 : 0,
+        }}>
           {filterTabs.map(tab => (
             <button key={tab.id} onClick={() => setFilterCat(tab.id)} style={{
               padding: "8px 18px", borderRadius: 30, border: "1.5px solid",
@@ -633,13 +705,15 @@ export default function DishesPage() {
               background: filterCat === tab.id ? "#1a1a1a" : "#fff",
               color: filterCat === tab.id ? "#fff" : "#555",
               fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "inherit",
+              flexShrink: 0,
+              whiteSpace: "nowrap",
             }}>{tab.label}</button>
           ))}
         </div>
       </div>
 
       {/* Grid de platos */}
-      <div style={{ padding: "20px 40px 40px" }}>
+      <div style={{ padding: `20px ${px} 40px` }}>
         {loading ? (
           <div style={{ textAlign: "center", padding: 60, color: "#888" }}>Cargando platos...</div>
         ) : filtered.length === 0 ? (
@@ -658,7 +732,13 @@ export default function DishesPage() {
             )}
           </div>
         ) : (
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(340px, 1fr))", gap: 20 }}>
+          <div style={{
+            display: "grid",
+            gridTemplateColumns: isMobile
+              ? "1fr"
+              : "repeat(auto-fill, minmax(340px, 1fr))",
+            gap: isMobile ? 14 : 20,
+          }}>
             {filtered.map(dish => (
               <DishCard
                 key={dish._id}
@@ -673,7 +753,7 @@ export default function DishesPage() {
 
       {/* Modal crear */}
       {showCreateModal && (
-        <Modal title="Nuevo Plato" onClose={() => setShowCreateModal(false)} wide>
+        <Modal title="Nuevo Plato" onClose={() => setShowCreateModal(false)} wide isMobile={isMobile}>
           <DishForm
             initial={emptyForm}
             categories={categories}
@@ -681,13 +761,14 @@ export default function DishesPage() {
             onCancel={() => { setShowCreateModal(false); setFormError(""); }}
             error={formError}
             submitLabel="Crear Plato"
+            isMobile={isMobile}
           />
         </Modal>
       )}
 
       {/* Modal editar */}
       {editDish && (
-        <Modal title="Editar Plato" onClose={() => setEditDish(null)} wide>
+        <Modal title="Editar Plato" onClose={() => setEditDish(null)} wide isMobile={isMobile}>
           <DishForm
             initial={{
               name: editDish.name,
@@ -703,13 +784,14 @@ export default function DishesPage() {
             onCancel={() => { setEditDish(null); setFormError(""); }}
             error={formError}
             submitLabel="Guardar Cambios"
+            isMobile={isMobile}
           />
         </Modal>
       )}
 
       {/* Modal confirmar delete */}
       {deleteDishId && (
-        <Modal onClose={() => setDeleteDishId(null)}>
+        <Modal onClose={() => setDeleteDishId(null)} isMobile={isMobile}>
           <div style={{ textAlign: "center" }}>
             <div style={{ fontSize: 44, marginBottom: 12 }}>🗑️</div>
             <h2 style={{ margin: "0 0 8px", fontSize: 19, fontWeight: 700, color: "#1a1a1a" }}>¿Eliminar plato?</h2>
@@ -745,7 +827,6 @@ function DishCard({ dish, onEdit, onDelete }: {
           <h3 style={{ margin: 0, fontSize: 16, fontWeight: 700, color: "#1a1a1a", flex: 1, marginRight: 10 }}>
             {dish.name}
           </h3>
-        
         </div>
 
         {/* Categoría */}
@@ -777,7 +858,7 @@ function DishCard({ dish, onEdit, onDelete }: {
             src={dish.image_url}
             alt={dish.name}
             fill
-            sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
+            sizes="(max-width: 640px) 100vw, (max-width: 1200px) 50vw, 33vw"
             style={{ objectFit: "cover" }}
           />
         </div>

@@ -25,6 +25,18 @@ interface IDish {
 
 const API = "/api";
 
+// ─── Hook responsive ──────────────────────────────────────────────────────────
+function useIsMobile() {
+  const [isMobile, setIsMobile] = useState(false);
+  useEffect(() => {
+    const check = () => setIsMobile(window.innerWidth < 640);
+    check();
+    window.addEventListener("resize", check);
+    return () => window.removeEventListener("resize", check);
+  }, []);
+  return isMobile;
+}
+
 // ─── Botón reutilizable ───────────────────────────────────────────────────────
 type BtnVariant = "primary" | "secondary" | "danger" | "ghost" | "orange";
 function Btn({
@@ -77,6 +89,7 @@ const inputStyle: React.CSSProperties = {
 // ─── Page principal ───────────────────────────────────────────────────────────
 export default function CategoriesPage() {
   const router = useRouter();
+  const isMobile = useIsMobile();
 
   const [categories, setCategories] = useState<ICategory[]>([]);
   const [dishes, setDishes] = useState<IDish[]>([]);
@@ -90,11 +103,9 @@ export default function CategoriesPage() {
 
   const [catForm, setCatForm] = useState({ nombre: "", descripcion: "", activo: true });
 
-  // Modal asignar
   const [showAssignModal, setShowAssignModal] = useState(false);
   const [assignTargetCategory, setAssignTargetCategory] = useState<ICategory | null>(null);
 
-  // Modal detalle plato (solo vista)
   const [selectedDish, setSelectedDish] = useState<IDish | null>(null);
   const [showDishDetail, setShowDishDetail] = useState(false);
 
@@ -124,7 +135,6 @@ export default function CategoriesPage() {
     setTimeout(() => setSuccessMsg(""), 3000);
   };
 
-  // ── helpers ────────────────────────────────────────────────────────────────
   const getCatId = (d: IDish): string | null => {
     if (!d.category_id) return null;
     if (typeof d.category_id === "object") return d.category_id._id;
@@ -185,7 +195,6 @@ export default function CategoriesPage() {
     } catch { setError("Error al eliminar"); }
   };
 
-  // ── asignar plato a categoría ──────────────────────────────────────────────
   const openAssignModal = (cat: ICategory) => {
     setAssignTargetCategory(cat);
     setShowAssignModal(true);
@@ -219,41 +228,77 @@ export default function CategoriesPage() {
   const dishesNotInCategory = (catId: string) =>
     dishes.filter((d) => getCatId(d) !== catId);
 
+  // ─── Padding lateral responsive ────────────────────────────────────────────
+  const px = isMobile ? "16px" : "40px";
+
   // ── render ─────────────────────────────────────────────────────────────────
   return (
     <div style={{ minHeight: "100vh", background: "#f8f7f4", fontFamily: "'Georgia', serif" }}>
 
       {/* Header */}
       <div style={{
-        background: "#fff", borderBottom: "2px solid #1a1a1a",
-        padding: "18px 40px", display: "flex", alignItems: "center", justifyContent: "space-between",
+        background: "#fff",
+        borderBottom: "2px solid #1a1a1a",
+        padding: isMobile ? "14px 16px" : "18px 40px",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "space-between",
+        gap: 10,
       }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
+        {/* Izquierda: back + ícono + título */}
+        <div style={{ display: "flex", alignItems: "center", gap: isMobile ? 10 : 14, minWidth: 0 }}>
           <button onClick={() => router.push("/dashboard")} style={{
             background: "#f4f4f4", border: "1.5px solid #e0e0e0", borderRadius: 9,
-            width: 38, height: 38, display: "flex", alignItems: "center", justifyContent: "center",
+            width: 38, height: 38, flexShrink: 0,
+            display: "flex", alignItems: "center", justifyContent: "center",
             cursor: "pointer", fontSize: 16,
           }}>←</button>
           <div style={{
-            width: 44, height: 44, borderRadius: 12, background: "#e85d26",
-            display: "flex", alignItems: "center", justifyContent: "center", fontSize: 22,
+            width: 40, height: 40, borderRadius: 12, background: "#e85d26",
+            flexShrink: 0,
+            display: "flex", alignItems: "center", justifyContent: "center", fontSize: isMobile ? 18 : 22,
           }}>🍽️</div>
-          <div>
-            <h1 style={{ margin: 0, fontSize: 20, fontWeight: 700, color: "#1a1a1a" }}>Gestión de Categorías</h1>
-            <p style={{ margin: 0, fontSize: 12, color: "#888" }}>Organiza y asigna los platos de tu menú</p>
-          </div>
+          {!isMobile && (
+            <div>
+              <h1 style={{ margin: 0, fontSize: 20, fontWeight: 700, color: "#1a1a1a" }}>Gestión de Categorías</h1>
+              <p style={{ margin: 0, fontSize: 12, color: "#888" }}>Organiza y asigna los platos de tu menú</p>
+            </div>
+          )}
+          {isMobile && (
+            <h1 style={{ margin: 0, fontSize: 15, fontWeight: 700, color: "#1a1a1a", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+              Categorías
+            </h1>
+          )}
         </div>
-        <div style={{ display: "flex", gap: 10 }}>
-          {/* ← Navega a /dishes */}
-          <Btn variant="secondary" onClick={() => router.push("/dishes")}>🍴 Gestión de Platos</Btn>
-          <Btn variant="primary" onClick={openCreateCat}>+ Nueva Categoría</Btn>
+
+        {/* Derecha: botones */}
+        <div style={{ display: "flex", gap: isMobile ? 6 : 10, flexShrink: 0 }}>
+          {isMobile ? (
+            <>
+              <button onClick={() => router.push("/dishes")} title="Gestión de Platos" style={{
+                background: "#f4f4f4", border: "1.5px solid #e0e0e0", borderRadius: 9,
+                width: 38, height: 38, display: "flex", alignItems: "center", justifyContent: "center",
+                cursor: "pointer", fontSize: 18,
+              }}>🍴</button>
+              <button onClick={openCreateCat} title="Nueva Categoría" style={{
+                background: "#1a1a1a", border: "none", borderRadius: 9,
+                width: 38, height: 38, display: "flex", alignItems: "center", justifyContent: "center",
+                cursor: "pointer", fontSize: 18, color: "#fff",
+              }}>+</button>
+            </>
+          ) : (
+            <>
+              <Btn variant="secondary" onClick={() => router.push("/dishes")}>🍴 Gestión de Platos</Btn>
+              <Btn variant="primary" onClick={openCreateCat}>+ Nueva Categoría</Btn>
+            </>
+          )}
         </div>
       </div>
 
       {/* Toast */}
       {successMsg && (
         <div style={{
-          position: "fixed", top: 24, right: 24, zIndex: 9999,
+          position: "fixed", top: 24, right: isMobile ? 12 : 24, left: isMobile ? 12 : "auto", zIndex: 9999,
           background: "#1a1a1a", color: "#fff",
           padding: "13px 22px", borderRadius: 10, fontSize: 14, fontWeight: 600,
           boxShadow: "0 4px 20px rgba(0,0,0,0.2)",
@@ -263,7 +308,7 @@ export default function CategoriesPage() {
       {/* Error global */}
       {error && !showCatModal && !showAssignModal && !showDishDetail && (
         <div style={{
-          margin: "16px 40px 0", background: "#fff0ee", border: "1px solid #e85d26",
+          margin: `16px ${px} 0`, background: "#fff0ee", border: "1px solid #e85d26",
           borderRadius: 10, padding: "11px 18px", color: "#c0392b", fontSize: 13,
           display: "flex", justifyContent: "space-between", alignItems: "center",
         }}>
@@ -273,7 +318,13 @@ export default function CategoriesPage() {
       )}
 
       {/* Stats */}
-      <div style={{ padding: "24px 40px 0", display: "flex", gap: 14, flexWrap: "wrap" }}>
+      <div style={{
+        padding: `24px ${px} 0`,
+        display: "flex",
+        gap: isMobile ? 8 : 14,
+        flexWrap: "wrap",
+        overflowX: isMobile ? "auto" : "visible",
+      }}>
         {[
           { label: "Total Categorías", value: categories.length, color: "#1a1a1a" },
           { label: "Activas", value: categories.filter(c => c.activo).length, color: "#27ae60" },
@@ -283,16 +334,19 @@ export default function CategoriesPage() {
         ].map((s) => (
           <div key={s.label} style={{
             background: "#fff", border: "1.5px solid #e8e8e8",
-            borderRadius: 14, padding: "16px 24px", minWidth: 130,
+            borderRadius: 14,
+            padding: isMobile ? "12px 16px" : "16px 24px",
+            minWidth: isMobile ? 100 : 130,
+            flexShrink: 0,
           }}>
-            <p style={{ margin: 0, fontSize: 11, color: "#888", marginBottom: 4 }}>{s.label}</p>
-            <p style={{ margin: 0, fontSize: 26, fontWeight: 700, color: s.color }}>{s.value}</p>
+            <p style={{ margin: 0, fontSize: isMobile ? 10 : 11, color: "#888", marginBottom: 4 }}>{s.label}</p>
+            <p style={{ margin: 0, fontSize: isMobile ? 22 : 26, fontWeight: 700, color: s.color }}>{s.value}</p>
           </div>
         ))}
       </div>
 
       {/* Lista */}
-      <div style={{ padding: "24px 40px" }}>
+      <div style={{ padding: `24px ${px}` }}>
         {loading ? (
           <div style={{ textAlign: "center", padding: 60, color: "#888" }}>Cargando...</div>
         ) : (
@@ -316,20 +370,26 @@ export default function CategoriesPage() {
                   border: "1.5px solid #e8e8e8", overflow: "hidden",
                   boxShadow: "0 2px 8px rgba(0,0,0,0.04)",
                 }}>
+                  {/* Cabecera de categoría */}
                   <div style={{
-                    padding: "18px 24px",
-                    display: "flex", alignItems: "center", justifyContent: "space-between",
+                    padding: isMobile ? "14px 16px" : "18px 24px",
+                    display: "flex",
+                    flexDirection: isMobile ? "column" : "row",
+                    alignItems: isMobile ? "flex-start" : "center",
+                    justifyContent: "space-between",
+                    gap: isMobile ? 12 : 0,
                     borderBottom: catDishes.length > 0 ? "1.5px solid #f0f0f0" : "none",
                   }}>
+                    {/* Info */}
                     <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
                       <div style={{
-                        width: 46, height: 46, borderRadius: 12,
+                        width: 46, height: 46, borderRadius: 12, flexShrink: 0,
                         background: cat.activo ? "#fff8f5" : "#f5f5f5",
                         border: `2px solid ${cat.activo ? "#e85d26" : "#ddd"}`,
                         display: "flex", alignItems: "center", justifyContent: "center", fontSize: 20,
                       }}>🏷️</div>
                       <div>
-                        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
                           <h2 style={{ margin: 0, fontSize: 17, fontWeight: 700, color: "#1a1a1a" }}>{cat.nombre}</h2>
                           <span style={{
                             fontSize: 10, fontWeight: 700, padding: "2px 9px", borderRadius: 20,
@@ -346,7 +406,9 @@ export default function CategoriesPage() {
                         </p>
                       </div>
                     </div>
-                    <div style={{ display: "flex", gap: 8 }}>
+
+                    {/* Botones de acción */}
+                    <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
                       <Btn variant="secondary" small onClick={() => openAssignModal(cat)}>＋ Asignar plato</Btn>
                       <Btn variant="secondary" small onClick={() => openEditCat(cat)}>✏️ Editar</Btn>
                       <Btn variant="danger" small onClick={() => { setError(""); setShowDeleteConfirm(cat._id); }}>🗑️</Btn>
@@ -354,8 +416,14 @@ export default function CategoriesPage() {
                   </div>
 
                   {catDishes.length > 0 && (
-                    <div style={{ padding: "14px 24px 18px", background: "#fafafa" }}>
-                      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))", gap: 12 }}>
+                    <div style={{ padding: isMobile ? "12px 16px 16px" : "14px 24px 18px", background: "#fafafa" }}>
+                      <div style={{
+                        display: "grid",
+                        gridTemplateColumns: isMobile
+                          ? "1fr"
+                          : "repeat(auto-fill, minmax(220px, 1fr))",
+                        gap: 12,
+                      }}>
                         {catDishes.map((dish) => (
                           <DishCard
                             key={dish._id}
@@ -375,13 +443,13 @@ export default function CategoriesPage() {
             {uncategorizedDishes.length > 0 && (
               <div style={{ background: "#fff", borderRadius: 16, border: "2px dashed #ccc", overflow: "hidden" }}>
                 <div style={{
-                  padding: "18px 24px",
+                  padding: isMobile ? "14px 16px" : "18px 24px",
                   display: "flex", alignItems: "center",
                   borderBottom: "1.5px solid #f0f0f0",
                 }}>
                   <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
                     <div style={{
-                      width: 46, height: 46, borderRadius: 12, background: "#f5f5f5",
+                      width: 46, height: 46, borderRadius: 12, background: "#f5f5f5", flexShrink: 0,
                       border: "2px solid #ddd", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 20,
                     }}>📦</div>
                     <div>
@@ -392,8 +460,14 @@ export default function CategoriesPage() {
                     </div>
                   </div>
                 </div>
-                <div style={{ padding: "14px 24px 18px", background: "#fafafa" }}>
-                  <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))", gap: 12 }}>
+                <div style={{ padding: isMobile ? "12px 16px 16px" : "14px 24px 18px", background: "#fafafa" }}>
+                  <div style={{
+                    display: "grid",
+                    gridTemplateColumns: isMobile
+                      ? "1fr"
+                      : "repeat(auto-fill, minmax(220px, 1fr))",
+                    gap: 12,
+                  }}>
                     {uncategorizedDishes.map((dish) => (
                       <DishCard
                         key={dish._id}
@@ -413,7 +487,7 @@ export default function CategoriesPage() {
 
       {/* ── Modal categoría ── */}
       {showCatModal && (
-        <Modal title={catModalMode === "create" ? "Nueva Categoría" : "Editar Categoría"} onClose={closeCatModal}>
+        <Modal title={catModalMode === "create" ? "Nueva Categoría" : "Editar Categoría"} onClose={closeCatModal} isMobile={isMobile}>
           {error && <ErrorBox msg={error} />}
           <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
             <Field label="Nombre *">
@@ -442,7 +516,7 @@ export default function CategoriesPage() {
 
       {/* ── Modal asignar platos ── */}
       {showAssignModal && assignTargetCategory && (
-        <Modal title={`Asignar platos → ${assignTargetCategory.nombre}`} onClose={() => setShowAssignModal(false)} wide>
+        <Modal title={`Asignar platos → ${assignTargetCategory.nombre}`} onClose={() => setShowAssignModal(false)} wide isMobile={isMobile}>
           {error && <ErrorBox msg={error} />}
           <p style={{ margin: "0 0 14px", fontSize: 13, color: "#888" }}>Selecciona platos para moverlos a esta categoría.</p>
           <div style={{ maxHeight: 360, overflowY: "auto", display: "flex", flexDirection: "column", gap: 8 }}>
@@ -451,7 +525,11 @@ export default function CategoriesPage() {
             ) : (
               dishesNotInCategory(assignTargetCategory._id).map((dish) => (
                 <div key={dish._id} style={{
-                  display: "flex", alignItems: "center", justifyContent: "space-between",
+                  display: "flex",
+                  alignItems: isMobile ? "flex-start" : "center",
+                  justifyContent: "space-between",
+                  flexDirection: isMobile ? "column" : "row",
+                  gap: isMobile ? 10 : 0,
                   padding: "11px 14px", borderRadius: 10, border: "1.5px solid #eee", background: "#fafafa",
                 }}>
                   <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
@@ -461,10 +539,10 @@ export default function CategoriesPage() {
                         alt={dish.name}
                         width={40}
                         height={40}
-                        style={{ borderRadius: 8, objectFit: "cover" }}
+                        style={{ borderRadius: 8, objectFit: "cover", flexShrink: 0 }}
                       />
                     ) : (
-                      <div style={{ width: 40, height: 40, borderRadius: 8, background: "#eee", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18 }}>🍴</div>
+                      <div style={{ width: 40, height: 40, borderRadius: 8, background: "#eee", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18, flexShrink: 0 }}>🍴</div>
                     )}
                     <div>
                       <p style={{ margin: 0, fontSize: 14, fontWeight: 700, color: "#1a1a1a" }}>{dish.name}</p>
@@ -473,7 +551,9 @@ export default function CategoriesPage() {
                       </p>
                     </div>
                   </div>
-                  <Btn variant="orange" small onClick={() => handleAssignDish(dish._id, assignTargetCategory._id)}>Añadir aquí</Btn>
+                  <div style={{ alignSelf: isMobile ? "flex-end" : "auto" }}>
+                    <Btn variant="orange" small onClick={() => handleAssignDish(dish._id, assignTargetCategory._id)}>Añadir aquí</Btn>
+                  </div>
                 </div>
               ))
             )}
@@ -486,31 +566,29 @@ export default function CategoriesPage() {
 
       {/* ── Modal detalle plato (solo vista) ── */}
       {showDishDetail && selectedDish && (
-        <Modal title="" onClose={() => { setShowDishDetail(false); setSelectedDish(null); }} wide>
-          {/* Cabecera */}
+        <Modal title="" onClose={() => { setShowDishDetail(false); setSelectedDish(null); }} wide isMobile={isMobile}>
           <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", marginBottom: 20 }}>
             <div>
-              <h2 style={{ margin: 0, fontSize: 20, fontWeight: 700, color: "#1a1a1a" }}>{selectedDish.name}</h2>
+              <h2 style={{ margin: 0, fontSize: isMobile ? 17 : 20, fontWeight: 700, color: "#1a1a1a" }}>{selectedDish.name}</h2>
               <p style={{ margin: "4px 0 0", fontSize: 13, color: "#888" }}>
                 {typeof selectedDish.category_id === "object" && selectedDish.category_id
                   ? selectedDish.category_id.nombre
                   : "Sin categoría"}
               </p>
             </div>
-            {/* Sin botones de editar/eliminar */}
           </div>
 
           <div style={{ display: "flex", flexDirection: "column", gap: 18 }}>
             {selectedDish.image_url && (
-            <div style={{ position: "relative", width: "100%", height: 200 }}>
-              <Image
-                src={selectedDish.image_url}
-                alt={selectedDish.name}
-                fill
-                sizes="(max-width: 768px) 100vw, 600px"
-                style={{ objectFit: "cover", borderRadius: 12 }}
-              />
-            </div>
+              <div style={{ position: "relative", width: "100%", height: isMobile ? 160 : 200 }}>
+                <Image
+                  src={selectedDish.image_url}
+                  alt={selectedDish.name}
+                  fill
+                  sizes="(max-width: 640px) 100vw, 600px"
+                  style={{ objectFit: "cover", borderRadius: 12 }}
+                />
+              </div>
             )}
 
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
@@ -542,7 +620,7 @@ export default function CategoriesPage() {
               </div>
             )}
 
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 4 }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 10, marginTop: 4 }}>
               <p style={{ margin: 0, fontSize: 12, color: "#bbb" }}>
                 Para editar este plato ve a{" "}
                 <span
@@ -560,7 +638,7 @@ export default function CategoriesPage() {
 
       {/* ── Modal confirmar delete categoría ── */}
       {showDeleteConfirm && (
-        <Modal title="" onClose={() => { setShowDeleteConfirm(null); setError(""); }}>
+        <Modal title="" onClose={() => { setShowDeleteConfirm(null); setError(""); }} isMobile={isMobile}>
           <div style={{ textAlign: "center" }}>
             <div style={{ fontSize: 44, marginBottom: 12 }}>🗑️</div>
             <h2 style={{ margin: "0 0 8px", fontSize: 19, fontWeight: 700, color: "#1a1a1a" }}>¿Eliminar categoría?</h2>
@@ -579,38 +657,37 @@ export default function CategoriesPage() {
 
 // ─── Componentes auxiliares ───────────────────────────────────────────────────
 
-function Modal({ title, children, onClose, wide = false }: {
-  title: string; children: React.ReactNode; onClose: () => void; wide?: boolean;
+function Modal({ title, children, onClose, wide = false, isMobile = false }: {
+  title: string; children: React.ReactNode; onClose: () => void; wide?: boolean; isMobile?: boolean;
 }) {
   return (
     <div
-      onClick={onClose} // 👈 cerrar al hacer click fuera
+      onClick={onClose}
       style={{
         position: "fixed",
         inset: 0,
         background: "rgba(0,0,0,0.45)",
         display: "flex",
-        alignItems: "center",
+        alignItems: isMobile ? "flex-end" : "center",
         justifyContent: "center",
         zIndex: 1000,
-        padding: 20,
+        padding: isMobile ? 0 : 20,
       }}
     >
       <div
-        onClick={(e) => e.stopPropagation()} // 👈 evita que se cierre al hacer click dentro
+        onClick={(e) => e.stopPropagation()}
         style={{
-          position: "relative", // 👈 necesario para el botón X
+          position: "relative",
           background: "#fff",
-          borderRadius: 18,
-          padding: "32px 36px",
-          width: wide ? 600 : 460,
+          borderRadius: isMobile ? "18px 18px 0 0" : 18,
+          padding: isMobile ? "28px 20px 32px" : "32px 36px",
+          width: isMobile ? "100%" : wide ? 600 : 460,
           maxWidth: "100%",
-          maxHeight: "90vh",
+          maxHeight: isMobile ? "92vh" : "90vh",
           overflowY: "auto",
           boxShadow: "0 20px 60px rgba(0,0,0,0.18)",
         }}
       >
-        {/* ❌ Botón cerrar */}
         <button
           onClick={onClose}
           style={{
@@ -632,7 +709,8 @@ function Modal({ title, children, onClose, wide = false }: {
             margin: "0 0 20px",
             fontSize: 19,
             fontWeight: 700,
-            color: "#1a1a1a"
+            color: "#1a1a1a",
+            paddingRight: 24,
           }}>
             {title}
           </h2>
@@ -717,30 +795,30 @@ function DishCard({ dish, onClick, categories, onRemove, onAssign }: {
       {/* Selector para platos sin categoría */}
       {categories && onAssign && (
         <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
-        <select value={assignValue} onChange={(e) => setAssignValue(e.target.value)} style={{
-          flex: 1, minWidth: 0,         // ← minWidth: 0 permite que se encoja
-          padding: "6px 8px", borderRadius: 7,
-          border: "1.5px solid #e0e0e0", fontSize: 11,
-          fontFamily: "inherit", color: "#333", background: "#fff",
-          overflow: "hidden", textOverflow: "ellipsis",
-        }}>
-          <option value="">Asignar a categoría...</option>
-          {categories.map((c) => <option key={c._id} value={c._id}>{c.nombre}</option>)}
-        </select>
-        <button onClick={() => { if (assignValue) { onAssign(assignValue); setAssignValue(""); } }}
-          disabled={!assignValue} style={{
-            background: assignValue ? "#e85d26" : "#f0f0f0",
-            color: assignValue ? "#fff" : "#aaa",
-            border: "none", borderRadius: 7,
-            padding: "6px 12px",          
-            fontSize: 12, fontWeight: 600,
-            cursor: assignValue ? "pointer" : "not-allowed",
-            flexShrink: 0,                
-            whiteSpace: "nowrap",
+          <select value={assignValue} onChange={(e) => setAssignValue(e.target.value)} style={{
+            flex: 1, minWidth: 0,
+            padding: "6px 8px", borderRadius: 7,
+            border: "1.5px solid #e0e0e0", fontSize: 11,
+            fontFamily: "inherit", color: "#333", background: "#fff",
+            overflow: "hidden", textOverflow: "ellipsis",
           }}>
-          Asignar
-        </button>
-      </div>
+            <option value="">Asignar a categoría...</option>
+            {categories.map((c) => <option key={c._id} value={c._id}>{c.nombre}</option>)}
+          </select>
+          <button onClick={() => { if (assignValue) { onAssign(assignValue); setAssignValue(""); } }}
+            disabled={!assignValue} style={{
+              background: assignValue ? "#e85d26" : "#f0f0f0",
+              color: assignValue ? "#fff" : "#aaa",
+              border: "none", borderRadius: 7,
+              padding: "6px 12px",
+              fontSize: 12, fontWeight: 600,
+              cursor: assignValue ? "pointer" : "not-allowed",
+              flexShrink: 0,
+              whiteSpace: "nowrap",
+            }}>
+            Asignar
+          </button>
+        </div>
       )}
     </div>
   );
