@@ -228,6 +228,11 @@ export default function CategoriesPage() {
         padding: "18px 40px", display: "flex", alignItems: "center", justifyContent: "space-between",
       }}>
         <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
+          <button onClick={() => router.push("/dashboard")} style={{
+            background: "#f4f4f4", border: "1.5px solid #e0e0e0", borderRadius: 9,
+            width: 38, height: 38, display: "flex", alignItems: "center", justifyContent: "center",
+            cursor: "pointer", fontSize: 16,
+          }}>←</button>
           <div style={{
             width: 44, height: 44, borderRadius: 12, background: "#e85d26",
             display: "flex", alignItems: "center", justifyContent: "center", fontSize: 22,
@@ -496,18 +501,15 @@ export default function CategoriesPage() {
 
           <div style={{ display: "flex", flexDirection: "column", gap: 18 }}>
             {selectedDish.image_url && (
+            <div style={{ position: "relative", width: "100%", height: 200 }}>
               <Image
                 src={selectedDish.image_url}
                 alt={selectedDish.name}
-                width={600} // ancho base requerido
-                height={200}
-                style={{
-                  width: "100%",
-                  height: 200,
-                  objectFit: "cover",
-                  borderRadius: 12,
-                }}
+                fill
+                sizes="(max-width: 768px) 100vw, 600px"
+                style={{ objectFit: "cover", borderRadius: 12 }}
               />
+            </div>
             )}
 
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>

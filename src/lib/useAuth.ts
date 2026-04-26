@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 
 export interface AuthUser {
   _id: string;
-  nombre: string;
+  name: string;
   email: string;
   rol: "admin" | "cajero" | "cocinero" | "mesero" | "cliente";
   activo: boolean;
