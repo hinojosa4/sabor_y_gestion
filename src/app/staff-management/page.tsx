@@ -8,11 +8,14 @@ import { useState } from "react";
 import Link from "next/link";
 import { useEmployeeData } from "@/hooks/useEmployeeData";
 import { Employee } from "../../types/employee";
+import { useAuth } from "@/lib/useAuth";
+import { ADMIN } from "@/lib/roles";
 
 export default function StaffManagementPage() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingEmployee, setEditingEmployee] = useState<Employee | null>(null);
   const [activeTab, setActiveTab] = useState("staff");
+  const { user, loading: userLoading } = useAuth(ADMIN);
 
   const {
     stats,
@@ -65,6 +68,18 @@ export default function StaffManagementPage() {
     setEditingEmployee(employee);
     setIsModalOpen(true);
   };
+
+  if (userLoading) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center font-semibold text-gray-700">
+          Verificando sesión...
+        </div>
+      </div>
+    );
+  }
+
+  if (!user) return null;
 
   if (loading) {
     return (
