@@ -3,19 +3,20 @@ import bcrypt from "bcryptjs";
 
 export type UserRole = "admin" | "cajero" | "cocinero" | "mesero" | "cliente";
 export interface IUser extends Document {
-  nombre: string;
+  name: string;
   email: string;
   password: string;
   rol: UserRole;
   activo: boolean;
   createdAt: Date;
   updatedAt: Date;
+  googleId: string;
   comparePassword(candidatePassword: string): Promise<boolean>;
 }
 
 const UserSchema = new Schema<IUser>(
   {
-    nombre: {
+    name: {
       type: String,
       required: [true, "El nombre es obligatorio"],
       trim: true,
@@ -48,6 +49,10 @@ const UserSchema = new Schema<IUser>(
       type: Boolean,
       default: true,
     },
+    googleId: {
+      type: String,
+      sparse: true, // permite múltiples null pero no duplicados en los que tienen valor
+    },
   },
   {
     timestamps: true,
@@ -65,6 +70,7 @@ UserSchema.pre("save", async function () {
 
 // --- Método de instancia para comparar contraseñas ---
 UserSchema.methods.comparePassword = async function (
+  this: IUser,
   candidatePassword: string
 ): Promise<boolean> {
   return bcrypt.compare(candidatePassword, this.password);

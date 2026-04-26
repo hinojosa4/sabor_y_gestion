@@ -1,53 +1,25 @@
 "use client";
-
 import React, { useState } from "react";
 import { useRouter } from "next/navigation";
-import { 
-  UtensilsCrossed, 
-  Users, 
-} from 'lucide-react';
-import { RoleCard } from "@/components/UI/RoleCard";
-import { SelectUserBlock } from "@/components/UI/SelectUserBlock";
-
-const containerStyle = {
-  width: '80px',           
-  height: '80px',          
-  backgroundColor: '#ea580c', 
-  borderRadius: '1rem',    
-  display: 'flex',         
-  alignItems: 'center',    
-  justifyContent: 'center',
-  boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -4px rgba(0, 0, 0, 0.1)'
-}
+import { UtensilsCrossed } from "lucide-react";
 
 export default function LoginPage() {
   const router = useRouter();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [rol, setRol] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
-  const [selectedRole, setSelectedRole] = useState(false)
-  const [clientOptions, setClientOptions] = useState(true)
-
-  const [newName, setNewName] = useState("")
-  const [newEmail, setNewEmail] = useState("")
-  const [newPhone, setNewPhone] = useState("")
-  const [newPassword, setNewPassword] = useState("")
-
-  const [active, setActive] = useState<"login" | "register">("login");
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
 
-    if (!email || !password || !rol) {
+    if (!email || !password) {
       setError("Completa todos los campos.");
       return;
     }
 
     setLoading(true);
-
     try {
       const res = await fetch("/api/auth/login", {
         method: "POST",
@@ -81,327 +53,216 @@ export default function LoginPage() {
     }
   };
 
-  const handleBackButton = () => {
-    setSelectedRole(false);
-    setEmail("");
-    setPassword("");
-    setError("");
-    setRol("");
-  }
-
-  const handleClientButton = (condition: boolean) => {
-    if(condition === true){
-      setClientOptions(true);
-      setActive("login");
-    }else {
-      setClientOptions(false);
-      setActive("register");
-    }
-  }
-  console.log("ROL SELECCIONADO: ", rol)
+  const handleGoogleLogin = () => {
+    // TODO: implementar Google OAuth
+    window.location.href = "/api/auth/google";
+  };
 
   return (
-    <div className="flex flex-col" style={{display: "flex", alignItems: "center", minHeight: "100vh", padding: "1rem" }}>
-      
-      {
-        !selectedRole ? (
-          <div>
-            <div style={{alignItems: "start",width: "100%", maxWidth: "100%", textAlign: "center", marginBottom: "2rem"}}>
-              <div className="flex flex-col items-center justify-center">
-                <div style={containerStyle} className="size-[100]">
-                  <UtensilsCrossed className="size-[50] md:size-8 text-white" />
-                </div>
-                <h1 style={{fontSize: "2.5rem"}} > Bievenido </h1>
-                <span className="opacity-[50%]"> Sistema de Gestión del Restaurante </span>
-              </div>
-            </div>
-            <div>
-              <SelectUserBlock setSelectedRole={setSelectedRole} setRol={setRol}/>
-            </div>
+    <div
+      style={{
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        minHeight: "100vh",
+        padding: "1rem",
+        backgroundColor: "#f9fafb",
+      }}
+    >
+      <div
+        style={{
+          width: "100%",
+          maxWidth: "380px",
+          border: "1px solid #e5e5e5",
+          borderRadius: "12px",
+          padding: "2rem",
+          background: "#fff",
+          boxShadow: "0 4px 12px rgba(0,0,0,0.08)",
+        }}
+      >
+        {/* Logo */}
+        <div
+          style={{
+            display: "flex",
+            justifyContent: "center",
+            marginBottom: "1.25rem",
+          }}
+        >
+          <div
+            style={{
+              width: "72px",
+              height: "72px",
+              backgroundColor: "#ea580c",
+              borderRadius: "16px",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              boxShadow: "0 8px 16px rgba(234,88,12,0.25)",
+            }}
+          >
+            <UtensilsCrossed size={36} color="white" />
           </div>
-        ) : (
-          <div>
-            {/* Seleccion de rol anterior */}
-            
-            {/*
-              {rol === "Admin" && (
-                <div className="flex flex-col justify-center items-center gap-[18]">
-                  <div className="flex items-center rounded-full p-[12px]" style={{backgroundColor: " #F5F5F5"}}>
-                    <Briefcase size={50} style={{color: "#8E24AA"}}/>
-                  </div>
-                  <span> {rol} </span>
-                </div>
-              )}
-              {rol === "Cajero" && (
-                <div className="flex flex-col justify-center items-center gap-[18]">
-                  <div className="flex items-center rounded-full p-[12px]" style={{backgroundColor: " #F5F5F5"}}>
-                    <CreditCard size={50} style={{color: "#FB8C00"}}/>
-                  </div>
-                  <span> {rol} </span>
-                </div>
-              )}
-              {rol === "Cocinero" && (
-                <div className="flex flex-col justify-center items-center gap-[18]">
-                  <div className="flex items-center rounded-full p-[12px]" style={{backgroundColor: " #F5F5F5"}}>
-                    <ChefHat size={50} style={{color: "#1E88E5"}}/>
-                  </div>
-                  <span> {rol} </span>
-                </div>
-              )}
-              {rol === "Mesero" && (
-                <div className="flex flex-col justify-center items-center gap-[18]">
-                  <div className="flex items-center rounded-full p-[12px]" style={{backgroundColor: " #F5F5F5"}}>
-                    <Users size={50} style={{color: "#43A047"}}/>
-                  </div>
-                  <span> {rol} </span>
-                </div>
-              )}
-            */}
-            {
-              rol === "cliente" ? (
-                <div className="flex flex-col justify-center items-center" style={{ width: "100%", maxWidth: "380px", border: "1px solid #e5e5e5", borderRadius: "12px", padding: "2rem", background: "#fff", boxShadow: "0 4px 12px rgba(0, 0, 0, 0.1)" }}>
-                  <div className="flex justify-center items-center size-[100] bg-[#ea580c]  rounded-[20px] mb-[20px]">
-                    <Users className="size-[50] text-[white]"/>
-                  </div>   
-                  <h1> Inicio de sesion </h1>
-                  <span> Acceso de clientes </span>
+        </div>
 
-                  <span> Inicia sesión o crea una cuenta nueva </span>
+        {/* Título */}
+        <h1
+          style={{
+            fontSize: "20px",
+            fontWeight: 600,
+            textAlign: "center",
+            margin: "0 0 4px",
+          }}
+        >
+          Sistema de Gestión
+        </h1>
+        <p
+          style={{
+            fontSize: "13px",
+            color: "#6b7280",
+            textAlign: "center",
+            marginBottom: "1.5rem",
+          }}
+        >
+          Inicia sesión para continuar
+        </p>
 
-                  <div className="flex flex-row justify-center mt-[1rem] mb-[1rem] bg-[#EEEEEE] rounded-full h-[40px] p-[5px] w-[100%]">
-                    <button 
-                      onClick={() => handleClientButton(true)}
-                      className={`border-[white] h-[100%] size-full px-6 py-[2px] rounded-full transition-all duration-200
-                        ${
-                          active === "login"
-                            ? "bg-[white] shadow text-[black]"
-                            : "text-[#9E9E9E]"
-                        }`}
-                      >
-                    Iniciar sesion
-                    </button>
-                    <button 
-                      onClick={() => handleClientButton(false)}
-                      className={`border-[white] size-full px-6 py-[2px] rounded-full transition-all duration-200
-                        ${
-                          active === "register"
-                            ? "bg-[white] shadow text-[black]"
-                            : "text-[#9E9E9E]"
-                        }`}
-                      >
-                    Registrarse
-                    </button>
-                  </div>
-
-                  {
-                    clientOptions ? (
-                      <form onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
-                        <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
-                          <label htmlFor="email" style={{ fontSize: "13px", color: "#555" }}>Correo electrónico</label>
-                          <input
-                            id="email"
-                            type="email"
-                            value={email}
-                            onChange={(e) => setEmail(e.target.value)}
-                            placeholder="usuario@restaurante.com"
-                            style={{ padding: "10px 12px", border: "1px solid #ddd", borderRadius: "8px", fontSize: "14px", outline: "none" }}
-                          />
-                        </div>
-
-                        <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
-                          <label htmlFor="password" style={{ fontSize: "13px", color: "#555" }}>Contraseña</label>
-                          <input
-                            id="password"
-                            type="password"
-                            value={password}
-                            onChange={(e) => setPassword(e.target.value)}
-                            placeholder="••••••••"
-                            style={{ padding: "10px 12px", border: "1px solid #ddd", borderRadius: "8px", fontSize: "14px", outline: "none" }}
-                          />
-                        </div>
-
-                        {/* aqui estaba el menu desplegable para elgir el rol */}
-                        {/*<div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
-                          <label htmlFor="rol" style={{ fontSize: "13px", color: "#555" }}>Rol</label>
-                          <select
-                            id="rol"
-                            value={rol}
-                            onChange={(e) => setRol(e.target.value)}
-                            style={{ padding: "10px 12px", border: "1px solid #ddd", borderRadius: "8px", fontSize: "14px", background: "#fff", outline: "none" }}
-                          >
-                            <option value="" disabled>{rol}</option>
-                            <option value="admin">Admin</option>
-                            <option value="cajero">Cajero</option>
-                            <option value="cocinero">Cocinero</option>
-                            <option value="mesero">Mesero</option>
-                          </select>
-                        </div>*/}
-
-                        {error && (
-                          <p style={{ fontSize: "13px", color: "#c0392b", background: "#fdf0f0", padding: "10px 12px", borderRadius: "8px", margin: 0 }}>
-                            {error}
-                          </p>
-                        )}
-
-                        <button
-                          type="submit"
-                          disabled={loading}
-                          style={{ padding: "11px", background: "#111", color: "#fff", border: "none", borderRadius: "8px", fontSize: "14px", cursor: loading ? "not-allowed" : "pointer", opacity: loading ? 0.6 : 1, marginTop: "4px" }}
-                        >
-                          {loading ? "Iniciando sesión..." : "Iniciar sesión"}
-                        </button>
-                        <button
-                          style={{ padding: "11px", background: "#111", color: "#fff", border: "none", borderRadius: "8px", fontSize: "14px", cursor: loading ? "not-allowed" : "pointer", opacity: loading ? 0.6 : 1, marginTop: "4px" }}
-                          onClick={handleBackButton}
-                        >
-                          Volver
-                        </button>
-
-                      </form>
-                    ) : (
-                      <form onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
-                        <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
-                          <label htmlFor="newName" style={{ fontSize: "13px", color: "#555" }}>Nombre completo</label>
-                          <input
-                            id="newName"
-                            type="text"
-                            value={newName}
-                            onChange={(e) => setNewName(e.target.value)}
-                            placeholder="Juan Perez"
-                            style={{ padding: "10px 12px", border: "1px solid #ddd", borderRadius: "8px", fontSize: "14px", outline: "none" }}
-                          />
-                        </div>
-
-                        <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
-                          <label htmlFor="email" style={{ fontSize: "13px", color: "#555" }}>Correo electrónico</label>
-                          <input
-                            id="email"
-                            type="email"
-                            value={newEmail}
-                            onChange={(e) => setNewEmail(e.target.value)}
-                            placeholder="usuario@restaurante.com"
-                            style={{ padding: "10px 12px", border: "1px solid #ddd", borderRadius: "8px", fontSize: "14px", outline: "none" }}
-                          />
-                        </div>
-
-                        <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
-                          <label htmlFor="telefono" style={{ fontSize: "13px", color: "#555" }}>Teléfono</label>
-                          <input
-                            id="telefono"
-                            type="tel"
-                            value={newPhone}
-                            onChange={(e) => setNewPhone(e.target.value)}
-                            placeholder="••••••••"
-                            style={{ padding: "10px 12px", border: "1px solid #ddd", borderRadius: "8px", fontSize: "14px", outline: "none" }}
-                          />
-                        </div>
-
-                        <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
-                          <label htmlFor="password" style={{ fontSize: "13px", color: "#555" }}>Contraseña</label>
-                          <input
-                            id="password"
-                            type="password"
-                            value={newPassword}
-                            onChange={(e) => setNewPassword(e.target.value)}
-                            placeholder="••••••••"
-                            style={{ padding: "10px 12px", border: "1px solid #ddd", borderRadius: "8px", fontSize: "14px", outline: "none" }}
-                          />
-                        </div>
-
-                        {error && (
-                          <p style={{ fontSize: "13px", color: "#c0392b", background: "#fdf0f0", padding: "10px 12px", borderRadius: "8px", margin: 0 }}>
-                            {error}
-                          </p>
-                        )}
-
-                        <button
-                          type="submit"
-                          disabled={loading}
-                          style={{ padding: "11px", background: "#111", color: "#fff", border: "none", borderRadius: "8px", fontSize: "14px", cursor: loading ? "not-allowed" : "pointer", opacity: loading ? 0.6 : 1, marginTop: "4px" }}
-                        >
-                          {loading ? "Iniciando sesión..." : "Iniciar sesión"}
-                        </button>
-                        <button
-                          style={{ padding: "11px", background: "#111", color: "#fff", border: "none", borderRadius: "8px", fontSize: "14px", cursor: loading ? "not-allowed" : "pointer", opacity: loading ? 0.6 : 1, marginTop: "4px" }}
-                          onClick={handleBackButton}
-                        >
-                          Volver
-                        </button>
-
-                      </form>
-                    )
-                  } 
-                  
-                  
-                </div>
-              ) : (
-                <div className="flex flex-col justify-center items-center" style={{ width: "100%", maxWidth: "380px", border: "1px solid #e5e5e5", borderRadius: "12px", padding: "2rem", background: "#fff", boxShadow: "0 4px 12px rgba(0, 0, 0, 0.1)" }}>
-                  <div className="flex justify-center items-center size-[100] bg-[purple] rounded-[20px] mb-[20px]">
-                    <Users className="size-[50] text-[white]"/>
-                  </div>   
-                  <h1> Inicio de sesion </h1>
-                  <span> Acceso para personal del restaurante </span>
-
-                  <span> Selecciona tu Rol </span>
-
-                  <RoleCard setRole={setRol}/>
-                  
-                  <form onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
-
-                    <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
-                      <label htmlFor="email" style={{ fontSize: "13px", color: "#555" }}>Correo electrónico</label>
-                      <input
-                        id="email"
-                        type="email"
-                        value={email}
-                        onChange={(e) => setEmail(e.target.value)}
-                        placeholder="usuario@restaurante.com"
-                        style={{ padding: "10px 12px", border: "1px solid #ddd", borderRadius: "8px", fontSize: "14px", outline: "none" }}
-                      />
-                    </div>
-
-                    <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
-                      <label htmlFor="password" style={{ fontSize: "13px", color: "#555" }}>Contraseña</label>
-                      <input
-                        id="password"
-                        type="password"
-                        value={password}
-                        onChange={(e) => setPassword(e.target.value)}
-                        placeholder="••••••••"
-                        style={{ padding: "10px 12px", border: "1px solid #ddd", borderRadius: "8px", fontSize: "14px", outline: "none" }}
-                      />
-                    </div>
-
-                    {error && (
-                      <p style={{ fontSize: "13px", color: "#c0392b", background: "#fdf0f0", padding: "10px 12px", borderRadius: "8px", margin: 0 }}>
-                        {error}
-                      </p>
-                    )}
-
-                    <button
-                      type="submit"
-                      disabled={loading}
-                      style={{ padding: "11px", background: "#111", color: "#fff", border: "none", borderRadius: "8px", fontSize: "14px", cursor: loading ? "not-allowed" : "pointer", opacity: loading ? 0.6 : 1, marginTop: "4px" }}
-                    >
-                      {loading ? "Iniciando sesión..." : "Iniciar sesión"}
-                    </button>
-                    <button
-                      style={{ padding: "11px", background: "#111", color: "#fff", border: "none", borderRadius: "8px", fontSize: "14px", cursor: loading ? "not-allowed" : "pointer", opacity: loading ? 0.6 : 1, marginTop: "4px" }}
-                      onClick={handleBackButton}
-                    >
-                      Volver
-                    </button>
-
-                  </form>
-                </div>
-              )
-            }
+        {/* Formulario */}
+        <form onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
+          <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
+            <label htmlFor="email" style={{ fontSize: "13px", color: "#555" }}>
+              Correo electrónico
+            </label>
+            <input
+              id="email"
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              placeholder="usuario@restaurante.com"
+              style={{
+                padding: "10px 12px",
+                border: "1px solid #ddd",
+                borderRadius: "8px",
+                fontSize: "14px",
+                outline: "none",
+              }}
+            />
           </div>
-          
-            
-        )
-      }
-      
+
+          <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
+            <label htmlFor="password" style={{ fontSize: "13px", color: "#555" }}>
+              Contraseña
+            </label>
+            <input
+              id="password"
+              type="password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              placeholder="••••••••"
+              style={{
+                padding: "10px 12px",
+                border: "1px solid #ddd",
+                borderRadius: "8px",
+                fontSize: "14px",
+                outline: "none",
+              }}
+            />
+          </div>
+
+          {error && (
+            <p
+              style={{
+                fontSize: "13px",
+                color: "#c0392b",
+                background: "#fdf0f0",
+                padding: "10px 12px",
+                borderRadius: "8px",
+                margin: 0,
+              }}
+            >
+              {error}
+            </p>
+          )}
+
+          <button
+            type="submit"
+            disabled={loading}
+            style={{
+              padding: "11px",
+              background: "#111",
+              color: "#fff",
+              border: "none",
+              borderRadius: "8px",
+              fontSize: "14px",
+              cursor: loading ? "not-allowed" : "pointer",
+              opacity: loading ? 0.6 : 1,
+              marginTop: "4px",
+            }}
+          >
+            {loading ? "Iniciando sesión..." : "Iniciar sesión"}
+          </button>
+        </form>
+
+        {/* Divider */}
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: "10px",
+            margin: "1.25rem 0",
+          }}
+        >
+          <div style={{ flex: 1, height: "1px", background: "#e5e7eb" }} />
+          <span style={{ fontSize: "12px", color: "#9ca3af", whiteSpace: "nowrap" }}>
+            o continúa con
+          </span>
+          <div style={{ flex: 1, height: "1px", background: "#e5e7eb" }} />
+        </div>
+
+        {/* Google */}
+        <button
+          type="button"
+          onClick={handleGoogleLogin}
+          style={{
+            width: "100%",
+            padding: "10px",
+            background: "#fff",
+            color: "#111",
+            border: "1px solid #ddd",
+            borderRadius: "8px",
+            fontSize: "14px",
+            cursor: "pointer",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            gap: "8px",
+          }}
+        >
+          <svg width="18" height="18" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+            <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/>
+            <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
+            <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l3.66-2.84z" fill="#FBBC05"/>
+            <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/>
+          </svg>
+          Continuar con Google
+        </button>
+
+        {/* Olvidaste contraseña */}
+        <div
+          style={{
+            textAlign: "center",
+            marginTop: "1.25rem",
+            paddingTop: "1.25rem",
+            borderTop: "1px solid #f0f0f0",
+          }}
+        >
+          <a
+            href="/forgot-password"
+            style={{ fontSize: "13px", color: "#6b7280", textDecoration: "none" }}
+          >
+            ¿Olvidaste tu contraseña?
+          </a>
+        </div>
+      </div>
     </div>
   );
 }
