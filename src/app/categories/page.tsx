@@ -496,18 +496,15 @@ export default function CategoriesPage() {
 
           <div style={{ display: "flex", flexDirection: "column", gap: 18 }}>
             {selectedDish.image_url && (
+            <div style={{ position: "relative", width: "100%", height: 200 }}>
               <Image
                 src={selectedDish.image_url}
                 alt={selectedDish.name}
-                width={600} // ancho base requerido
-                height={200}
-                style={{
-                  width: "100%",
-                  height: 200,
-                  objectFit: "cover",
-                  borderRadius: 12,
-                }}
+                fill
+                sizes="(max-width: 768px) 100vw, 600px"
+                style={{ objectFit: "cover", borderRadius: 12 }}
               />
+            </div>
             )}
 
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
