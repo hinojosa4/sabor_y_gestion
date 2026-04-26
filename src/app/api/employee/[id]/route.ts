@@ -1,7 +1,7 @@
-// app/api/tables/[id]/route.ts
+// app/api/employee/[id]/route.ts
 import { NextResponse } from 'next/server';
 import { connectDB } from '@/lib/db';
-import Table from '@/models/Table';
+import Employee from '@/models/Employee';
 
 export async function PUT(
     request: Request,
@@ -12,29 +12,42 @@ export async function PUT(
         const { id } = await params;
         const data = await request.json();
 
-        // 🔥 Si llega isAvailable, eliminarlo (ya no existe en el modelo)
-        if (data.isAvailable !== undefined) {
-            delete data.isAvailable;
+        // ✅ Si viene password_hash, mapear a password
+        if (data.password_hash) {
+            data.password = data.password_hash;
+            delete data.password_hash;
         }
 
-        const table = await Table.findByIdAndUpdate(
-            id,
-            data,
-            { returnDocument: 'after' }
-        );
+        // ✅ Asegurar employmentDetails
+        const updateData = {
+            ...data,
+            employmentDetails: data.employmentDetails || {
+                phone: '',
+                shift: 'Turno Mañana',
+                startDate: new Date(),
+                salary: 0,
+                status: 'Activo'
+            }
+        };
 
-        if (!table) {
+        const employee = await Employee.findByIdAndUpdate(
+            id,
+            updateData,
+            { returnDocument: 'after' }
+        ).select('-password');  // ✅ Cambiado de '-password_hash' a '-password'
+
+        if (!employee) {
             return NextResponse.json(
-                { error: 'Mesa no encontrada' },
+                { error: 'Empleado no encontrado' },
                 { status: 404 }
             );
         }
 
-        return NextResponse.json(table);
+        return NextResponse.json(employee);
     } catch (error) {
         console.error('Error en PUT:', error);
         return NextResponse.json(
-            { error: 'Error al actualizar la mesa' },
+            { error: 'Error al actualizar' },
             { status: 500 }
         );
     }
@@ -48,11 +61,11 @@ export async function DELETE(
         await connectDB();
         const { id } = await params;
 
-        const deleted = await Table.findByIdAndDelete(id);
+        const deleted = await Employee.findByIdAndDelete(id);
 
         if (!deleted) {
             return NextResponse.json(
-                { error: 'Mesa no encontrada' },
+                { error: 'Empleado no encontrado' },
                 { status: 404 }
             );
         }
@@ -61,7 +74,7 @@ export async function DELETE(
     } catch (error) {
         console.error('Error en DELETE:', error);
         return NextResponse.json(
-            { error: 'Error al eliminar la mesa' },
+            { error: 'Error al eliminar' },
             { status: 500 }
         );
     }

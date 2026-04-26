@@ -1,3 +1,5 @@
+// types/table.ts
+
 export type TableStatus = 'Libre' | 'Ocupada' | 'Reservada' | 'Cuenta solicitada';
 export type TableLocation = 'Interior - Salón Principal' | 'Interior - Salón VIP' | 'Terraza' | 'Exterior - Jardín' | 'Segundo Piso' | 'Bar';
 

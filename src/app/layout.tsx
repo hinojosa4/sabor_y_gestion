@@ -7,7 +7,7 @@ export const metadata: Metadata = {
   description: 'Sistema Integral de Gestión Gastronómica',
 }
 
-const inter = Inter({ 
+const inter = Inter({
   subsets: ['latin'],
   display: 'swap',
 })
@@ -19,7 +19,7 @@ export default function RootLayout({
 }) {
   return (
     <html className={inter.className} lang="es">
-      <body className="antialiased">
+      <body className="antialiased" suppressHydrationWarning>
         {children}
       </body>
     </html>

@@ -1,329 +1,163 @@
-import { useState, useEffect, useCallback } from "react";
-import { Table, TableStats, TableStatus } from "@/types/table";
-
-type CreateTableInput = {
-  restaurantId: string;
-  number: number | string;
-  capacity: number | string;
-  location: string;
-  xPosition?: number;
-  yPosition?: number;
-  status?: TableStatus;
-};
+// hooks/useTableData.ts
+import { useState, useEffect, useCallback } from 'react';
+import { Table, TableStats, CreateTableDTO } from '@/types/table';
 
 export function useTableData(restaurantId: string) {
-  const [tables, setTables] = useState<Table[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+    const [tables, setTables] = useState<Table[]>([]);
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState<string | null>(null);
+    const [searchQuery, setSearchQuery] = useState('');
+    const [selectedLocation, setSelectedLocation] = useState('Todas');
 
-  const [searchQuery, setSearchQuery] = useState("");
-  const [selectedLocation, setSelectedLocation] =
-    useState("Todas");
+    const stats: TableStats = {
+        total: tables.length,
+        libre: tables.filter(t => t.status === 'Libre').length,
+        ocupada: tables.filter(t => t.status === 'Ocupada').length,
+        reservada: tables.filter(t => t.status === 'Reservada').length,
+        cuentaSolicitada: tables.filter(t => t.status === 'Cuenta solicitada').length,
+        totalSeats: tables.reduce((sum, t) => sum + t.capacity, 0),
+        locations: [...new Set(tables.map(t => t.location))].length,
+        distributionByLocation: tables.reduce((acc, table) => {
+            acc[table.location] = (acc[table.location] || 0) + 1;
+            return acc;
+        }, {} as Record<string, number>)
+    };
 
-  const stats: TableStats = {
-    total: tables.length,
-    libre: tables.filter(
-      (t) => t.status === "Libre"
-    ).length,
-    ocupada: tables.filter(
-      (t) => t.status === "Ocupada"
-    ).length,
-    reservada: tables.filter(
-      (t) => t.status === "Reservada"
-    ).length,
-    cuentaSolicitada: tables.filter(
-      (t) =>
-        t.status === "Cuenta solicitada"
-    ).length,
-    totalSeats: tables.reduce(
-      (sum, t) => sum + t.capacity,
-      0
-    ),
-    locations: new Set(
-      tables.map((t) => t.location)
-    ).size,
-    distributionByLocation: tables.reduce(
-      (acc, table) => {
-        acc[table.location] =
-          (acc[table.location] ?? 0) + 1;
-        return acc;
-      },
-      {} as Record<string, number>
-    ),
-  };
+    const locations = ['Todas', ...new Set(tables.map(t => t.location))];
 
-  const locations = [
-    "Todas",
-    ...new Set(
-      tables.map((t) => t.location)
-    ),
-  ];
+    const filteredTables = tables.filter(table => {
+        const tableNumberStr = table.number.toString();
+        const searchLower = searchQuery.toLowerCase();
 
-  const filteredTables = tables.filter(
-    (table) => {
-      const searchLower =
-        searchQuery.toLowerCase();
+        const matchesSearch = tableNumberStr.includes(searchQuery) ||
+            table.location.toLowerCase().includes(searchLower);
+        const matchesLocation = selectedLocation === 'Todas' || table.location === selectedLocation;
+        return matchesSearch && matchesLocation;
+    });
 
-      const matchesSearch =
-        table.number
-          .toString()
-          .includes(searchQuery) ||
-        table.location
-          .toLowerCase()
-          .includes(searchLower);
-
-      const matchesLocation =
-        selectedLocation === "Todas" ||
-        table.location ===
-          selectedLocation;
-
-      return (
-        matchesSearch &&
-        matchesLocation
-      );
-    }
-  );
-
-  const fetchTables = useCallback(
-    async () => {
-      if (!restaurantId) {
-        setLoading(false);
-        return;
-      }
-
-      setLoading(true);
-      setError(null);
-
-      try {
-        const response = await fetch(
-          `/api/tables?restaurantId=${restaurantId}`
-        );
-
-        const data:
-          | Table[]
-          | { error?: string } =
-          await response.json();
-
-        if (!response.ok) {
-          const message =
-            "error" in data
-              ? data.error
-              : "Error al cargar mesas";
-
-          setError(
-            message ??
-              "Error al cargar mesas"
-          );
-          setTables([]);
-          return;
+    const fetchTables = useCallback(async () => {
+        if (!restaurantId) {
+            setLoading(false);
+            return;
         }
 
-        setTables(data as Table[]);
-      } catch (err: unknown) {
-        console.error(
-          "Error al cargar mesas:",
-          err
-        );
+        setLoading(true);
+        setError(null);
 
-        setError(
-          "Error de conexión al servidor"
-        );
-        setTables([]);
-      } finally {
-        setLoading(false);
-      }
-    },
-    [restaurantId]
-  );
+        try {
+            const response = await fetch(`/api/tables?restaurantId=${restaurantId}`);
+            const data = await response.json();
 
-  const addTable = async (
-    tableData: CreateTableInput
-  ) => {
-    try {
-      const payload = {
-        restaurantId:
-          tableData.restaurantId,
-        number: Number(
-          tableData.number
-        ),
-        capacity: Number(
-          tableData.capacity
-        ),
-        location:
-          tableData.location,
-        xPosition:
-          tableData.xPosition ??
-          50,
-        yPosition:
-          tableData.yPosition ??
-          50,
-        status:
-          tableData.status ??
-          "Libre",
-      };
-
-      const response = await fetch(
-        "/api/tables",
-        {
-          method: "POST",
-          headers: {
-            "Content-Type":
-              "application/json",
-          },
-          body: JSON.stringify(
-            payload
-          ),
+            if (response.ok) {
+                setTables(data);
+            } else {
+                setError(data.error || 'Error al cargar las mesas');
+                setTables([]);
+            }
+        } catch (err) {
+            console.error('Error al cargar mesas:', err);
+            setError('Error de conexión al servidor');
+            setTables([]);
+        } finally {
+            setLoading(false);
         }
-      );
+    }, [restaurantId]);
 
-      const data:
-        | Table
-        | { error?: string } =
-        await response.json();
+    // ✅ Cambiar 'any' por 'CreateTableDTO'
+    const addTable = async (tableData: CreateTableDTO) => {
+        try {
+            const payload = {
+                restaurantId: tableData.restaurantId,
+                number: Number(tableData.number),
+                capacity: Number(tableData.capacity),
+                location: tableData.location,
+                xPosition: Number(tableData.xPosition) || 50,
+                yPosition: Number(tableData.yPosition) || 50,
+                status: 'Libre' as const
+            };
 
-      if (!response.ok) {
-        const message =
-          "error" in data
-            ? data.error
-            : "Error al crear mesa";
+            const response = await fetch('/api/tables', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
 
-        throw new Error(
-          message ??
-            "Error al crear mesa"
-        );
-      }
+            const data = await response.json();
 
-      setTables((prev) => [
-        ...prev,
-        data as Table,
-      ]);
+            if (!response.ok) {
+                const errorMessage = data.error || 'Error al crear la mesa';
+                alert(errorMessage);
+                return null;
+            }
 
-      return data as Table;
-    } catch (err: unknown) {
-      console.error(
-        "Error al agregar mesa:",
-        err
-      );
-
-      throw err;
-    }
-  };
-
-  const updateTable = async (
-    id: string,
-    updates: Partial<Table>
-  ) => {
-    try {
-      const response = await fetch(
-        `/api/tables/${id}`,
-        {
-          method: "PUT",
-          headers: {
-            "Content-Type":
-              "application/json",
-          },
-          body: JSON.stringify(
-            updates
-          ),
+            setTables(prev => [...prev, data]);
+            return data;
+        } catch (error) {
+            console.error('Error al agregar mesa:', error);
+            alert('Error de conexión al servidor');
+            return null;
         }
-      );
+    };
 
-      const data:
-        | Table
-        | { error?: string } =
-        await response.json();
+    const updateTable = async (id: string, updates: Partial<Table>) => {
+        try {
+            const response = await fetch(`/api/tables/${id}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(updates)
+            });
 
-      if (!response.ok) {
-        const message =
-          "error" in data
-            ? data.error
-            : "Error al actualizar";
+            const data = await response.json();
 
-        throw new Error(
-          message ??
-            "Error al actualizar"
-        );
-      }
+            if (!response.ok) {
+                throw new Error(data.error || 'Error al actualizar la mesa');
+            }
 
-      setTables((prev) =>
-        prev.map((table) =>
-          table._id === id
-            ? (data as Table)
-            : table
-        )
-      );
-
-      return data as Table;
-    } catch (err: unknown) {
-      console.error(
-        "Error al actualizar mesa:",
-        err
-      );
-      throw err;
-    }
-  };
-
-  const deleteTable = async (
-    id: string
-  ) => {
-    try {
-      const response = await fetch(
-        `/api/tables/${id}`,
-        {
-          method: "DELETE",
+            setTables(prev => prev.map(t => t._id === id ? data : t));
+            return data;
+        } catch (error) {
+            console.error('Error al actualizar mesa:', error);
+            throw error;
         }
-      );
+    };
 
-      const data:
-        | { success?: boolean }
-        | { error?: string } =
-        await response.json();
+    const deleteTable = async (id: string) => {
+        try {
+            const response = await fetch(`/api/tables/${id}`, {
+                method: 'DELETE'
+            });
 
-      if (!response.ok) {
-        const message =
-          "error" in data
-            ? data.error
-            : "Error al eliminar";
+            const data = await response.json();
 
-        throw new Error(
-          message ??
-            "Error al eliminar"
-        );
-      }
+            if (!response.ok) {
+                throw new Error(data.error || 'Error al eliminar la mesa');
+            }
 
-      setTables((prev) =>
-        prev.filter(
-          (table) =>
-            table._id !== id
-        )
-      );
-    } catch (err: unknown) {
-      console.error(
-        "Error al eliminar mesa:",
-        err
-      );
-      throw err;
-    }
-  };
+            setTables(prev => prev.filter(t => t._id !== id));
+        } catch (error) {
+            console.error('Error al eliminar mesa:', error);
+            throw error;
+        }
+    };
 
-  useEffect(() => {
-    fetchTables();
-  }, [fetchTables]);
+    useEffect(() => {
+        fetchTables();
+    }, [fetchTables]);
 
-  return {
-    tables,
-    loading,
-    error,
-    stats,
-    locations,
-    searchQuery,
-    setSearchQuery,
-    selectedLocation,
-    setSelectedLocation,
-    filteredTables,
-    addTable,
-    updateTable,
-    deleteTable,
-    refreshTables: fetchTables,
-  };
+    return {
+        tables,
+        loading,
+        error,
+        stats,
+        locations,
+        searchQuery,
+        setSearchQuery,
+        selectedLocation,
+        setSelectedLocation,
+        filteredTables,
+        addTable,
+        updateTable,
+        deleteTable,
+        refreshTables: fetchTables
+    };
 }
