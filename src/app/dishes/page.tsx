@@ -276,27 +276,70 @@ function DishForm({ initial, categories, onSubmit, onCancel, error, submitLabel 
         {/* Imagen — subida a Cloudinary */}
         <div style={{ gridColumn: "1 / -1" }}>
           <Field label="Imagen del plato">
-            <input
-              type="file"
-              accept="image/*"
-              onChange={(e) => {
-              const file = e.target.files?.[0];
-              if (!file) return;
+            
+            {/* Zona de subida personalizada */}
+            <label style={{
+              display: "flex", alignItems: "center", gap: 12,
+              padding: "12px 16px", borderRadius: 9,
+              border: "1.5px dashed #e0e0e0", background: "#fafafa",
+              cursor: "pointer", transition: "border-color 0.15s",
+            }}
+            onMouseEnter={e => (e.currentTarget.style.borderColor = "#e85d26")}
+            onMouseLeave={e => (e.currentTarget.style.borderColor = "#e0e0e0")}
+            >
+              <div style={{
+                width: 40, height: 40, borderRadius: 9,
+                background: "#fff8f5", border: "1.5px solid #e85d26",
+                display: "flex", alignItems: "center", justifyContent: "center",
+                fontSize: 20, flexShrink: 0,
+              }}>📷</div>
+              <div>
+                <p style={{ margin: 0, fontSize: 13, fontWeight: 600, color: "#1a1a1a" }}>
+                  {uploading ? "Subiendo imagen..." : "Seleccionar imagen"}
+                </p>
+                <p style={{ margin: "2px 0 0", fontSize: 11, color: "#aaa" }}>
+                  JPG, PNG, WEBP o GIF · Máx. 5MB
+                </p>
+              </div>
+              <input
+                type="file"
+                accept="image/*"
+                style={{ display: "none" }}  
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  if (!file) return;
+                  const allowedTypes = ["image/jpeg", "image/png", "image/webp", "image/gif"];
+                  if (!allowedTypes.includes(file.type)) {
+                    alert("Solo se permiten imágenes (JPG, PNG, WEBP, GIF)");
+                    e.target.value = "";
+                    return;
+                  }
+                  if (file.size > 5 * 1024 * 1024) {
+                    alert("La imagen no puede superar los 5MB");
+                    e.target.value = "";
+                    return;
+                  }
+                  handleImageUpload(file);
+                }}
+              />
+            </label>
 
-               // ✅ Validar tipo
-              const allowedTypes = ["image/jpeg", "image/png", "image/webp", "image/gif"];
-              if (!allowedTypes.includes(file.type)) {
-                alert("Solo se permiten imágenes (JPG, PNG, WEBP, GIF)");
-                e.target.value = ""; // limpia el input
-                return;
-                }
-                handleImageUpload(file);
-              }}
-              style={inputStyle}
-            />
+            {/* Loading */}
             {uploading && (
-              <p style={{ fontSize: 12, color: "#888", marginTop: 6 }}>⏳ Subiendo imagen...</p>
+              <div style={{ marginTop: 8, display: "flex", alignItems: "center", gap: 8 }}>
+                <div style={{
+                  width: "100%", height: 4, background: "#f0f0f0", borderRadius: 2, overflow: "hidden",
+                }}>
+                  <div style={{
+                    height: "100%", background: "#e85d26", borderRadius: 2,
+                    width: "60%", animation: "pulse 1s ease-in-out infinite",
+                  }} />
+                </div>
+                <span style={{ fontSize: 11, color: "#888", whiteSpace: "nowrap" }}>Subiendo...</span>
+              </div>
             )}
+
+            {/* Preview */}
             {form.image_url && !uploading && (
               <div style={{ marginTop: 8, position: "relative" }}>
                 <div style={{ position: "relative", width: "100%", height: 150 }}>
@@ -304,17 +347,18 @@ function DishForm({ initial, categories, onSubmit, onCancel, error, submitLabel 
                     src={form.image_url}
                     alt="preview"
                     fill
-                    sizes="100vw"
+                    sizes="(max-width: 620px) 100vw, 620px"
                     style={{ objectFit: "cover", borderRadius: 9 }}
                   />
-                  </div>
+                </div>
                 <button
                   onClick={() => setForm(f => ({ ...f, image_url: "" }))}
                   style={{
                     position: "absolute", top: 6, right: 6,
-                    background: "rgba(0,0,0,0.5)", color: "#fff",
-                    border: "none", borderRadius: 6, padding: "3px 8px",
-                    fontSize: 12, cursor: "pointer",
+                    background: "rgba(0,0,0,0.55)", color: "#fff",
+                    border: "none", borderRadius: 6, padding: "4px 10px",
+                    fontSize: 12, fontWeight: 600, cursor: "pointer",
+                    display: "flex", alignItems: "center", gap: 4,
                   }}
                 >✕ Quitar</button>
               </div>

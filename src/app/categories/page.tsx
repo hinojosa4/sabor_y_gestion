@@ -206,6 +206,7 @@ export default function CategoriesPage() {
           isAvailable: dish.isAvailable,
           description: dish.description || "",
           ingredients: dish.ingredients || [],
+          image_url: dish.image_url || "",
         }),
       });
       const data = await res.json();
@@ -715,26 +716,31 @@ function DishCard({ dish, onClick, categories, onRemove, onAssign }: {
 
       {/* Selector para platos sin categoría */}
       {categories && onAssign && (
-        <div style={{ display: "flex", gap: 6 }}>
-          <select value={assignValue} onChange={(e) => setAssignValue(e.target.value)} style={{
-            flex: 1, padding: "6px 10px", borderRadius: 7,
-            border: "1.5px solid #e0e0e0", fontSize: 12,
-            fontFamily: "inherit", color: "#333", background: "#fff",
+        <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+        <select value={assignValue} onChange={(e) => setAssignValue(e.target.value)} style={{
+          flex: 1, minWidth: 0,         // ← minWidth: 0 permite que se encoja
+          padding: "6px 8px", borderRadius: 7,
+          border: "1.5px solid #e0e0e0", fontSize: 11,
+          fontFamily: "inherit", color: "#333", background: "#fff",
+          overflow: "hidden", textOverflow: "ellipsis",
+        }}>
+          <option value="">Asignar a categoría...</option>
+          {categories.map((c) => <option key={c._id} value={c._id}>{c.nombre}</option>)}
+        </select>
+        <button onClick={() => { if (assignValue) { onAssign(assignValue); setAssignValue(""); } }}
+          disabled={!assignValue} style={{
+            background: assignValue ? "#e85d26" : "#f0f0f0",
+            color: assignValue ? "#fff" : "#aaa",
+            border: "none", borderRadius: 7,
+            padding: "6px 12px",          
+            fontSize: 12, fontWeight: 600,
+            cursor: assignValue ? "pointer" : "not-allowed",
+            flexShrink: 0,                
+            whiteSpace: "nowrap",
           }}>
-            <option value="">Asignar a categoría...</option>
-            {categories.map((c) => <option key={c._id} value={c._id}>{c.nombre}</option>)}
-          </select>
-          <button onClick={() => { if (assignValue) { onAssign(assignValue); setAssignValue(""); } }}
-            disabled={!assignValue} style={{
-              background: assignValue ? "#e85d26" : "#f0f0f0",
-              color: assignValue ? "#fff" : "#aaa",
-              border: "none", borderRadius: 7, padding: "6px 12px",
-              fontSize: 12, fontWeight: 600,
-              cursor: assignValue ? "pointer" : "not-allowed",
-            }}>
-            Asignar
-          </button>
-        </div>
+          Asignar
+        </button>
+      </div>
       )}
     </div>
   );
