@@ -83,7 +83,7 @@ export default function StaffManagementPage() {
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
             <div className="flex items-center gap-3">
               <Link
-                href="/"
+                href="/dashboard"
                 className="inline-flex items-center justify-center whitespace-nowrap text-black font-medium transition-colors hover:bg-gray-100 rounded-md h-8 px-3"
               >
                 <ArrowLeft className="size-5" />

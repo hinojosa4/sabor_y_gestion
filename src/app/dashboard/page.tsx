@@ -12,6 +12,8 @@ interface Stats {
   activeCategories: number;
   totalUsers: number;
   activeUsers: number;
+  totalTables: number;
+  availableTables: number;
   adminCount: number;
   cajeroCount: number;
   cocineroCount: number;
@@ -21,11 +23,11 @@ interface Stats {
 }
 
 const ROL_LABEL: Record<string, string> = {
-  admin:    "Administrador",
-  cajero:   "Cajero",
+  admin: "Administrador",
+  cajero: "Cajero",
   cocinero: "Cocinero",
-  mesero:   "Mesero",
-  cliente:  "Cliente",
+  mesero: "Mesero",
+  cliente: "Cliente",
 };
 
 export default function DashboardPage() {
@@ -36,6 +38,7 @@ export default function DashboardPage() {
     totalDishes: 0, availableDishes: 0,
     totalCategories: 0, activeCategories: 0,
     totalUsers: 0, activeUsers: 0,
+    totalTables: 0, availableTables: 0,
     adminCount: 0, cajeroCount: 0,
     cocineroCount: 0, meseroCount: 0,
     clienteCount: 0, staffCount: 0,
@@ -53,32 +56,37 @@ export default function DashboardPage() {
 
     const fetchStats = async () => {
       try {
-        const [dishRes, catRes, userRes] = await Promise.all([
+        const [dishRes, catRes, userRes, tableRes] = await Promise.all([
           fetch("/api/dishes"),
           fetch("/api/categories"),
           fetch("/api/users"),
+          fetch("/api/tables"),
         ]);
         const dishData = await dishRes.json();
-        const catData  = await catRes.json();
+        const catData = await catRes.json();
         const userData = await userRes.json();
+        const tableData = await tableRes.json();
 
         const dishes = dishData.ok ? dishData.data : [];
-        const cats   = catData.ok  ? catData.data  : [];
-        const users  = userData.ok ? userData.data : [];
+        const cats = catData.ok ? catData.data : [];
+        const users = userData.ok ? userData.data : [];
+        const tables = tableData.ok ? tableData.data : [];
 
         setStats({
-          totalDishes:      dishes.length,
-          availableDishes:  dishes.filter((d: { isAvailable: boolean }) => d.isAvailable).length,
-          totalCategories:  cats.length,
+          totalDishes: dishes.length,
+          availableDishes: dishes.filter((d: { isAvailable: boolean }) => d.isAvailable).length,
+          totalCategories: cats.length,
           activeCategories: cats.filter((c: { activo: boolean }) => c.activo).length,
-          totalUsers:       users.length,
-          activeUsers:      users.filter((u: { activo: boolean }) => u.activo).length,
-          adminCount:       users.filter((u: { rol: string }) => u.rol === "admin").length,
-          cajeroCount:      users.filter((u: { rol: string }) => u.rol === "cajero").length,
-          cocineroCount:    users.filter((u: { rol: string }) => u.rol === "cocinero").length,
-          meseroCount:      users.filter((u: { rol: string }) => u.rol === "mesero").length,
-          clienteCount:     users.filter((u: { rol: string }) => u.rol === "cliente").length,
-          staffCount:       users.filter((u: { rol: string }) => ["cajero", "cocinero", "mesero"].includes(u.rol)).length,
+          totalUsers: users.length,
+          activeUsers: users.filter((u: { activo: boolean }) => u.activo).length,
+          totalTables: tables.length,
+          availableTables: tables.filter((t: { isAvailable: boolean }) => t.isAvailable).length,
+          adminCount: users.filter((u: { rol: string }) => u.rol === "admin").length,
+          cajeroCount: users.filter((u: { rol: string }) => u.rol === "cajero").length,
+          cocineroCount: users.filter((u: { rol: string }) => u.rol === "cocinero").length,
+          meseroCount: users.filter((u: { rol: string }) => u.rol === "mesero").length,
+          clienteCount: users.filter((u: { rol: string }) => u.rol === "cliente").length,
+          staffCount: users.filter((u: { rol: string }) => ["cajero", "cocinero", "mesero"].includes(u.rol)).length,
         });
       } catch { /* silencioso */ }
       finally { setLoading(false); }
@@ -113,25 +121,26 @@ export default function DashboardPage() {
   const firstName = user.name.split(" ")[0];
 
   const statCards = [
-    { label: "Total Platos",  value: loading ? "—" : stats.totalDishes,     sub: loading ? "" : `${stats.availableDishes} disponibles`, subColor: "#27ae60", icon: "🍴", iconBg: "#fff8f5" },
-    { label: "Categorías",    value: loading ? "—" : stats.totalCategories,  sub: loading ? "" : `${stats.activeCategories} activas`,    subColor: "#27ae60", icon: "🏷️", iconBg: "#f0f6ff" },
-    { label: "Usuarios",      value: loading ? "—" : stats.totalUsers,       sub: loading ? "" : `${stats.activeUsers} activos`,         subColor: "#27ae60", icon: "👥", iconBg: "#f0fdf4" },
-    { label: "Personal",      value: loading ? "—" : stats.staffCount,       sub: loading ? "" : `${stats.adminCount} admin${stats.adminCount !== 1 ? "s" : ""}`, subColor: "#8e44ad", icon: "👨‍🍳", iconBg: "#fdf4ff" },
+    { label: "Total Platos", value: loading ? "—" : stats.totalDishes, sub: loading ? "" : `${stats.availableDishes} disponibles`, subColor: "#27ae60", icon: "🍴", iconBg: "#fff8f5" },
+    { label: "Categorías", value: loading ? "—" : stats.totalCategories, sub: loading ? "" : `${stats.activeCategories} activas`, subColor: "#27ae60", icon: "🏷️", iconBg: "#f0f6ff" },
+    { label: "Usuarios", value: loading ? "—" : stats.totalUsers, sub: loading ? "" : `${stats.activeUsers} activos`, subColor: "#27ae60", icon: "👥", iconBg: "#f0fdf4" },
+    { label: "Personal", value: loading ? "—" : stats.staffCount, sub: loading ? "" : `${stats.adminCount} admin${stats.adminCount !== 1 ? "s" : ""}`, subColor: "#8e44ad", icon: "👨‍🍳", iconBg: "#fdf4ff" },
   ];
 
   const quickActions = [
-    { icon: "🏷️", title: "Gestión de Categorías", desc: "Organiza y administra las categorías del menú",  route: "/categories", color: "#e85d26", bg: "#fff8f5", border: "#ffd4bc", stats: loading ? "—" : `${stats.totalCategories} categorías · ${stats.activeCategories} activas` },
-    { icon: "🍴", title: "Gestión de Platos",      desc: "Administra platos, precios e ingredientes",       route: "/dishes",     color: "#2563eb", bg: "#f0f6ff", border: "#bfdbfe", stats: loading ? "—" : `${stats.totalDishes} platos · ${stats.availableDishes} disponibles` },
-    { icon: "👥", title: "Gestión de Usuarios",    desc: "Administra el personal y sus permisos",           route: "/staff-management",      color: "#059669", bg: "#f0fdf4", border: "#a7f3d0", stats: loading ? "—" : `${stats.totalUsers} usuarios · ${stats.activeUsers} activos` },
+    { icon: "🏷️", title: "Gestión de Categorías", desc: "Organiza y administra las categorías del menú", route: "/categories", color: "#e85d26", bg: "#fff8f5", border: "#ffd4bc", stats: loading ? "—" : `${stats.totalCategories} categorías · ${stats.activeCategories} activas` },
+    { icon: "🍴", title: "Gestión de Platos", desc: "Administra platos, precios e ingredientes", route: "/dishes", color: "#2563eb", bg: "#f0f6ff", border: "#bfdbfe", stats: loading ? "—" : `${stats.totalDishes} platos · ${stats.availableDishes} disponibles` },
+    { icon: "👥", title: "Gestión de Usuarios", desc: "Administra el personal y sus permisos", route: "/staff-management", color: "#059669", bg: "#f0fdf4", border: "#a7f3d0", stats: loading ? "—" : `${stats.totalUsers} usuarios · ${stats.activeUsers} activos` },
+    { icon: "🪑", title: "Gestión de Mesas", desc: "Administra mesas, estados y disponibilidad", route: "/tableManage", color: "#7c3aed", bg: "#f5f3ff", border: "#ddd6fe", stats: loading ? "—" : `${stats.totalTables} mesas · ${stats.availableTables} disponibles` },
   ];
 
   // ── Desglose completo de roles ──────────────────────────────────────────
   const roles = [
-    { label: "Admins",    key: "adminCount"   as const, color: "#8e44ad", icon: "🛡️" },
-    { label: "Cajeros",   key: "cajeroCount"  as const, color: "#2563eb", icon: "🧾" },
-    { label: "Cocineros", key: "cocineroCount"as const, color: "#e85d26", icon: "👨‍🍳" },
-    { label: "Meseros",   key: "meseroCount"  as const, color: "#059669", icon: "🍽️" },
-    { label: "Clientes",  key: "clienteCount" as const, color: "#888",    icon: "👤" },
+    { label: "Admins", key: "adminCount" as const, color: "#8e44ad", icon: "🛡️" },
+    { label: "Cajeros", key: "cajeroCount" as const, color: "#2563eb", icon: "🧾" },
+    { label: "Cocineros", key: "cocineroCount" as const, color: "#e85d26", icon: "👨‍🍳" },
+    { label: "Meseros", key: "meseroCount" as const, color: "#059669", icon: "🍽️" },
+    { label: "Clientes", key: "clienteCount" as const, color: "#888", icon: "👤" },
   ];
 
   return (
@@ -210,7 +219,7 @@ export default function DashboardPage() {
                 onClick={() => router.push(action.route)}
                 style={{ background: "#fff", border: `1.5px solid ${action.border}`, borderRadius: 16, padding: "22px 24px", cursor: "pointer", textAlign: "left", display: "flex", alignItems: "center", gap: 18, boxShadow: "0 2px 8px rgba(0,0,0,0.03)", transition: "transform 0.15s, box-shadow 0.15s", fontFamily: "inherit", width: "100%" }}
                 onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.transform = "translateY(-2px)"; (e.currentTarget as HTMLButtonElement).style.boxShadow = "0 8px 24px rgba(0,0,0,0.1)"; }}
-                onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.transform = "translateY(0)";  (e.currentTarget as HTMLButtonElement).style.boxShadow = "0 2px 8px rgba(0,0,0,0.03)"; }}
+                onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.transform = "translateY(0)"; (e.currentTarget as HTMLButtonElement).style.boxShadow = "0 2px 8px rgba(0,0,0,0.03)"; }}
               >
                 <div style={{ width: 52, height: 52, borderRadius: 14, background: action.bg, border: `1.5px solid ${action.border}`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 24, flexShrink: 0 }}>{action.icon}</div>
                 <div style={{ flex: 1 }}>
