@@ -8,9 +8,10 @@ import { LayoutGrid, List, Plus, Search, ArrowLeft, MapPin, X } from 'lucide-rea
 import { useState } from "react";
 import Link from 'next/link';
 import { useTableData } from '@/hooks/useTableData';
-import { Table } from '@/types/table'; // ✅ Importar tipo Table
+import { Table } from '@/types/table';
+import { useAuth } from "@/lib/useAuth";
+import { ADMIN } from "@/lib/roles";
 
-// ✅ Mover OrderModal FUERA del componente principal (antes de TableManagementPage)
 const OrderModal = ({
   isOpen,
   onClose,
@@ -18,7 +19,7 @@ const OrderModal = ({
 }: {
   isOpen: boolean;
   onClose: () => void;
-  table: Table | null;  // ✅ Cambiar any por Table | null
+  table: Table | null;
 }) => {
   if (!isOpen || !table) return null;
 
@@ -70,6 +71,7 @@ export default function TableManagementPage() {
   const [editingTable, setEditingTable] = useState<Table | null>(null);  // ✅ Cambiar any por Table | null
   const [selectedTable, setSelectedTable] = useState<Table | null>(null);  // ✅ Cambiar any por Table | null
   const [viewMode, setViewMode] = useState<'list' | 'floorplan'>('list');
+  const { user, loading: userLoading } = useAuth(ADMIN);
 
   // Obtener restaurantId del contexto/session 
   const restaurantId = "69e170e941daf8c2b2f76677"; // TODO: Obtener del usuario logueado
@@ -145,6 +147,18 @@ export default function TableManagementPage() {
       setIsOrderModalOpen(true);
     }
   };
+
+  if (userLoading) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center font-semibold text-gray-700">
+          Verificando sesión...
+        </div>
+      </div>
+    );
+  }
+
+  if (!user) return null;
 
   if (loading) {
     return (
