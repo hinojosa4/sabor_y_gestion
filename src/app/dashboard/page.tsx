@@ -141,6 +141,7 @@ export default function DashboardPage() {
     { icon: "🍴",  title: "Gestión de Platos",     desc: "Administra platos, precios e ingredientes",     route: "/dishes",           color: "#2563eb", bg: "#f0f6ff", border: "#bfdbfe", stats: loading ? "—" : `${stats.totalDishes} platos · ${stats.availableDishes} disponibles` },
     { icon: "👥",  title: "Gestión de Usuarios",   desc: "Administra el personal y sus permisos",         route: "/staff-management", color: "#059669", bg: "#f0fdf4", border: "#a7f3d0", stats: loading ? "—" : `${stats.totalUsers} usuarios · ${stats.activeUsers} activos` },
     { icon: "🪑",  title: "Gestión de Mesas",      desc: "Administra mesas, estados y disponibilidad",    route: "/tableManage",      color: "#7c3aed", bg: "#f5f3ff", border: "#ddd6fe", stats: loading ? "—" : `${stats.totalTables} mesas · ${stats.availableTables} libres` },
+    { icon: "👤", title: "Gestión de Clientes", desc: "Visualiza y administra tu base de clientes", route: "/client-management", color: "#0e7490", bg: "#f0fdff", border: "#a5f3fc", stats: loading ? "—" : `${stats.clienteCount} clientes · ${Math.round((stats.activeUsers / stats.totalUsers) * 100) || 0}% activos` },
   ];
 
   const roles = [
