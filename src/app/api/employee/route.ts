@@ -2,10 +2,7 @@
 import { NextResponse } from 'next/server';
 import { connectDB } from '@/lib/db';
 import Employee from '@/models/Employee';
-// ✅ Eliminar import no usado
-// import { Employee as EmployeeType } from '@/types/employee';
 
-// ✅ Definir interfaz para tipar el documento de MongoDB
 interface MongoEmployee {
     _id: string;
     restaurantId: string;
@@ -28,12 +25,17 @@ interface MongoEmployee {
 export async function GET() {
     try {
         await connectDB();
-        const employees = await Employee.find({})
+        const employees = await Employee.find({
+            $or: [
+                { rol: { $ne: 'cliente' } },
+                { rol: { $exists: false } }
+            ],
+            role: { $nin: ['cliente', 'client'] }
+        })
             .select('-password')
             .sort({ createdAt: -1 })
             .lean();
 
-        // ✅ Usar MongoEmployee en lugar de any
         const normalizedEmployees = employees.map((emp: MongoEmployee) => {
             const formatDateOnly = (date: Date | string | undefined) => {
                 if (!date) return null;
@@ -69,7 +71,6 @@ export async function POST(request: Request) {
         await connectDB();
         const data = await request.json();
 
-        // ✅ Mapear password_hash a password
         const employeeData = {
             restaurantId: data.restaurantId,
             name: data.name,
