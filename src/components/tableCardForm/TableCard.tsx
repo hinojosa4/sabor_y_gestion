@@ -1,8 +1,6 @@
-// components/TableCard.tsx
-import { Button } from './ui/Button';
+import { Button } from '../ui/Button';
 import { Users, MapPin, Pencil, Trash2 } from 'lucide-react';
 
-// ✅ Definir el tipo Table para usarlo en lugar de any
 interface Table {
     id: string;
     number: number;
@@ -15,11 +13,10 @@ interface Table {
 
 interface TableCardProps {
     table: Table;
-    onEdit: (table: Table) => void;  // ✅ Cambiar 'any' por 'Table'
+    onEdit: (table: Table) => void;
     onDelete: (id: string) => void;
 }
 
-// Colores para el estado
 const getStatusStyle = (status: string) => {
     const styles: Record<string, { bg: string; text: string }> = {
         'Libre': { bg: 'bg-green-100', text: 'text-green-800' },

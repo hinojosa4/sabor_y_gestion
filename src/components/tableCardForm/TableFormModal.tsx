@@ -1,12 +1,9 @@
-// components/TableFormModal.tsx - Versión corregida con capacity
-/* eslint-disable react-hooks/set-state-in-effect */  // ✅ Agregar al inicio
-
-import { useState, useEffect, useCallback } from 'react';  // ✅ Agregar useCallback
-import { Button } from './ui/Button';
+/* eslint-disable react-hooks/set-state-in-effect */
+import { useState, useEffect, useCallback } from 'react';
+import { Button } from '../ui/Button';
 import { X } from 'lucide-react';
 import { TableStatus, statusColors, Table } from '@/types/table';
 
-// ✅ Usar Partial<Table> directamente
 interface TableFormModalProps {
     isOpen: boolean;
     onClose: () => void;
@@ -15,7 +12,6 @@ interface TableFormModalProps {
     existingTables?: Partial<Table>[];
 }
 
-// Ubicaciones predefinidas
 const locationOptions = [
     'Interior - Salón Principal',
     'Interior - Salón VIP',

@@ -1,19 +1,24 @@
 "use client";
 import { Button } from '../../components/ui/Button'
 import { Input } from '../../components/ui/Input';
-import { EmployeeCard } from "../../components/EmployeeCard";
-import { EmployeeForm } from "../../components/EmployeeForm";
+import { EmployeeCard } from "../../components/employeeCardForm/EmployeeCard";
+import { EmployeeForm } from "../../components/employeeCardForm/EmployeeForm";
+import { ClientCard } from "../../components/clientCard/ClientCard";
+import { ClientForm } from "../../components/clientCard/ClientForm";
 import { Users, Plus, Search, ArrowLeft } from "lucide-react";
 import { useState } from "react";
 import Link from "next/link";
 import { useEmployeeData } from "@/hooks/useEmployeeData";
 import { Employee } from "../../types/employee";
+import { Client } from '@/types/client';
 import { useAuth } from "@/lib/useAuth";
 import { ADMIN } from "@/lib/roles";
 
 export default function StaffManagementPage() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingEmployee, setEditingEmployee] = useState<Employee | null>(null);
+  const [isClientModalOpen, setIsClientModalOpen] = useState(false);
+  const [editingClient, setEditingClient] = useState<Client | null>(null);
   const [activeTab, setActiveTab] = useState("staff");
   const { user, loading: userLoading } = useAuth(ADMIN);
 
@@ -26,9 +31,40 @@ export default function StaffManagementPage() {
     addEmployee,
     updateEmployee,
     deleteEmployee,
+    updateClient,
   } = useEmployeeData();
 
   const restaurantId = "69e170e941daf8c2b2f76677"; // Obtener del usuario logueado
+
+  const getRolePriority = (role: string) => {
+    if (role === 'cliente') return 100;
+    const order = ['admin', 'manager', 'waiter', 'chef', 'driver'];
+    const index = order.indexOf(role);
+    return index === -1 ? 50 : index;
+  };
+
+  const roleNames: Record<string, string> = {
+    'admin': '👑 Administradores',
+    'manager': '📋 Gerentes',
+    'waiter': '🍽️ Meseros',
+    'chef': '🧑‍🍳 Chefs',
+    'driver': '🚚 Delivery',
+    'cliente': '👥 Clientes'
+  };
+
+  const groupEmployeesByRole = (employees: Employee[]) => {
+    const grouped: Record<string, Employee[]> = {};
+
+    employees.forEach(employee => {
+      const role = employee.role || 'cliente';
+      if (!grouped[role]) {
+        grouped[role] = [];
+      }
+      grouped[role].push(employee);
+    });
+
+    return grouped;
+  };
 
   const handleSubmitEmployee = async (
     employee: Omit<Employee, "_id" | "createdAt" | "updatedAt"> | Employee,
@@ -57,6 +93,22 @@ export default function StaffManagementPage() {
     }
   };
 
+  const handleSubmitClient = async (clientData: Partial<Client>) => {
+    try {
+      await updateClient({
+        _id: clientData._id!,
+        isActive: clientData.activo ?? true,
+        loyaltyPoints: clientData.loyaltyPoints
+      });
+
+      setIsClientModalOpen(false);
+      setEditingClient(null);
+    } catch (error) {
+      console.error('Error al actualizar cliente:', error);
+      alert('Error al guardar los cambios');
+    }
+  };
+
   const handleDeleteEmployee = async (id: string) => {
     if (confirm("¿Eliminar este empleado?")) {
       await deleteEmployee(id);
@@ -69,27 +121,12 @@ export default function StaffManagementPage() {
     setIsModalOpen(true);
   };
 
-  if (userLoading) {
-    return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="text-center font-semibold text-gray-700">
-          Verificando sesión...
-        </div>
-      </div>
-    );
-  }
+  const handleEditClient = (client: Client) => {
+    setEditingClient(client);
+    setIsClientModalOpen(true);
+  };
 
-  if (!user) return null;
-
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="text-center font-semibold text-gray-700">
-          Cargando...
-        </div>
-      </div>
-    );
-  }
+  if (userLoading || loading || !user) return null;
 
   return (
     <div className="min-h-screen bg-gray-50" style={{ zoom: 1.25 }}>
@@ -109,10 +146,10 @@ export default function StaffManagementPage() {
                 </div>
                 <div>
                   <h1 className="text-black leading-none font-semibold">
-                    Gestión de Personal
+                    Gestión de Usuarios
                   </h1>
                   <p className="text-xs md:text-sm text-gray-500">
-                    Administra tu equipo de trabajo
+                    Administra usuarios del sistema
                   </p>
                 </div>
               </div>
@@ -134,7 +171,7 @@ export default function StaffManagementPage() {
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-6 mb-6 md:mb-8">
           <div className="rounded-xl border border-gray-200 bg-white shadow">
             <div className="p-6">
-              <p className="text-xs md:text-sm text-gray-500">Total Personal</p>
+              <p className="text-xs md:text-sm text-gray-500">Total Usuarios</p>
               <p className="mt-10 text-2xl md:text-3xl text-black">
                 {stats.total}
               </p>
@@ -143,7 +180,7 @@ export default function StaffManagementPage() {
           <div className="rounded-xl border border-gray-200 bg-white shadow">
             <div className="p-6">
               <p className="text-xs md:text-sm text-gray-500">
-                Personal Activo
+                Usuarios Activo
               </p>
               <p className="mt-10 text-2xl md:text-3xl font-light text-green-600">
                 {stats.active}
@@ -152,7 +189,7 @@ export default function StaffManagementPage() {
           </div>
           <div className="rounded-xl border border-gray-200 bg-white shadow">
             <div className="p-6">
-              <p className="text-xs md:text-sm text-gray-500">En Vacaciones</p>
+              <p className="text-xs md:text-sm text-gray-500">Personal En Vacaciones</p>
               <p className="mt-10 text-2xl md:text-3xl font-light text-blue-600">
                 {stats.onVacation}
               </p>
@@ -172,21 +209,19 @@ export default function StaffManagementPage() {
         <div className="bg-gray-100 h-9 items-center justify-center rounded-xl p-[3px] grid w-full grid-cols-2 mb-4 md:mb-6">
           <button
             onClick={() => setActiveTab("staff")}
-            className={`inline-flex h-[calc(100%-1px)] flex-1 items-center justify-center rounded-xl px-2 py-1 text-sm font-semibold transition-all ${
-              activeTab === "staff"
-                ? "bg-white text-gray-900 shadow-sm"
-                : "text-gray-500 hover:text-gray-900"
-            }`}
+            className={`inline-flex h-[calc(100%-1px)] flex-1 items-center justify-center rounded-xl px-2 py-1 text-sm font-semibold transition-all ${activeTab === "staff"
+              ? "bg-white text-gray-900 shadow-sm"
+              : "text-gray-500 hover:text-gray-900"
+              }`}
           >
-            Personal
+            Usuarios
           </button>
           <button
             onClick={() => setActiveTab("schedule")}
-            className={`inline-flex h-[calc(100%-1px)] flex-1 items-center justify-center rounded-xl px-2 py-1 text-sm font-semibold transition-all ${
-              activeTab === "schedule"
-                ? "bg-white text-gray-900 shadow-sm"
-                : "text-gray-500 hover:text-gray-900"
-            }`}
+            className={`inline-flex h-[calc(100%-1px)] flex-1 items-center justify-center rounded-xl px-2 py-1 text-sm font-semibold transition-all ${activeTab === "schedule"
+              ? "bg-white text-gray-900 shadow-sm"
+              : "text-gray-500 hover:text-gray-900"
+              }`}
           >
             Horarios
           </button>
@@ -212,15 +247,70 @@ export default function StaffManagementPage() {
                 <p className="text-gray-500">No se encontraron empleados</p>
               </div>
             ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
-                {filteredEmployees.map((employee, index) => (
-                  <EmployeeCard
-                    key={employee._id || index}
-                    employee={employee}
-                    onEdit={handleEditEmployee}
-                    onDelete={handleDeleteEmployee}
-                  />
-                ))}
+              <div className="space-y-8">
+                {Object.entries(groupEmployeesByRole(filteredEmployees))
+                  .sort(([roleA], [roleB]) => getRolePriority(roleA) - getRolePriority(roleB))
+                  .map(([role, employeesList]) => (
+                    <div key={role} className="bg-white rounded-xl border border-gray-200 shadow">
+                      <div className="p-4 md:p-6 border-b border-gray-100 bg-gray-50 rounded-t-xl">
+                        <div className="flex justify-between items-center">
+                          <div>
+                            <h3 className="text-lg font-semibold text-black">
+                              {roleNames[role] || role}
+                            </h3>
+                            <p className="text-sm text-gray-500">
+                              {employeesList.length} {employeesList.length === 1 ? 'empleado' : 'empleados'}
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                      <div className="p-4 md:p-6">
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
+                          {employeesList.map((employee, index) => {
+                            const isClientEmployee = role === 'cliente' || (employee.role as string) === 'cliente';
+
+                            if (isClientEmployee) {
+                              return (
+                                <ClientCard
+                                  key={employee._id || index}
+                                  client={{
+                                    _id: employee._id,
+                                    name: employee.name,
+                                    email: employee.email,
+                                    rol: (employee.role as string) || 'cliente',
+                                    activo: employee.isActive !== undefined ? employee.isActive : true,
+                                    createdAt: employee.createdAt?.toString() || new Date().toISOString()
+                                  }}
+                                  onEdit={() => {
+                                    const clientData: Client = {
+                                      _id: employee._id,
+                                      name: employee.name,
+                                      email: employee.email,
+                                      rol: (employee.role as string) || 'cliente',
+                                      activo: employee.isActive !== undefined ? employee.isActive : true,
+                                      createdAt: employee.createdAt?.toString() || new Date().toISOString()
+                                    };
+                                    handleEditClient(clientData);
+                                  }}
+                                  onDelete={() => handleDeleteEmployee(employee._id)}
+                                />
+                              );
+                            }
+
+                            // Empleado
+                            return (
+                              <EmployeeCard
+                                key={employee._id || index}
+                                employee={employee}
+                                onEdit={handleEditEmployee}
+                                onDelete={handleDeleteEmployee}
+                              />
+                            );
+                          })}
+                        </div>
+                      </div>
+                    </div>
+                  ))}
               </div>
             )}
           </>
@@ -233,10 +323,8 @@ export default function StaffManagementPage() {
           </div>
         )}
       </main>
-      
+
       <EmployeeForm
-        // Al incluir isModalOpen en la key, React forzará un "reset" total
-        // cada vez que el modal se abra o se cierre.
         key={`${isModalOpen}-${editingEmployee?._id || "nuevo"}`}
         isOpen={isModalOpen}
         onClose={() => {
@@ -246,6 +334,15 @@ export default function StaffManagementPage() {
         onSubmit={handleSubmitEmployee}
         employee={editingEmployee}
         restaurantId={restaurantId}
+      />
+      <ClientForm
+        isOpen={isClientModalOpen}
+        onClose={() => {
+          setIsClientModalOpen(false);
+          setEditingClient(null);
+        }}
+        onSubmit={handleSubmitClient}
+        client={editingClient}
       />
     </div>
   );

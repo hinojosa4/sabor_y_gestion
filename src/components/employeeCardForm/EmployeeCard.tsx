@@ -1,5 +1,5 @@
-import { Employee, roleColors, statusColors } from '../types/employee';
-import { Button } from './ui/Button';
+import { Employee, roleColors, statusColors } from '../../types/employee';
+import { Button } from '../ui/Button';
 import { Mail, Phone, Clock, Calendar, Pencil, Trash2 } from 'lucide-react';
 
 interface EmployeeCardProps {
@@ -8,13 +8,34 @@ interface EmployeeCardProps {
     onDelete: (id: string) => void;
 }
 
+const roleSpanishMap: Record<string, string> = {
+    'admin': 'Administrador',
+    'manager': 'Gerente',
+    'waiter': 'Mesero',
+    'chef': 'Chef',
+    'driver': 'Delivery',
+    'cliente': 'Cliente'
+};
+
+const statusSpanishMap: Record<string, string> = {
+    'Activo': 'Activo',
+    'Vacaciones': 'Vacaciones',
+    'Inactivo': 'Inactivo'
+};
+
 const formatDate = (dateValue: string | Date): string => {
-  if (!dateValue) return 'No registrada';
-  
-  const dateStr = typeof dateValue === 'string' ? dateValue : dateValue.toISOString();
-  const [year, month, day] = dateStr.split('T')[0].split('-');
-  
-  return `${day}/${month}/${year}`;
+    if (!dateValue) return 'No registrada';
+
+    const dateStr = typeof dateValue === 'string' ? dateValue : dateValue.toISOString();
+    const [year, month, day] = dateStr.split('T')[0].split('-');
+
+    return `${day}/${month}/${year}`;
+};
+
+const shiftSpanishMap: Record<string, string> = {
+    'Turno Mañana': 'Turno Mañana',
+    'Turno Tarde': 'Turno Tarde',
+    'Turno Completo': 'Turno Completo'
 };
 
 export function EmployeeCard({ employee, onEdit, onDelete }: EmployeeCardProps) {
@@ -30,11 +51,13 @@ export function EmployeeCard({ employee, onEdit, onDelete }: EmployeeCardProps) 
                     <div className="flex-1">
                         <h4 className="text-black md:text-lg font-semibold mb-2">{employee.name}</h4>
                         <div className="flex flex-wrap gap-2">
+                            {/* ✅ Rol en español */}
                             <span className={`inline-flex items-center justify-center rounded-md px-2 py-0.5 text-xs font-medium w-fit ${roleStyle.bg} ${roleStyle.text}`}>
-                                {employee.role}
+                                {roleSpanishMap[employee.role] || employee.role}
                             </span>
+                            {/* ✅ Estado en español */}
                             <span className={`inline-flex items-center justify-center rounded-md px-2 py-0.5 text-xs font-medium w-fit ${statusStyle.bg} ${statusStyle.text}`}>
-                                {employee.employmentDetails?.status || 'Activo'}
+                                {statusSpanishMap[employee.employmentDetails?.status || 'Activo'] || employee.employmentDetails?.status || 'Activo'}
                             </span>
                         </div>
                     </div>
@@ -50,9 +73,10 @@ export function EmployeeCard({ employee, onEdit, onDelete }: EmployeeCardProps) 
                         <Phone className="size-4 flex-shrink-0" />
                         <span>{employee.employmentDetails?.phone || 'No registrado'}</span>
                     </div>
+                    {/* ✅ Turno en español */}
                     <div className="flex items-center gap-2 text-gray-600">
                         <Clock className="size-4 flex-shrink-0" />
-                        <span>{employee.employmentDetails?.shift || 'No asignado'}</span>
+                        <span>{shiftSpanishMap[employee.employmentDetails?.shift || 'No asignado'] || employee.employmentDetails?.shift || 'No asignado'}</span>
                     </div>
                     <div className="flex items-center gap-2 text-gray-600">
                         <Calendar className="size-4 flex-shrink-0" />

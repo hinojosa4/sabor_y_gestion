@@ -25,18 +25,17 @@ interface MongoEmployee {
 export async function GET() {
     try {
         await connectDB();
-        const employees = await Employee.find({
-            $or: [
-                { rol: { $ne: 'cliente' } },
-                { rol: { $exists: false } }
-            ],
-            role: { $nin: ['cliente', 'client'] }
-        })
+        
+        // ✅ Ahora trae TODOS los documentos (incluyendo clientes)
+        const employees = await Employee.find({})
             .select('-password')
             .sort({ createdAt: -1 })
             .lean();
 
         const normalizedEmployees = employees.map((emp: MongoEmployee) => {
+            // ✅ Asegurar que los clientes tengan role = 'cliente'
+            const role = emp.role || emp.rol || 'cliente';
+            
             const formatDateOnly = (date: Date | string | undefined) => {
                 if (!date) return null;
                 const d = new Date(date);
@@ -46,6 +45,7 @@ export async function GET() {
 
             return {
                 ...emp,
+                role: role,  // ✅ Unificar role
                 employmentDetails: emp.employmentDetails ? {
                     ...emp.employmentDetails,
                     startDate: formatDateOnly(emp.employmentDetails.startDate)

@@ -1,9 +1,8 @@
-// app/tableManage/page.tsx
 "use client";
 import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
-import { TableCard } from '../../components/TableCard';
-import { TableFormModal } from '../../components/TableFormModal';
+import { TableCard } from '../../components/tableCardForm/TableCard';
+import { TableFormModal } from '../../components/tableCardForm/TableFormModal';
 import { LayoutGrid, List, Plus, Search, ArrowLeft, MapPin, X } from 'lucide-react';
 import { useState } from "react";
 import Link from 'next/link';
@@ -68,8 +67,8 @@ const OrderModal = ({
 export default function TableManagementPage() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isOrderModalOpen, setIsOrderModalOpen] = useState(false);
-  const [editingTable, setEditingTable] = useState<Table | null>(null);  // ✅ Cambiar any por Table | null
-  const [selectedTable, setSelectedTable] = useState<Table | null>(null);  // ✅ Cambiar any por Table | null
+  const [editingTable, setEditingTable] = useState<Table | null>(null);
+  const [selectedTable, setSelectedTable] = useState<Table | null>(null);
   const [viewMode, setViewMode] = useState<'list' | 'floorplan'>('list');
   const { user, loading: userLoading } = useAuth(ADMIN);
 
@@ -91,14 +90,12 @@ export default function TableManagementPage() {
     deleteTable
   } = useTableData(restaurantId);
 
-  // ✅ Tipar tableData con Partial<Table>
   const handleSubmitTable = async (tableData: Partial<Table>) => {
     try {
       let result;
       if (editingTable) {
         result = await updateTable(editingTable._id, tableData);
       } else {
-        // ✅ Crear el objeto con el tipo correcto sin usar 'as any'
         const newTableData = {
           restaurantId: restaurantId,
           number: tableData.number!,
@@ -135,38 +132,17 @@ export default function TableManagementPage() {
     }
   };
 
-  // ✅ Tipar table con Table
   const handleTableClick = (table: Table) => {
-    // Estados que abren el formulario de edición
     if (table.status === 'Libre' || table.status === 'Reservada') {
       setEditingTable(table);
       setIsModalOpen(true);
     } else {
-      // Ocupada o Cuenta solicitada: abrir modal de orden
       setSelectedTable(table);
       setIsOrderModalOpen(true);
     }
   };
 
-  if (userLoading) {
-    return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="text-center font-semibold text-gray-700">
-          Verificando sesión...
-        </div>
-      </div>
-    );
-  }
-
-  if (!user) return null;
-
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="text-center font-semibold text-gray-700">Cargando mesas...</div>
-      </div>
-    );
-  }
+  if (userLoading || loading || !user) return null;
 
   return (
     <div className="min-h-screen bg-gray-50" style={{ zoom: 1.25 }}>
