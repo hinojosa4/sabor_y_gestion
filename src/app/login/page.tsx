@@ -1,15 +1,40 @@
 "use client";
-import React, { useState } from "react";
-import { useRouter } from "next/navigation";
+import React, { useState, useEffect, Suspense } from "react"; // 👈 agrega Suspense
+import { useRouter, useSearchParams } from "next/navigation";
 import { UtensilsCrossed, Eye, EyeOff } from "lucide-react";
 
-export default function LoginPage() {
+// 👈 Componente separado que usa useSearchParams
+function LoginContent() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    const errorParam = searchParams.get("error");
+    const errorMessages: Record<string, string> = {
+      google_not_registered: "No tienes cuenta registrada con ese correo de Google. Regístrate primero.",
+      google_cancelled: "Cancelaste el inicio de sesión con Google.",
+      google_token: "Error al conectar con Google. Intenta de nuevo.",
+      google_profile: "No se pudo obtener tu perfil de Google.",
+      account_disabled: "Tu cuenta está desactivada. Contacta al administrador.",
+      server: "Error interno del servidor. Intenta de nuevo.",
+    };
+    if (errorParam && errorMessages[errorParam]) {
+      setError(errorMessages[errorParam]);
+    }
+  }, [searchParams]);
+
+  useEffect(() => {
+    const handlePageShow = (e: PageTransitionEvent) => {
+      if (e.persisted) window.location.reload();
+    };
+    window.addEventListener("pageshow", handlePageShow);
+    return () => window.removeEventListener("pageshow", handlePageShow);
+  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -55,7 +80,7 @@ export default function LoginPage() {
   };
 
   const handleGoogleLogin = () => {
-    window.location.href = "/api/auth/google";
+  window.location.href = "/api/auth/google?mode=login";
   };
 
   return (
@@ -273,5 +298,12 @@ export default function LoginPage() {
         </div>
       </div>
     </div>
+  );
+}
+export default function LoginPage() {
+  return (
+    <Suspense fallback={null}>
+      <LoginContent />
+    </Suspense>
   );
 }

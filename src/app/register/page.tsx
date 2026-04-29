@@ -1,8 +1,8 @@
 "use client";
 // src/app/register/page.tsx
-import React, { useState } from "react";
 import { useRouter } from "next/navigation";
 import { UtensilsCrossed, Eye, EyeOff } from "lucide-react";
+import React, { useState, useEffect } from "react";  // 👈 agrega useEffect
 
 type Rol = "cliente" | "admin";
 
@@ -17,6 +17,18 @@ export default function RegisterPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+
+  useEffect(() => {
+    const handlePageShow = (e: PageTransitionEvent) => {
+      if (e.persisted) {
+        // La página viene del bfcache (botón atrás), forzar reload
+        window.location.reload();
+      }
+    };
+
+    window.addEventListener("pageshow", handlePageShow);
+    return () => window.removeEventListener("pageshow", handlePageShow);
+  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -67,7 +79,7 @@ export default function RegisterPage() {
   };
 
   const handleGoogleRegister = () => {
-    window.location.href = "/api/auth/google";
+  window.location.href = "/api/auth/google?mode=register";
   };
 
   return (
