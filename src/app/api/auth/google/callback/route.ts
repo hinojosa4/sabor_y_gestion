@@ -1,4 +1,3 @@
-// src/app/api/auth/google/callback/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { connectDB } from "@/lib/db";
 import User from "@/models/User";
@@ -8,6 +7,7 @@ export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
   const code = searchParams.get("code");
   const error = searchParams.get("error");
+  const mode = searchParams.get("state") ?? "login"; // 👈 recuperamos el mode
 
   if (error || !code) {
     return NextResponse.redirect(new URL("/login?error=google_cancelled", req.url));
@@ -29,7 +29,6 @@ export async function GET(req: NextRequest) {
     const tokenData = await tokenRes.json();
 
     if (!tokenData.access_token) {
-      console.error("[Google callback] No access_token:", tokenData);
       return NextResponse.redirect(new URL("/login?error=google_token", req.url));
     }
 
@@ -48,6 +47,12 @@ export async function GET(req: NextRequest) {
     let user = await User.findOne({ email: profile.email });
 
     if (!user) {
+      if (mode === "login") {
+        // 👈 Solo login: el usuario no existe, rechazar
+        return NextResponse.redirect(new URL("/login?error=google_not_registered", req.url));
+      }
+
+      // 👈 Modo register: crear el usuario
       user = await User.create({
         name: profile.name,
         email: profile.email,
