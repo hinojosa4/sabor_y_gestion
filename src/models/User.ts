@@ -1,21 +1,22 @@
 import mongoose, { Document, Schema } from "mongoose";
 import bcrypt from "bcryptjs";
 
-export type UserRole = "admin" | "cajero" | "cocinero" | "mesero";
+export type UserRole = "admin" | "cajero" | "cocinero" | "mesero" | "cliente";
 export interface IUser extends Document {
-  nombre: string;
+  name: string;
   email: string;
   password: string;
   rol: UserRole;
   activo: boolean;
   createdAt: Date;
   updatedAt: Date;
+  googleId: string;
   comparePassword(candidatePassword: string): Promise<boolean>;
 }
 
 const UserSchema = new Schema<IUser>(
   {
-    nombre: {
+    name: {
       type: String,
       required: [true, "El nombre es obligatorio"],
       trim: true,
@@ -39,7 +40,7 @@ const UserSchema = new Schema<IUser>(
     rol: {
       type: String,
       enum: {
-        values: ["admin", "cajero", "cocinero", "mesero"],
+        values: ["admin", "cajero", "cocinero", "mesero", "cliente"],
         message: "El rol '{VALUE}' no es válido",
       },
       default: "mesero",
@@ -47,6 +48,10 @@ const UserSchema = new Schema<IUser>(
     activo: {
       type: Boolean,
       default: true,
+    },
+    googleId: {
+      type: String,
+      sparse: true, // permite múltiples null pero no duplicados en los que tienen valor
     },
   },
   {
@@ -65,6 +70,7 @@ UserSchema.pre("save", async function () {
 
 // --- Método de instancia para comparar contraseñas ---
 UserSchema.methods.comparePassword = async function (
+  this: IUser,
   candidatePassword: string
 ): Promise<boolean> {
   return bcrypt.compare(candidatePassword, this.password);
