@@ -1,3 +1,5 @@
+// src/components/clientCard/ClientCard.tsx
+import React from "react";
 import { Mail, Calendar, User, Pencil, Trash2 } from "lucide-react";
 
 interface Client {

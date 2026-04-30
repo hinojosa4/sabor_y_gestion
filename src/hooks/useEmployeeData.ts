@@ -16,7 +16,7 @@ export function useEmployeeData() {
         const active = emps.filter(emp => emp.employmentDetails?.status === 'Activo').length;
         const onVacation = emps.filter(emp => emp.employmentDetails?.status === 'Vacaciones').length;
         const monthlyPayroll = emps.reduce((sum, emp) => sum + (emp.employmentDetails?.salary || 0), 0);
-        
+
         setStats({
             total: emps.length,
             active,
@@ -50,13 +50,13 @@ export function useEmployeeData() {
                 body: JSON.stringify(employee),
             });
             const newEmployee = await res.json();
-            
+
             setEmployees(prev => {
                 const updated = [...prev, newEmployee];
                 calculateStats(updated);
                 return updated;
             });
-            
+
             return newEmployee;
         } catch (error) {
             console.error('Error:', error);
@@ -78,13 +78,13 @@ export function useEmployeeData() {
             }
 
             const updated = await res.json();
-            
+
             setEmployees(prev => {
                 const updatedList = prev.map(emp => emp._id === updated._id ? updated : emp);
                 calculateStats(updatedList);
                 return updatedList;
             });
-            
+
             return updated;
         } catch (error) {
             console.error('Error:', error);
@@ -99,6 +99,7 @@ export function useEmployeeData() {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     activo: clientData.isActive,
+                    loyaltyPoints: clientData.loyaltyPoints, // ✅ agregar esta línea
                 }),
             });
 
@@ -108,22 +109,24 @@ export function useEmployeeData() {
             }
 
             const updated = await res.json();
-            
+
+            // Actualizar el estado local incluyendo loyaltyPoints
             setEmployees(prev => prev.map(emp => {
                 if (emp._id === updated._id) {
                     return {
                         ...emp,
                         isActive: updated.activo,
+                        loyaltyPoints: updated.loyaltyPoints ?? clientData.loyaltyPoints, // guardar puntos local
                     };
                 }
                 return emp;
             }));
-            
+
             setEmployees(prev => {
                 calculateStats(prev);
                 return prev;
             });
-            
+
             return updated;
         } catch (error) {
             console.error('Error en updateClient:', error);
@@ -134,7 +137,7 @@ export function useEmployeeData() {
     const deleteEmployee = useCallback(async (id: string) => {
         try {
             await fetch(`/api/employee/${id}`, { method: 'DELETE' });
-            
+
             setEmployees(prev => {
                 const updated = prev.filter(emp => emp._id !== id);
                 calculateStats(updated);
