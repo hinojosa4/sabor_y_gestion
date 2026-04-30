@@ -1,5 +1,4 @@
 import { Employee, roleColors, statusColors } from '../../types/employee';
-import { Button } from '../ui/Button';
 import { Mail, Phone, Clock, Calendar, Pencil, Trash2 } from 'lucide-react';
 
 interface EmployeeCardProps {
@@ -9,26 +8,24 @@ interface EmployeeCardProps {
 }
 
 const roleSpanishMap: Record<string, string> = {
-    'admin': 'Administrador',
-    'manager': 'Gerente',
-    'waiter': 'Mesero',
-    'chef': 'Chef',
-    'driver': 'Delivery',
-    'cliente': 'Cliente'
+    admin: 'Administrador',
+    manager: 'Gerente',
+    waiter: 'Mesero',
+    chef: 'Chef',
+    driver: 'Delivery',
+    cliente: 'Cliente'
 };
 
 const statusSpanishMap: Record<string, string> = {
-    'Activo': 'Activo',
-    'Vacaciones': 'Vacaciones',
-    'Inactivo': 'Inactivo'
+    Activo: 'Activo',
+    Vacaciones: 'Vacaciones',
+    Inactivo: 'Inactivo'
 };
 
 const formatDate = (dateValue: string | Date): string => {
     if (!dateValue) return 'No registrada';
-
     const dateStr = typeof dateValue === 'string' ? dateValue : dateValue.toISOString();
     const [year, month, day] = dateStr.split('T')[0].split('-');
-
     return `${day}/${month}/${year}`;
 };
 
@@ -38,25 +35,166 @@ const shiftSpanishMap: Record<string, string> = {
     'Turno Completo': 'Turno Completo'
 };
 
+// Función para obtener estilos de rol (convertimos los colores de Tailwind a valores fijos)
+const getRoleStyle = (role: string) => {
+    const defaultStyle = { background: '#f3f4f6', color: '#374151' };
+    const styles: Record<string, { background: string; color: string }> = {
+        admin: { background: '#e0e7ff', color: '#3730a3' },
+        manager: { background: '#cffafe', color: '#0e7490' },
+        waiter: { background: '#fef3c7', color: '#b45309' },
+        chef: { background: '#fed7aa', color: '#9a3412' },
+        driver: { background: '#d1fae5', color: '#065f46' },
+        cliente: { background: '#f3e8ff', color: '#6b21a5' }
+    };
+    return styles[role] || defaultStyle;
+};
+
+// Función para obtener estilos de estado
+const getStatusStyle = (status: string) => {
+    const defaultStyle = { background: '#6b7280', color: '#ffffff' };
+    const styles: Record<string, { background: string; color: string }> = {
+        Activo: { background: '#dcfce7', color: '#166534' },
+        Vacaciones: { background: '#dbeafe', color: '#1e40af' },
+        Inactivo: { background: '#fee2e2', color: '#991b1b' }
+    };
+    return styles[status] || defaultStyle;
+};
+
 export function EmployeeCard({ employee, onEdit, onDelete }: EmployeeCardProps) {
-    const roleStyle = roleColors[employee.role] || { bg: 'bg-gray-100', text: 'text-gray-700' };
-    const statusStyle = statusColors[employee.employmentDetails?.status || 'Activo']
-        || { bg: 'bg-gray-500', text: 'text-white' };
+    const roleStyle = getRoleStyle(employee.role);
+    const statusStyle = getStatusStyle(employee.employmentDetails?.status || 'Activo');
+
+    // Estilos en línea usando variables del globals.css
+    const cardStyle: React.CSSProperties = {
+        borderRadius: "var(--radius-lg)",
+        border: `1px solid var(--border)`,
+        backgroundColor: "var(--card)",
+        boxShadow: "0 2px 8px rgba(0,0,0,0.04)",
+        transition: "box-shadow 0.2s ease",
+        overflow: "hidden",
+    };
+
+    const contentStyle: React.CSSProperties = {
+        padding: "calc(var(--radius-lg) * 2)",
+        display: "flex",
+        flexDirection: "column",
+        gap: "0.75rem",
+    };
+
+    const headerStyle: React.CSSProperties = {
+        display: "flex",
+        alignItems: "flex-start",
+        justifyContent: "space-between",
+    };
+
+    const nameStyle: React.CSSProperties = {
+        margin: 0,
+        fontSize: "1rem",
+        fontWeight: "var(--font-weight-medium)",
+        color: "var(--foreground)",
+        marginBottom: "0.5rem",
+    };
+
+    const badgeContainerStyle: React.CSSProperties = {
+        display: "flex",
+        flexWrap: "wrap",
+        gap: "0.5rem",
+    };
+
+    const badgeStyle = (bg: string, textColor: string): React.CSSProperties => ({
+        display: "inline-flex",
+        alignItems: "center",
+        justifyContent: "center",
+        borderRadius: "var(--radius-md)",
+        padding: "0.125rem 0.5rem",
+        fontSize: "0.75rem",
+        fontWeight: "var(--font-weight-medium)",
+        backgroundColor: bg,
+        color: textColor,
+        width: "fit-content",
+    });
+
+    const infoContainerStyle: React.CSSProperties = {
+        display: "flex",
+        flexDirection: "column",
+        gap: "0.5rem",
+        fontSize: "0.875rem",
+    };
+
+    const infoRowStyle: React.CSSProperties = {
+        display: "flex",
+        alignItems: "center",
+        gap: "0.5rem",
+        color: "var(--muted-foreground)",
+    };
+
+    const salaryContainerStyle: React.CSSProperties = {
+        paddingTop: "0.75rem",
+        borderTop: `1px solid var(--border)`,
+    };
+
+    const salaryLabelStyle: React.CSSProperties = {
+        margin: 0,
+        fontSize: "0.75rem",
+        color: "var(--muted-foreground)",
+        marginBottom: "0.25rem",
+    };
+
+    const salaryValueStyle: React.CSSProperties = {
+        margin: 0,
+        fontSize: "1.125rem",
+        fontWeight: "var(--font-weight-medium)",
+        color: "var(--foreground)",
+    };
+
+    const actionsStyle: React.CSSProperties = {
+        display: "flex",
+        gap: "0.5rem",
+        paddingTop: "0.5rem",
+    };
+
+    const editButtonStyle: React.CSSProperties = {
+        flex: 1,
+        backgroundColor: "transparent",
+        border: `1px solid var(--border)`,
+        borderRadius: "var(--radius-md)",
+        padding: "0.5rem 0",
+        fontSize: "0.875rem",
+        fontWeight: "var(--font-weight-medium)",
+        cursor: "pointer",
+        display: "inline-flex",
+        alignItems: "center",
+        justifyContent: "center",
+        gap: "0.5rem",
+        color: "var(--foreground)",
+        fontFamily: "inherit",
+    };
+
+    const deleteButtonStyle: React.CSSProperties = {
+        backgroundColor: "transparent",
+        border: `1px solid var(--border)`,
+        borderRadius: "var(--radius-md)",
+        padding: "0.5rem 0.75rem",
+        cursor: "pointer",
+        display: "inline-flex",
+        alignItems: "center",
+        justifyContent: "center",
+        color: "var(--destructive)",
+        fontFamily: "inherit",
+    };
 
     return (
-        <div className="rounded-xl border border-gray-200 bg-white shadow hover:shadow-lg transition-shadow">
-            <div className="p-6 space-y-3">
+        <div style={cardStyle}>
+            <div style={contentStyle}>
                 {/* Header */}
-                <div className="flex items-start justify-between">
-                    <div className="flex-1">
-                        <h4 className="text-black md:text-lg font-semibold mb-2">{employee.name}</h4>
-                        <div className="flex flex-wrap gap-2">
-                            {/* ✅ Rol en español */}
-                            <span className={`inline-flex items-center justify-center rounded-md px-2 py-0.5 text-xs font-medium w-fit ${roleStyle.bg} ${roleStyle.text}`}>
+                <div style={headerStyle}>
+                    <div style={{ flex: 1 }}>
+                        <h4 style={nameStyle}>{employee.name}</h4>
+                        <div style={badgeContainerStyle}>
+                            <span style={badgeStyle(roleStyle.background, roleStyle.color)}>
                                 {roleSpanishMap[employee.role] || employee.role}
                             </span>
-                            {/* ✅ Estado en español */}
-                            <span className={`inline-flex items-center justify-center rounded-md px-2 py-0.5 text-xs font-medium w-fit ${statusStyle.bg} ${statusStyle.text}`}>
+                            <span style={badgeStyle(statusStyle.background, statusStyle.color)}>
                                 {statusSpanishMap[employee.employmentDetails?.status || 'Activo'] || employee.employmentDetails?.status || 'Activo'}
                             </span>
                         </div>
@@ -64,43 +202,42 @@ export function EmployeeCard({ employee, onEdit, onDelete }: EmployeeCardProps) 
                 </div>
 
                 {/* Contact info */}
-                <div className="space-y-2 text-sm">
-                    <div className="flex items-center gap-2 text-gray-600">
-                        <Mail className="size-4 flex-shrink-0" />
-                        <span className="truncate">{employee.email}</span>
+                <div style={infoContainerStyle}>
+                    <div style={infoRowStyle}>
+                        <Mail size={16} style={{ flexShrink: 0 }} />
+                        <span style={{ overflow: "hidden", textOverflow: "ellipsis" }}>{employee.email}</span>
                     </div>
-                    <div className="flex items-center gap-2 text-gray-600">
-                        <Phone className="size-4 flex-shrink-0" />
+                    <div style={infoRowStyle}>
+                        <Phone size={16} style={{ flexShrink: 0 }} />
                         <span>{employee.employmentDetails?.phone || 'No registrado'}</span>
                     </div>
-                    {/* ✅ Turno en español */}
-                    <div className="flex items-center gap-2 text-gray-600">
-                        <Clock className="size-4 flex-shrink-0" />
+                    <div style={infoRowStyle}>
+                        <Clock size={16} style={{ flexShrink: 0 }} />
                         <span>{shiftSpanishMap[employee.employmentDetails?.shift || 'No asignado'] || employee.employmentDetails?.shift || 'No asignado'}</span>
                     </div>
-                    <div className="flex items-center gap-2 text-gray-600">
-                        <Calendar className="size-4 flex-shrink-0" />
+                    <div style={infoRowStyle}>
+                        <Calendar size={16} style={{ flexShrink: 0 }} />
                         <span>Desde {formatDate(employee.employmentDetails?.startDate)}</span>
                     </div>
                 </div>
 
                 {/* Salary */}
-                <div className="pt-3 border-t border-gray-100">
-                    <p className="text-sm text-gray-500 mb-1">Salario Mensual</p>
-                    <p className="text-gray-700 text-lg font-medium">
+                <div style={salaryContainerStyle}>
+                    <p style={salaryLabelStyle}>Salario Mensual</p>
+                    <p style={salaryValueStyle}>
                         ${employee.employmentDetails?.salary?.toLocaleString() ?? '0'}
                     </p>
                 </div>
 
                 {/* Actions */}
-                <div className="flex gap-2 pt-2">
-                    <Button variant="outline" size="sm" onClick={() => onEdit(employee)} className="flex-1">
-                        <Pencil className="size-4 mr-2" />
+                <div style={actionsStyle}>
+                    <button style={editButtonStyle} onClick={() => onEdit(employee)}>
+                        <Pencil size={14} />
                         Editar
-                    </Button>
-                    <Button variant="ghost" size="sm" onClick={() => onDelete(employee._id)}>
-                        <Trash2 className="size-4 text-red-500" />
-                    </Button>
+                    </button>
+                    <button style={deleteButtonStyle} onClick={() => onDelete(employee._id)}>
+                        <Trash2 size={16} />
+                    </button>
                 </div>
             </div>
         </div>

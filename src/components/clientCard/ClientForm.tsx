@@ -1,6 +1,5 @@
 // src/components/clientCard/ClientForm.tsx
 import { useState } from 'react';
-import { Button } from '../ui/Button';
 import { X } from 'lucide-react';
 import { Client } from '@/types/client';
 
@@ -29,51 +28,210 @@ export function ClientForm({ isOpen, onClose, onSubmit, client }: ClientFormProp
 
     if (!isOpen) return null;
 
-    return (
-        <div className="fixed inset-0 z-50 flex justify-center p-4 md:p-10 overflow-y-auto">
-            <div className="fixed inset-0 bg-black/50" onClick={onClose} />
+    // Estilos comunes usando variables del globals.css
+    const overlayStyle: React.CSSProperties = {
+        position: "fixed",
+        inset: 0,
+        backgroundColor: "rgba(0,0,0,0.5)",
+        zIndex: 50,
+        display: "flex",
+        justifyContent: "center",
+        alignItems: "center",
+        padding: "1rem",
+        overflowY: "auto",
+    };
 
-            <div className="relative bg-white rounded-lg shadow-lg w-full max-w-lg h-fit max-h-full overflow-hidden flex flex-col my-auto">
-                <div className="px-6 py-4 border-b sticky top-0 bg-white z-10">
+    const modalStyle: React.CSSProperties = {
+        position: "relative",
+        backgroundColor: "var(--card)",
+        borderRadius: "var(--radius-lg)",
+        boxShadow: "0 20px 60px rgba(0,0,0,0.18)",
+        width: "100%",
+        maxWidth: "32rem", // max-w-lg
+        maxHeight: "90vh",
+        display: "flex",
+        flexDirection: "column",
+        overflow: "hidden",
+        margin: "auto",
+    };
+
+    const headerStyle: React.CSSProperties = {
+        position: "sticky",
+        top: 0,
+        backgroundColor: "var(--card)",
+        borderBottom: `1px solid var(--border)`,
+        padding: "1rem 1.5rem",
+        zIndex: 10,
+    };
+
+    const closeButtonStyle: React.CSSProperties = {
+        position: "absolute",
+        top: "1rem",
+        right: "1rem",
+        background: "none",
+        border: "none",
+        borderRadius: "var(--radius-md)",
+        padding: "0.25rem",
+        cursor: "pointer",
+        display: "inline-flex",
+        alignItems: "center",
+        justifyContent: "center",
+        color: "var(--muted-foreground)",
+        transition: "background 0.2s",
+    };
+
+    const titleStyle: React.CSSProperties = {
+        margin: 0,
+        fontSize: "1.125rem", // text-lg
+        fontWeight: "var(--font-weight-medium)",
+        color: "var(--foreground)",
+    };
+
+    const subtitleStyle: React.CSSProperties = {
+        margin: "0.25rem 0 0",
+        fontSize: "0.875rem",
+        color: "var(--muted-foreground)",
+    };
+
+    const formStyle: React.CSSProperties = {
+        padding: "1.5rem",
+        display: "flex",
+        flexDirection: "column",
+        gap: "1rem",
+        overflowY: "auto",
+    };
+
+    const infoBoxStyle: React.CSSProperties = {
+        backgroundColor: "var(--muted)",
+        borderRadius: "var(--radius-lg)",
+        padding: "1rem",
+        display: "flex",
+        flexDirection: "column",
+        gap: "0.5rem",
+    };
+
+    const infoLabelStyle: React.CSSProperties = {
+        margin: 0,
+        fontSize: "0.875rem",
+        color: "var(--muted-foreground)",
+    };
+
+    const infoValueStyle: React.CSSProperties = {
+        margin: 0,
+        color: "var(--foreground)",
+        fontWeight: "var(--font-weight-medium)",
+    };
+
+    const fieldLabelStyle: React.CSSProperties = {
+        display: "block",
+        marginBottom: "0.25rem",
+        fontWeight: "var(--font-weight-medium)",
+        color: "var(--foreground)",
+    };
+
+    const selectStyle: React.CSSProperties = {
+        width: "100%",
+        borderRadius: "var(--radius-md)",
+        border: `1px solid var(--border)`,
+        backgroundColor: "var(--input-background)",
+        padding: "0.5rem 0.75rem",
+        fontSize: "0.875rem",
+        color: "var(--foreground)",
+        outline: "none",
+        transition: "border-color 0.2s, ring 0.2s",
+        fontFamily: "inherit",
+    };
+
+    const inputStyle: React.CSSProperties = {
+        width: "100%",
+        borderRadius: "var(--radius-md)",
+        border: `1px solid var(--border)`,
+        backgroundColor: "var(--background)",
+        padding: "0.5rem 0.75rem",
+        fontSize: "0.875rem",
+        color: "var(--foreground)",
+        outline: "none",
+        transition: "border-color 0.2s, ring 0.2s",
+        fontFamily: "inherit",
+    };
+
+    const helperTextStyle: React.CSSProperties = {
+        margin: "0.25rem 0 0",
+        fontSize: "0.75rem",
+        color: "var(--muted-foreground)",
+    };
+
+    const buttonContainerStyle: React.CSSProperties = {
+        display: "flex",
+        gap: "0.75rem",
+        paddingTop: "1rem",
+    };
+
+    const cancelButtonStyle: React.CSSProperties = {
+        flex: 1,
+        backgroundColor: "transparent",
+        border: `1px solid var(--border)`,
+        borderRadius: "var(--radius-md)",
+        padding: "0.5rem 0",
+        fontSize: "0.875rem",
+        fontWeight: "var(--font-weight-medium)",
+        cursor: "pointer",
+        color: "var(--foreground)",
+        fontFamily: "inherit",
+    };
+
+    const submitButtonStyle: React.CSSProperties = {
+        flex: 1,
+        backgroundColor: "var(--primary)",
+        border: "none",
+        borderRadius: "var(--radius-md)",
+        padding: "0.5rem 0",
+        fontSize: "0.875rem",
+        fontWeight: "var(--font-weight-medium)",
+        cursor: "pointer",
+        color: "var(--primary-foreground)",
+        fontFamily: "inherit",
+    };
+
+    return (
+        <div style={overlayStyle} onClick={onClose}>
+            <div style={modalStyle} onClick={(e) => e.stopPropagation()}>
+                <div style={headerStyle}>
                     <button
                         type="button"
                         onClick={onClose}
-                        className="absolute top-4 right-4 rounded-md p-1 hover:bg-gray-100 transition-colors"
+                        style={closeButtonStyle}
+                        onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "var(--muted)")}
+                        onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = "transparent")}
                     >
-                        <X className="size-5 text-gray-500 hover:text-gray-700" />
+                        <X size={20} style={{ color: "var(--muted-foreground)" }} />
                     </button>
-                    <h2 className="text-lg font-semibold text-black">
-                        Editar Cliente
-                    </h2>
-                    <p className="text-sm text-gray-500 mt-1">
-                        Actualiza la información del cliente
-                    </p>
+                    <h2 style={titleStyle}>Editar Cliente</h2>
+                    <p style={subtitleStyle}>Actualiza la información del cliente</p>
                 </div>
 
-                <form onSubmit={handleSubmit} className="p-6 space-y-4 overflow-y-auto">
+                <form onSubmit={handleSubmit} style={formStyle}>
                     {/* Información básica (solo lectura) */}
-                    <div className="bg-gray-50 p-4 rounded-lg space-y-2">
-                        <p className="text-sm text-gray-500">Nombre</p>
-                        <p className="text-black font-medium">{client?.name}</p>
-                        
-                        <p className="text-sm text-gray-500 mt-2">Email</p>
-                        <p className="text-black font-medium">{client?.email}</p>
-                        
-                        <p className="text-sm text-gray-500 mt-2">Cliente desde</p>
-                        <p className="text-black font-medium">
+                    <div style={infoBoxStyle}>
+                        <p style={infoLabelStyle}>Nombre</p>
+                        <p style={infoValueStyle}>{client?.name}</p>
+
+                        <p style={{ ...infoLabelStyle, marginTop: "0.5rem" }}>Email</p>
+                        <p style={infoValueStyle}>{client?.email}</p>
+
+                        <p style={{ ...infoLabelStyle, marginTop: "0.5rem" }}>Cliente desde</p>
+                        <p style={infoValueStyle}>
                             {client?.createdAt ? new Date(client.createdAt).toLocaleDateString('es-BO') : '-'}
                         </p>
                     </div>
 
                     {/* Estado */}
                     <div>
-                        <label className="text-black font-bold mb-1 block">
-                            Estado
-                        </label>
+                        <label style={fieldLabelStyle}>Estado</label>
                         <select
                             value={formData.activo ? 'activo' : 'inactivo'}
                             onChange={(e) => setFormData(prev => ({ ...prev, activo: e.target.value === 'activo' }))}
-                            className="w-full min-w-0 rounded-md border border-gray-300 bg-gray-50 px-3 py-2 text-sm text-gray-900 outline-none transition-all focus:border-gray-500 focus:ring-2 focus:ring-gray-500/30"
+                            style={selectStyle}
                         >
                             <option value="activo">Activo</option>
                             <option value="inactivo">Inactivo</option>
@@ -82,30 +240,28 @@ export function ClientForm({ isOpen, onClose, onSubmit, client }: ClientFormProp
 
                     {/* Puntos de Lealtad */}
                     <div>
-                        <label className="text-black font-bold mb-1 block">
-                            Puntos de Lealtad
-                        </label>
+                        <label style={fieldLabelStyle}>Puntos de Lealtad</label>
                         <input
                             type="number"
                             value={formData.loyaltyPoints}
                             onChange={(e) => setFormData(prev => ({ ...prev, loyaltyPoints: parseInt(e.target.value) || 0 }))}
                             min="0"
                             step="10"
-                            className="w-full min-w-0 rounded-md border border-gray-300 px-3 py-2 text-sm text-gray-900 outline-none transition-all focus:border-gray-500 focus:ring-2 focus:ring-gray-500/30"
+                            style={inputStyle}
                         />
-                        <p className="text-xs text-gray-400 mt-1">
+                        <p style={helperTextStyle}>
                             Puntos acumulados por compras (100 puntos = 1 Bs de descuento)
                         </p>
                     </div>
 
                     {/* Botones */}
-                    <div className="flex gap-3 pt-4">
-                        <Button type="button" onClick={onClose} variant="outline" className="flex-1">
+                    <div style={buttonContainerStyle}>
+                        <button type="button" onClick={onClose} style={cancelButtonStyle}>
                             Cancelar
-                        </Button>
-                        <Button type="submit" className="flex-1 bg-gray-800 hover:bg-gray-700 text-white">
+                        </button>
+                        <button type="submit" style={submitButtonStyle}>
                             Guardar Cambios
-                        </Button>
+                        </button>
                     </div>
                 </form>
             </div>

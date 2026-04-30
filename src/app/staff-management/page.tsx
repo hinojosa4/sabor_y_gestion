@@ -1,18 +1,45 @@
 "use client";
-import { Button } from '../../components/ui/Button'
-import { Input } from '../../components/ui/Input';
+import { useState } from "react";
+import Link from "next/link";
+import { Users, Plus, Search, ArrowLeft } from "lucide-react";
 import { EmployeeCard } from "../../components/employeeCardForm/EmployeeCard";
 import { EmployeeForm } from "../../components/employeeCardForm/EmployeeForm";
 import { ClientCard } from "../../components/clientCard/ClientCard";
 import { ClientForm } from "../../components/clientCard/ClientForm";
-import { Users, Plus, Search, ArrowLeft } from "lucide-react";
-import { useState } from "react";
-import Link from "next/link";
 import { useEmployeeData } from "@/hooks/useEmployeeData";
 import { Employee } from "../../types/employee";
-import { Client } from '@/types/client';
+import { Client } from "@/types/client";
 import { useAuth } from "@/lib/useAuth";
 import { ADMIN } from "@/lib/roles";
+
+// Estilos usando variables CSS del globals.css
+const inputStyle: React.CSSProperties = {
+  width: "100%",
+  padding: "11px 14px",
+  borderRadius: "var(--radius-md)",
+  border: `1px solid var(--border)`,
+  fontSize: "var(--text-base)",
+  outline: "none",
+  boxSizing: "border-box",
+  fontFamily: "inherit",
+  color: "var(--foreground)",
+  backgroundColor: "var(--input-background)",
+};
+
+const cardStyle: React.CSSProperties = {
+  borderRadius: "var(--radius-lg)",
+  border: `1px solid var(--border)`,
+  backgroundColor: "var(--card)",
+  boxShadow: "0 2px 8px rgba(0,0,0,0.04)",
+  overflow: "hidden",
+};
+
+const statsCardStyle: React.CSSProperties = {
+  borderRadius: "var(--radius-lg)",
+  border: `1px solid var(--border)`,
+  backgroundColor: "var(--card)",
+  padding: "calc(var(--radius-lg) * 2)",
+};
 
 export default function StaffManagementPage() {
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -20,6 +47,8 @@ export default function StaffManagementPage() {
   const [isClientModalOpen, setIsClientModalOpen] = useState(false);
   const [editingClient, setEditingClient] = useState<Client | null>(null);
   const [activeTab, setActiveTab] = useState("staff");
+  const [successMsg, setSuccessMsg] = useState("");
+  const [errorMsg, setErrorMsg] = useState("");
   const { user, loading: userLoading } = useAuth(ADMIN);
 
   const {
@@ -34,7 +63,17 @@ export default function StaffManagementPage() {
     updateClient,
   } = useEmployeeData();
 
-  const restaurantId = "69e170e941daf8c2b2f76677"; // Obtener del usuario logueado
+  const restaurantId = "69e170e941daf8c2b2f76677";
+
+  const showSuccess = (msg: string) => {
+    setSuccessMsg(msg);
+    setTimeout(() => setSuccessMsg(""), 3000);
+  };
+
+  const showError = (msg: string) => {
+    setErrorMsg(msg);
+    setTimeout(() => setErrorMsg(""), 4000);
+  };
 
   const getRolePriority = (role: string) => {
     if (role === 'cliente') return 100;
@@ -44,52 +83,48 @@ export default function StaffManagementPage() {
   };
 
   const roleNames: Record<string, string> = {
-    'admin': '👑 Administradores',
-    'manager': '📋 Gerentes',
-    'waiter': '🍽️ Meseros',
-    'chef': '🧑‍🍳 Chefs',
-    'driver': '🚚 Delivery',
-    'cliente': '👥 Clientes'
+    admin: "👑 Administradores",
+    manager: "📋 Gerentes",
+    waiter: "🍽️ Meseros",
+    chef: "🧑‍🍳 Chefs",
+    driver: "🚚 Delivery",
+    cliente: "👥 Clientes",
   };
 
   const groupEmployeesByRole = (employees: Employee[]) => {
     const grouped: Record<string, Employee[]> = {};
-
-    employees.forEach(employee => {
-      const role = employee.role || 'cliente';
-      if (!grouped[role]) {
-        grouped[role] = [];
-      }
+    employees.forEach((employee) => {
+      const role = employee.role || "cliente";
+      if (!grouped[role]) grouped[role] = [];
       grouped[role].push(employee);
     });
-
     return grouped;
   };
 
   const handleSubmitEmployee = async (
-    employee: Omit<Employee, "_id" | "createdAt" | "updatedAt"> | Employee,
+    employee: Omit<Employee, "_id" | "createdAt" | "updatedAt"> | Employee
   ) => {
-    console.log("Enviando:", employee);
     try {
       if (editingEmployee) {
-        const employeeToUpdate = employee as Employee;
-        console.log("Actualizando ID:", employeeToUpdate._id);
-        await updateEmployee(employeeToUpdate);
+        await updateEmployee(employee as Employee);
+        showSuccess("Empleado actualizado correctamente");
       } else {
         const newEmployee = employee as Omit<
           Employee,
           "_id" | "createdAt" | "updatedAt"
         >;
         if (!newEmployee.restaurantId) {
-          console.error("restaurantId faltante");
+          showError("Falta el ID del restaurante");
           return;
         }
         await addEmployee(newEmployee);
+        showSuccess("Empleado creado correctamente");
       }
       setIsModalOpen(false);
       setEditingEmployee(null);
     } catch (error) {
       console.error("Error al guardar:", error);
+      showError("Error al guardar el empleado. Intente nuevamente.");
     }
   };
 
@@ -98,25 +133,30 @@ export default function StaffManagementPage() {
       await updateClient({
         _id: clientData._id!,
         isActive: clientData.activo ?? true,
-        loyaltyPoints: clientData.loyaltyPoints
+        loyaltyPoints: clientData.loyaltyPoints,
       });
-
+      showSuccess("Cliente actualizado correctamente");
       setIsClientModalOpen(false);
       setEditingClient(null);
     } catch (error) {
-      console.error('Error al actualizar cliente:', error);
-      alert('Error al guardar los cambios');
+      console.error("Error al actualizar cliente:", error);
+      showError("Error al actualizar el cliente");
     }
   };
 
   const handleDeleteEmployee = async (id: string) => {
     if (confirm("¿Eliminar este empleado?")) {
-      await deleteEmployee(id);
+      try {
+        await deleteEmployee(id);
+        showSuccess("Empleado eliminado correctamente");
+      } catch (error) {
+        console.error("Error al eliminar:", error);
+        showError("Error al eliminar el empleado");
+      }
     }
   };
 
   const handleEditEmployee = (employee: Employee) => {
-    console.log("Editando empleado:", employee._id);
     setEditingEmployee(employee);
     setIsModalOpen(true);
   };
@@ -128,147 +168,269 @@ export default function StaffManagementPage() {
 
   if (userLoading || loading || !user) return null;
 
+  const isMobile = typeof window !== "undefined" ? window.innerWidth < 640 : false;
+
   return (
-    <div className="min-h-screen bg-gray-50" style={{ zoom: 1.25 }}>
-      <header className="bg-white border-b border-gray-200 sticky top-0 z-10">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3 md:py-4">
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-            <div className="flex items-center gap-3">
-              <Link
-                href="/dashboard"
-                className="inline-flex items-center justify-center whitespace-nowrap text-black font-medium transition-colors hover:bg-gray-100 rounded-md h-8 px-3"
-              >
-                <ArrowLeft className="size-5" />
-              </Link>
-              <div className="flex items-center gap-3">
-                <div className="size-10 bg-purple-600 rounded-lg flex items-center justify-center">
-                  <Users className="size-6 text-white" />
-                </div>
-                <div>
-                  <h1 className="text-black leading-none font-semibold">
-                    Gestión de Usuarios
-                  </h1>
-                  <p className="text-xs md:text-sm text-gray-500">
-                    Administra usuarios del sistema
-                  </p>
-                </div>
-              </div>
-            </div>
-            <Button
-              onClick={() => {
-                setEditingEmployee(null);
-                setIsModalOpen(true);
-              }}
-            >
-              <Plus className="size-4 mr-2" />
-              Agregar Personal
-            </Button>
-          </div>
+    <div style={{ minHeight: "100vh", backgroundColor: "var(--background)", fontFamily: "inherit" }}>
+      {/* Toast de éxito */}
+      {successMsg && (
+        <div style={{
+          position: "fixed",
+          top: 24,
+          right: isMobile ? 12 : 24,
+          left: isMobile ? 12 : "auto",
+          zIndex: 9999,
+          background: "var(--primary)",
+          color: "var(--primary-foreground)",
+          padding: "13px 22px",
+          borderRadius: "var(--radius-md)",
+          fontSize: 14,
+          fontWeight: 600,
+          boxShadow: "0 4px 20px rgba(0,0,0,0.2)",
+        }}>
+          ✓ {successMsg}
         </div>
-      </header>
-      <main className="max-w-7xl mx-auto px-3 sm:px-4 lg:px-6 py-3 md:py-5">
+      )}
+
+      {/* Toast de error */}
+      {errorMsg && (
+        <div style={{
+          position: "fixed",
+          top: 24,
+          right: isMobile ? 12 : 24,
+          left: isMobile ? 12 : "auto",
+          zIndex: 9999,
+          background: "var(--destructive)",
+          color: "white",
+          padding: "13px 22px",
+          borderRadius: "var(--radius-md)",
+          fontSize: 14,
+          fontWeight: 600,
+          boxShadow: "0 4px 20px rgba(0,0,0,0.2)",
+        }}>
+          ⚠️ {errorMsg}
+        </div>
+      )}
+
+      {/* Header */}
+      <div
+        style={{
+          backgroundColor: "var(--card)",
+          borderBottom: `2px solid var(--primary)`,
+          padding: isMobile ? "14px 16px" : "18px 40px",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          gap: 10,
+        }}
+      >
+        <div style={{ display: "flex", alignItems: "center", gap: isMobile ? 10 : 14, minWidth: 0 }}>
+          <Link
+            href="/dashboard"
+            style={{
+              backgroundColor: "var(--secondary)",
+              border: `1px solid var(--border)`,
+              borderRadius: "var(--radius-md)",
+              width: 38,
+              height: 38,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              cursor: "pointer",
+              fontSize: 16,
+              textDecoration: "none",
+              color: "var(--foreground)",
+            }}
+          >
+            ←
+          </Link>
+          <div
+            style={{
+              width: 40,
+              height: 40,
+              borderRadius: "var(--radius-lg)",
+              backgroundColor: "var(--primary)",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              fontSize: isMobile ? 18 : 22,
+            }}
+          >
+            <Users size={isMobile ? 18 : 22} color="white" />
+          </div>
+          {isMobile ? (
+            <h1 style={{ margin: 0, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+              Gestión de Usuarios
+            </h1>
+          ) : (
+            <div>
+              <h1 style={{ margin: 0 }}>Gestión de Usuarios</h1>
+              <p style={{ margin: 0, fontSize: "0.75rem", color: "var(--muted-foreground)" }}>
+                Administra usuarios del sistema
+              </p>
+            </div>
+          )}
+        </div>
+        <button
+          onClick={() => {
+            setEditingEmployee(null);
+            setIsModalOpen(true);
+          }}
+          style={{
+            backgroundColor: "var(--primary)",
+            color: "var(--primary-foreground)",
+            border: "none",
+            borderRadius: "var(--radius-md)",
+            padding: isMobile ? "10px 16px" : "11px 22px",
+            cursor: "pointer",
+            display: "inline-flex",
+            alignItems: "center",
+            gap: 6,
+            fontFamily: "inherit",
+          }}
+        >
+          <Plus size={16} /> Agregar Personal
+        </button>
+      </div>
+
+      {/* Main content */}
+      <main style={{ maxWidth: 1280, margin: "0 auto", padding: isMobile ? "16px" : "24px 32px" }}>
         {/* Stats Cards */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-6 mb-6 md:mb-8">
-          <div className="rounded-xl border border-gray-200 bg-white shadow">
-            <div className="p-6">
-              <p className="text-xs md:text-sm text-gray-500">Total Usuarios</p>
-              <p className="mt-10 text-2xl md:text-3xl text-black">
-                {stats.total}
-              </p>
-            </div>
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: isMobile ? "1fr 1fr" : "repeat(4, 1fr)",
+            gap: isMobile ? 12 : 20,
+            marginBottom: isMobile ? 24 : 32,
+          }}
+        >
+          <div style={statsCardStyle}>
+            <p style={{ margin: 0, fontSize: "0.75rem", color: "var(--muted-foreground)", marginBottom: 4 }}>Total Usuarios</p>
+            <p style={{ margin: 0, fontSize: "1.5rem", fontWeight: "var(--font-weight-medium)", color: "var(--foreground)" }}>{stats.total}</p>
           </div>
-          <div className="rounded-xl border border-gray-200 bg-white shadow">
-            <div className="p-6">
-              <p className="text-xs md:text-sm text-gray-500">
-                Usuarios Activo
-              </p>
-              <p className="mt-10 text-2xl md:text-3xl font-light text-green-600">
-                {stats.active}
-              </p>
-            </div>
+          <div style={statsCardStyle}>
+            <p style={{ margin: 0, fontSize: "0.75rem", color: "var(--muted-foreground)", marginBottom: 4 }}>Usuarios Activos</p>
+            <p style={{ margin: 0, fontSize: "1.5rem", fontWeight: "var(--font-weight-medium)", color: "var(--primary)" }}>{stats.active}</p>
           </div>
-          <div className="rounded-xl border border-gray-200 bg-white shadow">
-            <div className="p-6">
-              <p className="text-xs md:text-sm text-gray-500">Personal En Vacaciones</p>
-              <p className="mt-10 text-2xl md:text-3xl font-light text-blue-600">
-                {stats.onVacation}
-              </p>
-            </div>
+          <div style={statsCardStyle}>
+            <p style={{ margin: 0, fontSize: "0.75rem", color: "var(--muted-foreground)", marginBottom: 4 }}>Personal En Vacaciones</p>
+            <p style={{ margin: 0, fontSize: "1.5rem", fontWeight: "var(--font-weight-medium)", color: "var(--accent-foreground)" }}>{stats.onVacation}</p>
           </div>
-          <div className="rounded-xl border border-gray-200 bg-white shadow">
-            <div className="p-6">
-              <p className="text-xs md:text-sm text-gray-500">Nómina Mensual</p>
-              <p className="mt-10 text-xl md:text-2xl text-black">
-                ${stats.monthlyPayroll.toLocaleString()}
-              </p>
-            </div>
+          <div style={statsCardStyle}>
+            <p style={{ margin: 0, fontSize: "0.75rem", color: "var(--muted-foreground)", marginBottom: 4 }}>Nómina Mensual</p>
+            <p style={{ margin: 0, fontSize: "1.25rem", fontWeight: "var(--font-weight-medium)", color: "var(--foreground)" }}>
+              ${stats.monthlyPayroll.toLocaleString()}
+            </p>
           </div>
         </div>
 
         {/* Tabs */}
-        <div className="bg-gray-100 h-9 items-center justify-center rounded-xl p-[3px] grid w-full grid-cols-2 mb-4 md:mb-6">
+        <div
+          style={{
+            backgroundColor: "var(--muted)",
+            borderRadius: "var(--radius-lg)",
+            display: "flex",
+            padding: 3,
+            marginBottom: 24,
+          }}
+        >
           <button
             onClick={() => setActiveTab("staff")}
-            className={`inline-flex h-[calc(100%-1px)] flex-1 items-center justify-center rounded-xl px-2 py-1 text-sm font-semibold transition-all ${activeTab === "staff"
-              ? "bg-white text-gray-900 shadow-sm"
-              : "text-gray-500 hover:text-gray-900"
-              }`}
+            style={{
+              flex: 1,
+              padding: "8px 12px",
+              borderRadius: "calc(var(--radius-lg) - 2px)",
+              border: "none",
+              backgroundColor: activeTab === "staff" ? "var(--card)" : "transparent",
+              color: activeTab === "staff" ? "var(--foreground)" : "var(--muted-foreground)",
+              cursor: "pointer",
+              transition: "all 0.2s",
+              boxShadow: activeTab === "staff" ? "0 1px 3px rgba(0,0,0,0.1)" : "none",
+            }}
           >
             Usuarios
           </button>
           <button
             onClick={() => setActiveTab("schedule")}
-            className={`inline-flex h-[calc(100%-1px)] flex-1 items-center justify-center rounded-xl px-2 py-1 text-sm font-semibold transition-all ${activeTab === "schedule"
-              ? "bg-white text-gray-900 shadow-sm"
-              : "text-gray-500 hover:text-gray-900"
-              }`}
+            style={{
+              flex: 1,
+              padding: "8px 12px",
+              borderRadius: "calc(var(--radius-lg) - 2px)",
+              border: "none",
+              backgroundColor: activeTab === "schedule" ? "var(--card)" : "transparent",
+              color: activeTab === "schedule" ? "var(--foreground)" : "var(--muted-foreground)",
+              cursor: "pointer",
+              transition: "all 0.2s",
+              boxShadow: activeTab === "schedule" ? "0 1px 3px rgba(0,0,0,0.1)" : "none",
+            }}
           >
             Horarios
           </button>
         </div>
 
-        {/* Contenido Personal */}
+        {/* Staff Tab */}
         {activeTab === "staff" && (
           <>
-            <div className="mb-4 md:mb-6">
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 size-4 text-black" />
-                <Input
+            <div style={{ marginBottom: 24 }}>
+              <div style={{ position: "relative" }}>
+                <Search
+                  size={16}
+                  style={{
+                    position: "absolute",
+                    left: 14,
+                    top: "50%",
+                    transform: "translateY(-50%)",
+                    color: "var(--muted-foreground)",
+                  }}
+                />
+                <input
+                  type="text"
                   placeholder="Buscar por nombre, rol o email..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  className="pl-10 text-black font-light"
+                  style={{ ...inputStyle, paddingLeft: 40 }}
                 />
               </div>
             </div>
 
             {filteredEmployees.length === 0 ? (
-              <div className="text-center py-12">
-                <p className="text-gray-500">No se encontraron empleados</p>
+              <div style={{ textAlign: "center", padding: 48, color: "var(--muted-foreground)" }}>
+                No se encontraron empleados
               </div>
             ) : (
-              <div className="space-y-8">
+              <div style={{ display: "flex", flexDirection: "column", gap: 32 }}>
                 {Object.entries(groupEmployeesByRole(filteredEmployees))
                   .sort(([roleA], [roleB]) => getRolePriority(roleA) - getRolePriority(roleB))
                   .map(([role, employeesList]) => (
-                    <div key={role} className="bg-white rounded-xl border border-gray-200 shadow">
-                      <div className="p-4 md:p-6 border-b border-gray-100 bg-gray-50 rounded-t-xl">
-                        <div className="flex justify-between items-center">
+                    <div key={role} style={cardStyle}>
+                      <div
+                        style={{
+                          padding: "16px 20px",
+                          borderBottom: `1px solid var(--border)`,
+                          backgroundColor: "var(--muted)",
+                        }}
+                      >
+                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                           <div>
-                            <h3 className="text-lg font-semibold text-black">
+                            <h3 style={{ margin: 0, color: "var(--foreground)" }}>
                               {roleNames[role] || role}
                             </h3>
-                            <p className="text-sm text-gray-500">
-                              {employeesList.length} {employeesList.length === 1 ? 'empleado' : 'empleados'}
+                            <p style={{ margin: "4px 0 0", fontSize: "0.75rem", color: "var(--muted-foreground)" }}>
+                              {employeesList.length} {employeesList.length === 1 ? "empleado" : "empleados"}
                             </p>
                           </div>
                         </div>
                       </div>
-                      <div className="p-4 md:p-6">
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
+                      <div style={{ padding: 20 }}>
+                        <div
+                          style={{
+                            display: "grid",
+                            gridTemplateColumns: isMobile ? "1fr" : "repeat(auto-fill, minmax(300px, 1fr))",
+                            gap: 20,
+                          }}
+                        >
                           {employeesList.map((employee, index) => {
-                            const isClientEmployee = role === 'cliente' || (employee.role as string) === 'cliente';
-
+                            const isClientEmployee = role === "cliente";
                             if (isClientEmployee) {
                               return (
                                 <ClientCard
@@ -277,18 +439,18 @@ export default function StaffManagementPage() {
                                     _id: employee._id,
                                     name: employee.name,
                                     email: employee.email,
-                                    rol: (employee.role as string) || 'cliente',
+                                    rol: (employee.role as string) || "cliente",
                                     activo: employee.isActive !== undefined ? employee.isActive : true,
-                                    createdAt: employee.createdAt?.toString() || new Date().toISOString()
+                                    createdAt: employee.createdAt?.toString() || new Date().toISOString(),
                                   }}
                                   onEdit={() => {
                                     const clientData: Client = {
                                       _id: employee._id,
                                       name: employee.name,
                                       email: employee.email,
-                                      rol: (employee.role as string) || 'cliente',
+                                      rol: (employee.role as string) || "cliente",
                                       activo: employee.isActive !== undefined ? employee.isActive : true,
-                                      createdAt: employee.createdAt?.toString() || new Date().toISOString()
+                                      createdAt: employee.createdAt?.toString() || new Date().toISOString(),
                                     };
                                     handleEditClient(clientData);
                                   }}
@@ -296,8 +458,6 @@ export default function StaffManagementPage() {
                                 />
                               );
                             }
-
-                            // Empleado
                             return (
                               <EmployeeCard
                                 key={employee._id || index}
@@ -316,14 +476,15 @@ export default function StaffManagementPage() {
           </>
         )}
 
-        {/* Contenido Horarios */}
+        {/* Schedule Tab */}
         {activeTab === "schedule" && (
-          <div className="text-center py-12">
-            <p className="text-gray-500">Vista de horarios en desarrollo</p>
+          <div style={{ textAlign: "center", padding: 48, color: "var(--muted-foreground)" }}>
+            Vista de horarios en desarrollo
           </div>
         )}
       </main>
 
+      {/* Modales */}
       <EmployeeForm
         key={`${isModalOpen}-${editingEmployee?._id || "nuevo"}`}
         isOpen={isModalOpen}
