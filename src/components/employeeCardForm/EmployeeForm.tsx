@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Employee, Role, EmployeeStatus, WorkShift } from '../../types/employee';
+import { Employee, Rol, EmployeeStatus, WorkShift } from '../../types/employee';
 import { X } from 'lucide-react';
 
 interface EmployeeFormProps {
@@ -10,9 +10,9 @@ interface EmployeeFormProps {
   restaurantId?: string;
 }
 
-const roleOptions: Role[] = ['admin', 'manager', 'waiter', 'chef', 'driver', 'cajero'];
+const roleOptions: Rol[] = ['admin', 'manager', 'waiter', 'chef', 'driver', 'cajero'];
 const shiftOptions: WorkShift[] = ['Turno Mañana', 'Turno Tarde', 'Turno Completo'];
-const roleLabels: Record<Role, string> = {
+const roleLabels: Record<Rol, string> = {
   admin: 'Administrador',
   manager: 'Gerente',
   waiter: 'Mesero',
@@ -35,14 +35,14 @@ export function EmployeeForm({ isOpen, onClose, onSubmit, employee, restaurantId
     name: employee?.name || '',
     email: employee?.email || '',
     password: '',
-    role: (employee?.role as Role) || 'waiter',
+    role: (employee?.rol as Rol) || 'waiter',
     employmentDetails: {
       phone: employee?.employmentDetails?.phone || '',
       shift: (employee?.employmentDetails?.shift as WorkShift) || 'Turno Mañana',
-      startDate: employee?.employmentDetails?.startDate 
-        ? (typeof employee.employmentDetails.startDate === 'string' 
-            ? employee.employmentDetails.startDate.split('T')[0] 
-            : new Date(employee.employmentDetails.startDate).toISOString().split('T')[0])
+      startDate: employee?.employmentDetails?.startDate
+        ? (typeof employee.employmentDetails.startDate === 'string'
+          ? employee.employmentDetails.startDate.split('T')[0]
+          : new Date(employee.employmentDetails.startDate).toISOString().split('T')[0])
         : new Date().toISOString().split('T')[0],
       salary: employee?.employmentDetails?.salary || 0,
       status: (employee?.employmentDetails?.status as EmployeeStatus) || 'Activo'
@@ -106,7 +106,7 @@ export function EmployeeForm({ isOpen, onClose, onSubmit, employee, restaurantId
         ...employee,
         name: formData.name,
         email: formData.email,
-        role: formData.role,
+        rol: formData.role,
         employmentDetails: {
           phone: formData.employmentDetails.phone,
           shift: formData.employmentDetails.shift,
@@ -125,7 +125,7 @@ export function EmployeeForm({ isOpen, onClose, onSubmit, employee, restaurantId
         name: formData.name,
         email: formData.email,
         password_hash: formData.password,
-        role: formData.role,
+        rol: formData.role,
         isActive: true,
         employmentDetails: {
           phone: formData.employmentDetails.phone,
@@ -419,7 +419,7 @@ export function EmployeeForm({ isOpen, onClose, onSubmit, employee, restaurantId
             </label>
             <select
               value={formData.role}
-              onChange={(e) => handleChange('role', e.target.value as Role)}
+              onChange={(e) => handleChange('role', e.target.value as Rol)}
               style={selectStyle}
               required
             >

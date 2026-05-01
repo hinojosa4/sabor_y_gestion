@@ -61,7 +61,7 @@ const getStatusStyle = (status: string) => {
 };
 
 export function EmployeeCard({ employee, onEdit, onDelete }: EmployeeCardProps) {
-    const roleStyle = getRoleStyle(employee.role);
+    const roleStyle = getRoleStyle(employee.rol);
     const statusStyle = getStatusStyle(employee.employmentDetails?.status || 'Activo');
 
     // Estilos en línea usando variables del globals.css
@@ -192,7 +192,7 @@ export function EmployeeCard({ employee, onEdit, onDelete }: EmployeeCardProps) 
                         <h4 style={nameStyle}>{employee.name}</h4>
                         <div style={badgeContainerStyle}>
                             <span style={badgeStyle(roleStyle.background, roleStyle.color)}>
-                                {roleSpanishMap[employee.role] || employee.role}
+                                {roleSpanishMap[employee.rol] || employee.rol}
                             </span>
                             <span style={badgeStyle(statusStyle.background, statusStyle.color)}>
                                 {statusSpanishMap[employee.employmentDetails?.status || 'Activo'] || employee.employmentDetails?.status || 'Activo'}

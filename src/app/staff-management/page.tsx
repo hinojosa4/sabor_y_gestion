@@ -98,7 +98,7 @@ export default function StaffManagementPage() {
 
   // Empleados reales: excluir clientes
   const realEmployees = filteredEmployees.filter(
-    emp => (emp.role as string) !== 'cliente'
+    emp => (emp.rol as string) !== 'cliente'
   );
 
   // Combinar empleados y clientes
@@ -132,7 +132,7 @@ export default function StaffManagementPage() {
     return (
       user.name.toLowerCase().includes(q) ||
       (user.email || "").toLowerCase().includes(q) ||
-      (user.role as string).toLowerCase().includes(q)
+      (user.rol as string).toLowerCase().includes(q)
     );
   });
 
@@ -140,7 +140,7 @@ export default function StaffManagementPage() {
   const groupUsersByRole = (users: CombinedUser[]) => {
     const grouped: Record<string, CombinedUser[]> = {};
     users.forEach(user => {
-      const role = user.role || "cliente";
+      const role = user.rol || "cliente";
       if (!grouped[role]) grouped[role] = [];
       grouped[role].push(user);
     });

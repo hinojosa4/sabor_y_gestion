@@ -155,7 +155,7 @@ export function useEmployeeData() {
         return employees.filter(
             emp =>
                 emp.name.toLowerCase().includes(query) ||
-                emp.role.toLowerCase().includes(query) ||
+                emp.rol.toLowerCase().includes(query) ||
                 emp.email.toLowerCase().includes(query) ||
                 emp.employmentDetails?.phone?.toLowerCase().includes(query)
         );
