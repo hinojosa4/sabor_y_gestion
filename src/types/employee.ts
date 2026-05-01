@@ -1,7 +1,7 @@
 // types/employee.ts
 export type EmployeeStatus = 'Activo' | 'Vacaciones' | 'Inactivo';
 export type WorkShift = 'Turno Mañana' | 'Turno Tarde' | 'Turno Completo';
-export type Role = 'admin' | 'manager' | 'waiter' | 'chef' | 'driver';
+export type Role = 'admin' | 'manager' | 'waiter' | 'chef' | 'driver' | 'cajero';
 
 export interface Employee {
   _id: string;

@@ -1,10 +1,6 @@
-// src/app/dashboard/cajero/cierre-caja/page.tsx
 "use client";
 import { useState, useEffect } from 'react';
-import { useAuth } from '@/lib/useAuth';
-import { CAJERO, ADMIN } from '@/lib/roles';
-import { Button } from '@/components/ui/Button';
-import { ArrowLeft, DollarSign, CreditCard, Receipt, Printer, Download } from 'lucide-react';
+import { ArrowLeft, DollarSign, CreditCard, Receipt, Printer } from 'lucide-react';
 import Link from 'next/link';
 
 interface CashRegisterData {
@@ -20,8 +16,227 @@ interface CashRegisterData {
     closingBalance?: number;
 }
 
+// Estilos usando variables CSS del globals.css
+const containerStyle: React.CSSProperties = {
+    minHeight: "100vh",
+    backgroundColor: "var(--background)",
+    fontFamily: "inherit",
+};
+
+const headerStyle: React.CSSProperties = {
+    backgroundColor: "var(--card)",
+    borderBottom: `2px solid var(--primary)`,
+    position: "sticky",
+    top: 0,
+    zIndex: 10,
+};
+
+const backButtonStyle: React.CSSProperties = {
+    display: "inline-flex",
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "var(--secondary)",
+    border: `1px solid var(--border)`,
+    borderRadius: "var(--radius-md)",
+    width: 38,
+    height: 38,
+    cursor: "pointer",
+    color: "var(--foreground)",
+    textDecoration: "none",
+    fontSize: 16,
+};
+
+const titleStyle: React.CSSProperties = {
+    margin: 0,
+    fontSize: "1.125rem",
+    fontWeight: "var(--font-weight-medium)",
+    color: "var(--foreground)",
+};
+
+const subtitleStyle: React.CSSProperties = {
+    margin: "0.25rem 0 0",
+    fontSize: "0.75rem",
+    color: "var(--muted-foreground)",
+};
+
+const mainStyle: React.CSSProperties = {
+    maxWidth: 896,
+    margin: "0 auto",
+    padding: "1.5rem 1rem",
+};
+
+const cardStyle: React.CSSProperties = {
+    backgroundColor: "var(--card)",
+    borderRadius: "var(--radius-lg)",
+    border: `1px solid var(--border)`,
+    boxShadow: "0 2px 8px rgba(0,0,0,0.04)",
+    marginBottom: "1.5rem",
+    overflow: "hidden",
+};
+
+const cardHeaderStyle: React.CSSProperties = {
+    padding: "1.5rem",
+    borderBottom: `1px solid var(--border)`,
+};
+
+const cardTitleStyle: React.CSSProperties = {
+    margin: 0,
+    fontSize: "1.125rem",
+    fontWeight: "var(--font-weight-medium)",
+    color: "var(--foreground)",
+};
+
+const cardSubtitleStyle: React.CSSProperties = {
+    margin: "0.25rem 0 0",
+    fontSize: "0.75rem",
+    color: "var(--muted-foreground)",
+};
+
+const gridStatsStyle: React.CSSProperties = {
+    display: "grid",
+    gridTemplateColumns: "repeat(2, 1fr)",
+    gap: "1rem",
+    padding: "1.5rem",
+};
+
+const statItemStyle: React.CSSProperties = {
+    display: "flex",
+    flexDirection: "column",
+};
+
+const statLabelStyle: React.CSSProperties = {
+    margin: 0,
+    fontSize: "0.75rem",
+    color: "var(--muted-foreground)",
+};
+
+const statValueStyle: React.CSSProperties = {
+    margin: 0,
+    fontSize: "1.25rem",
+    fontWeight: "var(--font-weight-medium)",
+    color: "var(--foreground)",
+};
+
+const statValueGreenStyle: React.CSSProperties = {
+    ...statValueStyle,
+    color: "#27ae60",
+};
+
+const gridPaymentsStyle: React.CSSProperties = {
+    display: "grid",
+    gridTemplateColumns: "1fr",
+    gap: "1rem",
+    padding: "1.5rem",
+};
+
+const paymentCardStyle: React.CSSProperties = {
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "space-between",
+    padding: "1rem",
+    borderRadius: "var(--radius-lg)",
+};
+
+const paymentLeftStyle: React.CSSProperties = {
+    display: "flex",
+    alignItems: "center",
+    gap: "0.75rem",
+};
+
+const iconCircleStyle: React.CSSProperties = {
+    borderRadius: "9999px",
+    padding: "0.5rem",
+    display: "inline-flex",
+    alignItems: "center",
+    justifyContent: "center",
+};
+
+const paymentLabelStyle: React.CSSProperties = {
+    margin: 0,
+    fontSize: "0.75rem",
+    color: "var(--muted-foreground)",
+};
+
+const paymentAmountStyle: React.CSSProperties = {
+    margin: 0,
+    fontSize: "1.125rem",
+    fontWeight: "var(--font-weight-medium)",
+};
+
+const actionsStyle: React.CSSProperties = {
+    display: "flex",
+    justifyContent: "flex-end",
+    gap: "0.75rem",
+    marginTop: "0.5rem",
+};
+
+const printButtonStyle: React.CSSProperties = {
+    backgroundColor: "transparent",
+    border: `1px solid var(--border)`,
+    borderRadius: "var(--radius-md)",
+    padding: "0.5rem 1rem",
+    fontSize: "0.875rem",
+    fontWeight: "var(--font-weight-medium)",
+    cursor: "pointer",
+    display: "inline-flex",
+    alignItems: "center",
+    gap: "0.5rem",
+    color: "var(--foreground)",
+    fontFamily: "inherit",
+};
+
+const closeButtonStyle: React.CSSProperties = {
+    backgroundColor: "var(--destructive)",
+    border: "none",
+    borderRadius: "var(--radius-md)",
+    padding: "0.5rem 1rem",
+    fontSize: "0.875rem",
+    fontWeight: "var(--font-weight-medium)",
+    cursor: "pointer",
+    display: "inline-flex",
+    alignItems: "center",
+    gap: "0.5rem",
+    color: "white",
+    fontFamily: "inherit",
+};
+
+const closedContainerStyle: React.CSSProperties = {
+    backgroundColor: "var(--card)",
+    borderRadius: "var(--radius-lg)",
+    border: `1px solid var(--border)`,
+    boxShadow: "0 2px 8px rgba(0,0,0,0.04)",
+    padding: "3rem",
+    textAlign: "center",
+};
+
+const closedTitleStyle: React.CSSProperties = {
+    margin: "1rem 0 0.5rem",
+    fontSize: "1.25rem",
+    fontWeight: "var(--font-weight-medium)",
+    color: "var(--foreground)",
+};
+
+const closedTextStyle: React.CSSProperties = {
+    margin: "0 0 1rem",
+    fontSize: "0.875rem",
+    color: "var(--muted-foreground)",
+};
+
+const backButtonLargeStyle: React.CSSProperties = {
+    backgroundColor: "var(--primary)",
+    color: "var(--primary-foreground)",
+    border: "none",
+    borderRadius: "var(--radius-md)",
+    padding: "0.5rem 1rem",
+    cursor: "pointer",
+    display: "inline-flex",
+    alignItems: "center",
+    gap: "0.5rem",
+    fontFamily: "inherit",
+    textDecoration: "none",
+};
+
 export default function CierreCajaPage() {
-    //const { user, loading: userLoading } = useAuth(CAJERO);
     const [loading, setLoading] = useState(true);
     const [data, setData] = useState<CashRegisterData | null>(null);
     const [closing, setClosing] = useState(false);
@@ -44,7 +259,6 @@ export default function CierreCajaPage() {
 
     const handleCierre = async () => {
         if (!confirm('¿Estás seguro de realizar el cierre de caja? No podrás revertirlo.')) return;
-        
         setClosing(true);
         try {
             const res = await fetch('/api/cash-register/close', {
@@ -52,7 +266,6 @@ export default function CierreCajaPage() {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ closingBalance: data?.salesTotal })
             });
-            
             if (res.ok) {
                 alert('Cierre de caja realizado con éxito');
                 fetchCierreData();
@@ -79,114 +292,132 @@ export default function CierreCajaPage() {
         return new Date(date).toLocaleString('es-BO');
     };
 
-    /*if (userLoading || loading) {
+    if (loading) {
         return (
-            <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-600"></div>
+            <div style={containerStyle}>
+                <div style={{ textAlign: "center", padding: "3rem", color: "var(--muted-foreground)" }}>
+                    Cargando...
+                </div>
             </div>
         );
     }
 
-    if (!user) return null;*/
+    const isMobile = typeof window !== "undefined" ? window.innerWidth < 640 : false;
 
     return (
-        <div className="min-h-screen bg-gray-50">
-            <header className="bg-white border-b border-gray-200 sticky top-0 z-10">
-                <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
-                    <div className="flex items-center gap-3">
-                        <Link
-                            href="/dashboard/cajero"
-                            className="inline-flex items-center justify-center text-black font-medium transition-colors hover:bg-gray-100 rounded-md h-8 px-3"
-                        >
-                            <ArrowLeft className="size-5" />
-                        </Link>
-                        <div>
-                            <h1 className="text-black font-semibold">Cierre de Caja</h1>
-                            <p className="text-sm text-gray-500">Reporte de ventas del turno</p>
-                        </div>
-                    </div>
+        <div style={containerStyle}>
+            {/* Header actualizado */}
+            <header
+                id="cash-closure-header"
+                style={{
+                    ...headerStyle,
+                    padding: isMobile ? "14px 16px" : "18px 40px",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: isMobile ? 10 : 14,
+                }}
+            >
+                <Link href="/dashboard/cajero" style={backButtonStyle}>
+                    <ArrowLeft size={20} />
+                </Link>
+                <div style={{
+                    width: 40,
+                    height: 40,
+                    borderRadius: "var(--radius-lg)",
+                    backgroundColor: "var(--primary)",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    fontSize: isMobile ? 18 : 22,
+                }}>
+                    <Receipt size={isMobile ? 18 : 22} color="white" />
+                </div>
+                <div>
+                    <h1 style={titleStyle}>Cierre de Caja</h1>
+                    <p style={subtitleStyle}>Reporte de ventas del turno</p>
                 </div>
             </header>
 
-            <main className="max-w-4xl mx-auto px-4 py-6">
+            <main style={mainStyle}>
                 {data && data.status === 'abierto' ? (
                     <>
-                        <div className="bg-white rounded-xl border border-gray-200 shadow mb-6">
-                            <div className="p-6 border-b border-gray-100">
-                                <h2 className="text-lg font-semibold text-black">Resumen del Turno</h2>
-                                <p className="text-sm text-gray-500">
+                        {/* Resumen del Turno */}
+                        <div style={cardStyle}>
+                            <div style={cardHeaderStyle}>
+                                <h2 style={cardTitleStyle}>Resumen del Turno</h2>
+                                <p style={cardSubtitleStyle}>
                                     Apertura: {formatDate(data.openingDate)}
                                 </p>
                             </div>
-                            <div className="p-6 grid grid-cols-2 md:grid-cols-4 gap-4">
-                                <div>
-                                    <p className="text-sm text-gray-500">Apertura</p>
-                                    <p className="text-xl font-bold text-black">{formatCurrency(data.openingBalance)}</p>
+                            <div style={gridStatsStyle}>
+                                <div style={statItemStyle}>
+                                    <p style={statLabelStyle}>Apertura</p>
+                                    <p style={statValueStyle}>{formatCurrency(data.openingBalance)}</p>
                                 </div>
-                                <div>
-                                    <p className="text-sm text-gray-500">Ventas Totales</p>
-                                    <p className="text-xl font-bold text-green-600">{formatCurrency(data.salesTotal)}</p>
+                                <div style={statItemStyle}>
+                                    <p style={statLabelStyle}>Ventas Totales</p>
+                                    <p style={statValueGreenStyle}>{formatCurrency(data.salesTotal)}</p>
                                 </div>
-                                <div>
-                                    <p className="text-sm text-gray-500">Mesas Atendidas</p>
-                                    <p className="text-xl font-bold text-black">{data.tablesServed}</p>
+                                <div style={statItemStyle}>
+                                    <p style={statLabelStyle}>Mesas Atendidas</p>
+                                    <p style={statValueStyle}>{data.tablesServed}</p>
                                 </div>
-                                <div>
-                                    <p className="text-sm text-gray-500">Pedidos Totales</p>
-                                    <p className="text-xl font-bold text-black">{data.ordersCount}</p>
-                                </div>
-                            </div>
-                        </div>
-
-                        <div className="bg-white rounded-xl border border-gray-200 shadow mb-6">
-                            <div className="p-6 border-b border-gray-100">
-                                <h2 className="text-lg font-semibold text-black">Desglose por Método de Pago</h2>
-                            </div>
-                            <div className="p-6 grid grid-cols-1 md:grid-cols-2 gap-4">
-                                <div className="flex items-center justify-between p-4 bg-green-50 rounded-lg">
-                                    <div className="flex items-center gap-3">
-                                        <div className="bg-green-500 rounded-full p-2">
-                                            <DollarSign className="size-5 text-white" />
-                                        </div>
-                                        <div>
-                                            <p className="text-sm text-gray-500">Efectivo</p>
-                                            <p className="text-xl font-bold text-green-600">{formatCurrency(data.cashTotal)}</p>
-                                        </div>
-                                    </div>
-                                </div>
-                                <div className="flex items-center justify-between p-4 bg-blue-50 rounded-lg">
-                                    <div className="flex items-center gap-3">
-                                        <div className="bg-blue-500 rounded-full p-2">
-                                            <CreditCard className="size-5 text-white" />
-                                        </div>
-                                        <div>
-                                            <p className="text-sm text-gray-500">QR/Digital</p>
-                                            <p className="text-xl font-bold text-blue-600">{formatCurrency(data.qrTotal)}</p>
-                                        </div>
-                                    </div>
+                                <div style={statItemStyle}>
+                                    <p style={statLabelStyle}>Pedidos Totales</p>
+                                    <p style={statValueStyle}>{data.ordersCount}</p>
                                 </div>
                             </div>
                         </div>
 
-                        <div className="flex justify-end gap-3">
-                            <Button variant="outline" onClick={() => window.print()}>
-                                <Printer className="size-4 mr-2" />
+                        {/* Desglose por Método de Pago */}
+                        <div style={cardStyle}>
+                            <div style={cardHeaderStyle}>
+                                <h2 style={cardTitleStyle}>Desglose por Método de Pago</h2>
+                            </div>
+                            <div style={gridPaymentsStyle}>
+                                <div style={{ ...paymentCardStyle, backgroundColor: "#e8f5e9" }}>
+                                    <div style={paymentLeftStyle}>
+                                        <div style={{ ...iconCircleStyle, backgroundColor: "#27ae60" }}>
+                                            <DollarSign size={20} color="white" />
+                                        </div>
+                                        <div>
+                                            <p style={paymentLabelStyle}>Efectivo</p>
+                                            <p style={{ ...paymentAmountStyle, color: "#27ae60" }}>{formatCurrency(data.cashTotal)}</p>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div style={{ ...paymentCardStyle, backgroundColor: "#e3f2fd" }}>
+                                    <div style={paymentLeftStyle}>
+                                        <div style={{ ...iconCircleStyle, backgroundColor: "#1976d2" }}>
+                                            <CreditCard size={20} color="white" />
+                                        </div>
+                                        <div>
+                                            <p style={paymentLabelStyle}>QR/Digital</p>
+                                            <p style={{ ...paymentAmountStyle, color: "#1976d2" }}>{formatCurrency(data.qrTotal)}</p>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Acciones */}
+                        <div className="print-actions" style={actionsStyle}>
+                            <button style={printButtonStyle} onClick={() => window.print()}>
+                                <Printer size={16} />
                                 Imprimir
-                            </Button>
-                            <Button onClick={handleCierre} disabled={closing} className="bg-red-600 hover:bg-red-700">
+                            </button>
+                            <button style={closeButtonStyle} onClick={handleCierre} disabled={closing}>
                                 {closing ? 'Cerrando...' : 'Cerrar Caja'}
-                            </Button>
+                            </button>
                         </div>
                     </>
                 ) : (
-                    <div className="bg-white rounded-xl border border-gray-200 shadow p-12 text-center">
-                        <Receipt className="size-16 text-gray-400 mx-auto mb-4" />
-                        <h2 className="text-xl font-semibold text-black mb-2">Caja Cerrada</h2>
-                        <p className="text-gray-500 mb-4">
-                            El cierre de caja fue realizado
-                        </p>
-                        <Link href="/dashboard/cajero">
-                            <Button>Volver al Panel</Button>
+                    <div style={closedContainerStyle}>
+                        <Receipt size={64} style={{ color: "var(--muted-foreground)", margin: "0 auto 1rem" }} />
+                        <h2 style={closedTitleStyle}>Caja Cerrada</h2>
+                        <p style={closedTextStyle}>El cierre de caja fue realizado</p>
+                        <Link href="/dashboard/cajero" style={backButtonLargeStyle}>
+                            Volver al Panel
                         </Link>
                     </div>
                 )}

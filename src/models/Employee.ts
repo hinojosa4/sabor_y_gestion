@@ -10,7 +10,7 @@ const EmployeeSchema = new mongoose.Schema({
     role: {
         type: String,
         required: true,
-        enum: ['admin', 'manager', 'waiter', 'chef', 'driver']
+        enum: ['admin', 'manager', 'waiter', 'chef', 'driver', 'cajero']
     },
     isActive: { type: Boolean, default: true },
     employmentDetails: {

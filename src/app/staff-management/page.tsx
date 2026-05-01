@@ -161,6 +161,7 @@ export default function StaffManagementPage() {
     chef: "🧑‍🍳 Chefs",
     driver: "🚚 Delivery",
     cliente: "👥 Clientes",
+    cajero: "💰 Cajeros",
   };
 
   const showSuccess = (msg: string) => {

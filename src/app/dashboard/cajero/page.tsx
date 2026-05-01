@@ -1,22 +1,191 @@
-// src/app/dashboard/cajero/page.tsx
 "use client";
 import { useState } from 'react';
 import { useAuth } from '@/lib/useAuth';
 import { CAJERO } from '@/lib/roles';
-import { Button } from '@/components/ui/Button';
 import { Search, DollarSign, Receipt, Clock, ArrowLeft } from 'lucide-react';
 import Link from 'next/link';
 import { useTableData } from '@/hooks/useTableData';
 import { PreinvoiceModal } from '@/components/caja/PreinvoiceModal';
 
+const containerStyle: React.CSSProperties = {
+    minHeight: "100vh",
+    backgroundColor: "var(--background)",
+    fontFamily: "inherit",
+};
+
+const mainStyle: React.CSSProperties = {
+    maxWidth: 1280,
+    margin: "0 auto",
+    padding: "0.75rem 0.75rem",
+};
+
+const searchContainerStyle: React.CSSProperties = {
+    marginBottom: "1.5rem",
+    position: "relative",
+};
+
+const searchIconStyle: React.CSSProperties = {
+    position: "absolute",
+    left: "0.75rem",
+    top: "50%",
+    transform: "translateY(-50%)",
+    color: "var(--muted-foreground)",
+};
+
+const inputStyle: React.CSSProperties = {
+    width: "100%",
+    padding: "0.5rem 0.75rem 0.5rem 2.5rem",
+    borderRadius: "var(--radius-lg)",
+    border: `1px solid var(--border)`,
+    backgroundColor: "var(--input-background)",
+    fontSize: "0.875rem",
+    outline: "none",
+    fontFamily: "inherit",
+    color: "var(--foreground)",
+};
+
+const sectionStyle: React.CSSProperties = {
+    marginBottom: "2rem",
+};
+
+const sectionHeaderStyle: React.CSSProperties = {
+    display: "flex",
+    alignItems: "center",
+    gap: "0.5rem",
+    marginBottom: "1rem",
+};
+
+const sectionTitleStyle: React.CSSProperties = {
+    margin: 0,
+    fontSize: "1.125rem",
+    fontWeight: "var(--font-weight-medium)",
+    color: "var(--foreground)",
+};
+
+const badgeStyle: React.CSSProperties = {
+    backgroundColor: "var(--muted)",
+    color: "var(--muted-foreground)",
+    fontSize: "0.75rem",
+    padding: "0.125rem 0.5rem",
+    borderRadius: "9999px",
+};
+
+const gridStyle: React.CSSProperties = {
+    display: "grid",
+    gridTemplateColumns: "1fr",
+    gap: "1rem",
+};
+
+// Card estilos
+const billingCardStyle: React.CSSProperties = {
+    cursor: "pointer",
+    borderRadius: "var(--radius-lg)",
+    border: "2px solid #f97316",
+    backgroundColor: "#fff7ed",
+    padding: "1rem",
+    transition: "box-shadow 0.2s",
+};
+
+const occupiedCardStyle: React.CSSProperties = {
+    borderRadius: "var(--radius-lg)",
+    border: `1px solid var(--border)`,
+    backgroundColor: "var(--card)",
+    padding: "1rem",
+    opacity: 0.7,
+};
+
+const freeCardStyle: React.CSSProperties = {
+    borderRadius: "var(--radius-lg)",
+    border: "1px solid #dcfce7",
+    backgroundColor: "#f0fdf4",
+    padding: "1rem",
+    opacity: 0.6,
+};
+
+const cardHeaderStyle: React.CSSProperties = {
+    display: "flex",
+    justifyContent: "space-between",
+    alignItems: "flex-start",
+};
+
+const tableNumberStyle: React.CSSProperties = {
+    margin: 0,
+    fontSize: "1.25rem",
+    fontWeight: "bold",
+};
+
+const locationStyle: React.CSSProperties = {
+    margin: 0,
+    fontSize: "0.875rem",
+    color: "var(--muted-foreground)",
+};
+
+const statusTextStyle: React.CSSProperties = {
+    margin: "0.25rem 0 0",
+    fontSize: "0.75rem",
+    fontWeight: 500,
+};
+
+const iconCircleStyle: React.CSSProperties = {
+    borderRadius: "9999px",
+    padding: "0.75rem",
+    display: "inline-flex",
+    alignItems: "center",
+    justifyContent: "center",
+};
+
+const buttonFullStyle: React.CSSProperties = {
+    width: "100%",
+    marginTop: "0.75rem",
+    backgroundColor: "var(--primary)",
+    border: "none",
+    borderRadius: "var(--radius-md)",
+    padding: "0.5rem",
+    fontSize: "0.875rem",
+    fontWeight: "var(--font-weight-medium)",
+    cursor: "pointer",
+    color: "var(--primary-foreground)",
+    fontFamily: "inherit",
+};
+
+const buttonOutlineFullStyle: React.CSSProperties = {
+    ...buttonFullStyle,
+    backgroundColor: "transparent",
+    border: `1px solid var(--border)`,
+    color: "var(--foreground)",
+    cursor: "not-allowed",
+};
+
+const emptyStateStyle: React.CSSProperties = {
+    textAlign: "center",
+    padding: "3rem",
+    color: "var(--muted-foreground)",
+};
+
+const loadingContainerStyle: React.CSSProperties = {
+    minHeight: "100vh",
+    backgroundColor: "var(--background)",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+};
+
+const spinnerStyle: React.CSSProperties = {
+    border: "2px solid var(--muted)",
+    borderTopColor: "var(--primary)",
+    borderRadius: "50%",
+    width: 48,
+    height: 48,
+    animation: "spin 1s linear infinite",
+};
+
 export default function CajeroDashboard() {
-    //const { user, loading: userLoading } = useAuth(CAJERO);
+    const { user, loading: userLoading } = useAuth(CAJERO);
     const restaurantId = "69e170e941daf8c2b2f76677";
     const [searchQuery, setSearchQuery] = useState('');
     const [selectedTable, setSelectedTable] = useState<{ id: string; number: number } | null>(null);
     const [isPreinvoiceOpen, setIsPreinvoiceOpen] = useState(false);
 
-    // ✅ Usar el hook existente
     const { tables, loading, refreshTables } = useTableData(restaurantId);
 
     const filteredTables = tables.filter(table =>
@@ -37,101 +206,139 @@ export default function CajeroDashboard() {
         }
     };
 
-    /*if (userLoading || loading) {
+    if (userLoading || loading) {
         return (
-            <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-600"></div>
-            </div>
-        );
-    }*/
-
-    //if (!user) return null;
-
-    if (loading) {
-        return (
-            <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-600"></div>
+            <div style={loadingContainerStyle}>
+                <div style={spinnerStyle}></div>
             </div>
         );
     }
 
+    if (!user) return null;
+
+    if (loading) {
+        return (
+            <div style={loadingContainerStyle}>
+                <div style={spinnerStyle}></div>
+            </div>
+        );
+    }
+
+    const isMobile = typeof window !== "undefined" ? window.innerWidth < 640 : false;
+    const responsiveGrid: React.CSSProperties = {
+        ...gridStyle,
+        gridTemplateColumns: isMobile ? "1fr" : "repeat(auto-fill, minmax(300px, 1fr))",
+    };
+
     return (
-        <div className="min-h-screen bg-gray-50" style={{ zoom: 1.25 }}>
-            <header className="bg-white border-b border-gray-200 sticky top-0 z-10">
-                <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3 md:py-4">
-                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-                        <div className="flex items-center gap-3">
-                            <Link
-                                href="/dashboard"
-                                className="inline-flex items-center justify-center text-black font-medium transition-colors hover:bg-gray-100 rounded-md h-8 px-3"
-                            >
-                                <ArrowLeft className="size-5" />
-                            </Link>
-                            <div>
-                                <h1 className="text-black leading-none font-semibold">
-                                    Panel de Cajero
-                                </h1>
-                                <p className="text-xs md:text-sm text-gray-500">
-                                    Gestiona pagos y facturación
-                                </p>
-                            </div>
-                        </div>
-                        <div className="flex gap-2">
-                            <Link href="/dashboard/cajero/cierre-caja">
-                                <Button variant="outline">
-                                    <Receipt className="size-4 mr-2" />
-                                    Cierre de Caja
-                                </Button>
-                            </Link>
-                        </div>
+        <div style={containerStyle}>
+            <header style={{
+                backgroundColor: "var(--card)",
+                borderBottom: `2px solid var(--primary)`,
+                position: "sticky",
+                top: 0,
+                zIndex: 10,
+                padding: isMobile ? "14px 16px" : "18px 40px",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+                gap: 10,
+            }}>
+                <div style={{ display: "flex", alignItems: "center", gap: isMobile ? 10 : 14, minWidth: 0 }}>
+                    <Link href="/dashboard" style={{
+                        backgroundColor: "var(--secondary)",
+                        border: `1px solid var(--border)`,
+                        borderRadius: "var(--radius-md)",
+                        width: 38,
+                        height: 38,
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        cursor: "pointer",
+                        fontSize: 16,
+                        textDecoration: "none",
+                        color: "var(--foreground)",
+                    }}>
+                        <ArrowLeft size={20} />
+                    </Link>
+                    {/* Icono añadido aquí */}
+                    <div style={{
+                        width: 40,
+                        height: 40,
+                        borderRadius: "var(--radius-lg)",
+                        backgroundColor: "var(--primary)",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        fontSize: isMobile ? 18 : 22,
+                    }}>
+                        <Receipt size={isMobile ? 18 : 22} color="white" />
+                    </div>
+                    <div>
+                        <h1 style={{ margin: 0 }}>Panel de Cajero</h1>
+                        <p style={{ margin: 0, fontSize: "0.75rem", color: "var(--muted-foreground)" }}>Gestiona pagos y facturación</p>
                     </div>
                 </div>
+                <Link href="/dashboard/cajero/cierre-caja" style={{
+                    backgroundColor: "var(--primary)",
+                    color: "var(--primary-foreground)",
+                    border: "none",
+                    borderRadius: "var(--radius-md)",
+                    padding: isMobile ? "10px 16px" : "11px 22px",
+                    cursor: "pointer",
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: 6,
+                    fontFamily: "inherit",
+                    textDecoration: "none",
+                }}>
+                    <Receipt size={16} />
+                    Cierre de Caja
+                </Link>
             </header>
 
-            <main className="max-w-7xl mx-auto px-3 sm:px-4 lg:px-6 py-3 md:py-5">
-                <div className="mb-6">
-                    <div className="relative">
-                        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 size-4 text-gray-400" />
-                        <input
-                            type="text"
-                            placeholder="Buscar mesa por número o ubicación..."
-                            value={searchQuery}
-                            onChange={(e) => setSearchQuery(e.target.value)}
-                            className="w-full pl-10 pr-4 py-2 rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-purple-500"
-                        />
-                    </div>
+            <main style={mainStyle}>
+                <div style={searchContainerStyle}>
+                    <Search size={16} style={searchIconStyle} />
+                    <input
+                        type="text"
+                        placeholder="Buscar mesa por número o ubicación..."
+                        value={searchQuery}
+                        onChange={(e) => setSearchQuery(e.target.value)}
+                        style={inputStyle}
+                    />
                 </div>
 
                 {/* Cuentas por Cobrar */}
                 {billingTables.length > 0 && (
-                    <div className="mb-8">
-                        <div className="flex items-center gap-2 mb-4">
-                            <DollarSign className="size-5 text-orange-600" />
-                            <h2 className="text-lg font-semibold text-black">Cuentas por Cobrar</h2>
-                            <span className="bg-orange-100 text-orange-700 text-xs px-2 py-1 rounded-full">
+                    <div style={sectionStyle}>
+                        <div style={sectionHeaderStyle}>
+                            <DollarSign size={20} color="#ea580c" />
+                            <h2 style={sectionTitleStyle}>Cuentas por Cobrar</h2>
+                            <span style={{ ...badgeStyle, backgroundColor: "#fff7ed", color: "#ea580c" }}>
                                 {billingTables.length}
                             </span>
                         </div>
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                        <div style={responsiveGrid}>
                             {billingTables.map((table) => (
                                 <div
                                     key={table._id}
                                     onClick={() => handleTableClick(table._id, table.number, table.status)}
-                                    className="cursor-pointer rounded-xl border-2 border-orange-400 bg-orange-50 p-4 hover:shadow-lg transition-all"
+                                    style={billingCardStyle}
                                 >
-                                    <div className="flex justify-between items-start">
+                                    <div style={cardHeaderStyle}>
                                         <div>
-                                            <h3 className="text-xl font-bold text-orange-700">Mesa {table.number}</h3>
-                                            <p className="text-sm text-gray-600">{table.location}</p>
-                                            <p className="text-xs text-orange-600 mt-1 font-medium">Solicita cuenta</p>
+                                            <h3 style={{ ...tableNumberStyle, color: "#ea580c" }}>Mesa {table.number}</h3>
+                                            <p style={locationStyle}>{table.location}</p>
+                                            <p style={{ ...statusTextStyle, color: "#ea580c" }}>Solicita cuenta</p>
                                         </div>
-                                        <div className="bg-orange-500 rounded-full p-3">
-                                            <Receipt className="size-5 text-white" />
+                                        <div style={{ ...iconCircleStyle, backgroundColor: "#f97316" }}>
+                                            <Receipt size={20} color="white" />
                                         </div>
                                     </div>
-                                    <Button className="w-full mt-3 bg-orange-600 hover:bg-orange-700 text-white">
+                                    <button style={{ ...buttonFullStyle, backgroundColor: "#ea580c", marginTop: "0.75rem" }}>
                                         Ver cuenta
-                                    </Button>
+                                    </button>
                                 </div>
                             ))}
                         </div>
@@ -140,32 +347,32 @@ export default function CajeroDashboard() {
 
                 {/* Mesas Ocupadas */}
                 {occupiedTables.length > 0 && (
-                    <div className="mb-8">
-                        <div className="flex items-center gap-2 mb-4">
-                            <Clock className="size-5 text-blue-600" />
-                            <h2 className="text-lg font-semibold text-black">Mesas en Servicio</h2>
-                            <span className="bg-blue-100 text-blue-700 text-xs px-2 py-1 rounded-full">
+                    <div style={sectionStyle}>
+                        <div style={sectionHeaderStyle}>
+                            <Clock size={20} color="#2563eb" />
+                            <h2 style={sectionTitleStyle}>Mesas en Servicio</h2>
+                            <span style={{ ...badgeStyle, backgroundColor: "#eff6ff", color: "#2563eb" }}>
                                 {occupiedTables.length}
                             </span>
                         </div>
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                        <div style={responsiveGrid}>
                             {occupiedTables.map((table) => (
-                                <div key={table._id} className="rounded-xl border border-gray-200 bg-white p-4 opacity-70">
-                                    <div className="flex justify-between items-start">
+                                <div key={table._id} style={occupiedCardStyle}>
+                                    <div style={cardHeaderStyle}>
                                         <div>
-                                            <h3 className="text-xl font-bold text-gray-700">Mesa {table.number}</h3>
-                                            <p className="text-sm text-gray-500">{table.location}</p>
-                                            <p className="text-xs text-blue-600 mt-1 font-medium">
+                                            <h3 style={{ ...tableNumberStyle, color: "var(--foreground)" }}>Mesa {table.number}</h3>
+                                            <p style={locationStyle}>{table.location}</p>
+                                            <p style={{ ...statusTextStyle, color: "#2563eb" }}>
                                                 {table.status === 'Ocupada' ? 'En servicio' : 'Reservada'}
                                             </p>
                                         </div>
-                                        <div className="bg-gray-100 rounded-full p-3">
-                                            <Clock className="size-5 text-gray-500" />
+                                        <div style={{ ...iconCircleStyle, backgroundColor: "var(--muted)" }}>
+                                            <Clock size={20} color="var(--muted-foreground)" />
                                         </div>
                                     </div>
-                                    <Button variant="outline" className="w-full mt-3" disabled>
+                                    <button style={buttonOutlineFullStyle} disabled>
                                         Esperando solicitud
-                                    </Button>
+                                    </button>
                                 </div>
                             ))}
                         </div>
@@ -174,28 +381,28 @@ export default function CajeroDashboard() {
 
                 {/* Mesas Libres */}
                 {freeTables.length > 0 && (
-                    <div>
-                        <div className="flex items-center gap-2 mb-4">
-                            <h2 className="text-lg font-semibold text-black">Mesas Libres</h2>
-                            <span className="bg-green-100 text-green-700 text-xs px-2 py-1 rounded-full">
+                    <div style={sectionStyle}>
+                        <div style={sectionHeaderStyle}>
+                            <h2 style={sectionTitleStyle}>Mesas Libres</h2>
+                            <span style={{ ...badgeStyle, backgroundColor: "#dcfce7", color: "#16a34a" }}>
                                 {freeTables.length}
                             </span>
                         </div>
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                        <div style={responsiveGrid}>
                             {freeTables.map((table) => (
-                                <div key={table._id} className="rounded-xl border border-green-200 bg-green-50 p-4 opacity-60">
-                                    <div className="flex justify-between items-start">
+                                <div key={table._id} style={freeCardStyle}>
+                                    <div style={cardHeaderStyle}>
                                         <div>
-                                            <h3 className="text-xl font-bold text-green-700">Mesa {table.number}</h3>
-                                            <p className="text-sm text-gray-500">{table.location}</p>
+                                            <h3 style={{ ...tableNumberStyle, color: "#16a34a" }}>Mesa {table.number}</h3>
+                                            <p style={locationStyle}>{table.location}</p>
                                         </div>
-                                        <div className="bg-green-100 rounded-full p-3">
-                                            <div className="size-5 rounded-full bg-green-500"></div>
+                                        <div style={{ ...iconCircleStyle, backgroundColor: "#dcfce7" }}>
+                                            <div style={{ width: 20, height: 20, borderRadius: "50%", backgroundColor: "#16a34a" }} />
                                         </div>
                                     </div>
-                                    <Button variant="outline" className="w-full mt-3" disabled>
+                                    <button style={buttonOutlineFullStyle} disabled>
                                         Disponible
-                                    </Button>
+                                    </button>
                                 </div>
                             ))}
                         </div>
@@ -203,8 +410,8 @@ export default function CajeroDashboard() {
                 )}
 
                 {filteredTables.length === 0 && (
-                    <div className="text-center py-12">
-                        <p className="text-gray-500">No se encontraron mesas</p>
+                    <div style={emptyStateStyle}>
+                        <p>No se encontraron mesas</p>
                     </div>
                 )}
             </main>
@@ -214,15 +421,25 @@ export default function CajeroDashboard() {
                 onClose={() => {
                     setIsPreinvoiceOpen(false);
                     setSelectedTable(null);
-                    refreshTables();  // ✅ Usar refreshTables del hook
+                    refreshTables();
                 }}
                 tableId={selectedTable?.id || ''}
                 tableNumber={selectedTable?.number || 0}
                 onPay={() => {
                     setIsPreinvoiceOpen(false);
+                    // modal de pago
                     // setIsPaymentOpen(true);
                 }}
+                onPrint={() => {
+                    window.print();
+                }}
             />
+
+            <style jsx>{`
+                @keyframes spin {
+                    to { transform: rotate(360deg); }
+                }
+            `}</style>
         </div>
     );
 }

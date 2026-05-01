@@ -10,14 +10,15 @@ interface EmployeeFormProps {
   restaurantId?: string;
 }
 
-const roleOptions: Role[] = ['admin', 'manager', 'waiter', 'chef', 'driver'];
+const roleOptions: Role[] = ['admin', 'manager', 'waiter', 'chef', 'driver', 'cajero'];
 const shiftOptions: WorkShift[] = ['Turno Mañana', 'Turno Tarde', 'Turno Completo'];
 const roleLabels: Record<Role, string> = {
   admin: 'Administrador',
   manager: 'Gerente',
   waiter: 'Mesero',
   chef: 'Chef',
-  driver: 'Conductor'
+  driver: 'Conductor',
+  cajero: 'Cajero'
 };
 
 interface FormErrors {
