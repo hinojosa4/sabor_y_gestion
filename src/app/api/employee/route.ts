@@ -32,7 +32,7 @@ export async function GET() {
             .lean();
 
         const normalizedEmployees = employees.map((emp: MongoEmployee) => {
-            const rol = emp.rol || (emp as any).role || 'cliente';
+            const rol = emp.rol || (emp as { role?: string }).role || 'cliente';
 
             const formatDateOnly = (date: Date | string | undefined) => {
                 if (!date) return null;
