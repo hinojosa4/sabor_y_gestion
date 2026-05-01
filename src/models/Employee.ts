@@ -1,3 +1,4 @@
+// src/models/Employee.ts
 import mongoose from 'mongoose';
 import bcrypt from 'bcryptjs';
 
@@ -9,7 +10,7 @@ const EmployeeSchema = new mongoose.Schema({
     rol: {
         type: String,
         required: true,
-        enum: ['admin', 'manager', 'waiter', 'chef', 'driver', 'cajero']
+        enum: ['admin', 'gerente', 'mesero', 'cocinero', 'delivery', 'cajero']
     },
     isActive: { type: Boolean, default: true },
     employmentDetails: {

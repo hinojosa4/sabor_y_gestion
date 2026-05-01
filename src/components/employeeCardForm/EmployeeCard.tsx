@@ -9,10 +9,10 @@ interface EmployeeCardProps {
 
 const roleSpanishMap: Record<string, string> = {
     admin: 'Administrador',
-    manager: 'Gerente',
-    waiter: 'Mesero',
-    chef: 'Chef',
-    driver: 'Delivery',
+    gerente: 'Gerente',
+    mesero: 'Mesero',
+    cocinero: 'Cocinero',
+    delivery: 'Delivery',
     cliente: 'Cliente'
 };
 
@@ -40,10 +40,11 @@ const getRoleStyle = (role: string) => {
     const defaultStyle = { background: '#f3f4f6', color: '#374151' };
     const styles: Record<string, { background: string; color: string }> = {
         admin: { background: '#e0e7ff', color: '#3730a3' },
-        manager: { background: '#cffafe', color: '#0e7490' },
-        waiter: { background: '#fef3c7', color: '#b45309' },
-        chef: { background: '#fed7aa', color: '#9a3412' },
-        driver: { background: '#d1fae5', color: '#065f46' },
+        gerente: { background: '#cffafe', color: '#0e7490' },
+        mesero: { background: '#fef3c7', color: '#b45309' },
+        cocinero: { background: '#fed7aa', color: '#9a3412' },
+        delivery: { background: '#d1fae5', color: '#065f46' },
+        cajero: { background: '#fef9c3', color: '#854d0e' },
         cliente: { background: '#f3e8ff', color: '#6b21a5' }
     };
     return styles[role] || defaultStyle;

@@ -1,3 +1,4 @@
+// src/components/employeeCardForm/EmployeeForm.tsx
 import { useState } from 'react';
 import { Employee, Rol, EmployeeStatus, WorkShift } from '../../types/employee';
 import { X } from 'lucide-react';
@@ -10,14 +11,14 @@ interface EmployeeFormProps {
   restaurantId?: string;
 }
 
-const roleOptions: Rol[] = ['admin', 'manager', 'waiter', 'chef', 'driver', 'cajero'];
+const roleOptions: Rol[] = ['admin', 'gerente', 'mesero', 'cocinero', 'delivery', 'cajero'];
 const shiftOptions: WorkShift[] = ['Turno Mañana', 'Turno Tarde', 'Turno Completo'];
 const roleLabels: Record<Rol, string> = {
   admin: 'Administrador',
-  manager: 'Gerente',
-  waiter: 'Mesero',
-  chef: 'Chef',
-  driver: 'Conductor',
+  gerente: 'Gerente',
+  mesero: 'Mesero',
+  cocinero: 'Cocinero',
+  delivery: 'Delivery',
   cajero: 'Cajero'
 };
 
@@ -35,7 +36,7 @@ export function EmployeeForm({ isOpen, onClose, onSubmit, employee, restaurantId
     name: employee?.name || '',
     email: employee?.email || '',
     password: '',
-    role: (employee?.rol as Rol) || 'waiter',
+    rol: (employee?.rol as Rol) || 'mesero',
     employmentDetails: {
       phone: employee?.employmentDetails?.phone || '',
       shift: (employee?.employmentDetails?.shift as WorkShift) || 'Turno Mañana',
@@ -106,7 +107,7 @@ export function EmployeeForm({ isOpen, onClose, onSubmit, employee, restaurantId
         ...employee,
         name: formData.name,
         email: formData.email,
-        rol: formData.role,
+        rol: formData.rol,
         employmentDetails: {
           phone: formData.employmentDetails.phone,
           shift: formData.employmentDetails.shift,
@@ -125,7 +126,7 @@ export function EmployeeForm({ isOpen, onClose, onSubmit, employee, restaurantId
         name: formData.name,
         email: formData.email,
         password_hash: formData.password,
-        rol: formData.role,
+        rol: formData.rol,
         isActive: true,
         employmentDetails: {
           phone: formData.employmentDetails.phone,
@@ -140,7 +141,7 @@ export function EmployeeForm({ isOpen, onClose, onSubmit, employee, restaurantId
   };
 
   const handleChange = (field: string, value: string | number) => {
-    if (field === 'name' || field === 'email' || field === 'password' || field === 'role') {
+    if (field === 'name' || field === 'email' || field === 'password' || field === 'rol') {
       setFormData(prev => ({ ...prev, [field]: value }));
     } else if (field === 'salary' && value === '') {
       setFormData(prev => ({
@@ -418,8 +419,8 @@ export function EmployeeForm({ isOpen, onClose, onSubmit, employee, restaurantId
               Rol <span style={requiredStarStyle}>*</span>
             </label>
             <select
-              value={formData.role}
-              onChange={(e) => handleChange('role', e.target.value as Rol)}
+              value={formData.rol}
+              onChange={(e) => handleChange('rol', e.target.value as Rol)}
               style={selectStyle}
               required
             >

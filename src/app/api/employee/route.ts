@@ -32,7 +32,7 @@ export async function GET() {
             .lean();
 
         const normalizedEmployees = employees.map((emp: MongoEmployee) => {
-            const rol = emp.rol || (emp as { role?: string }).role || 'cliente';
+            const rol = emp.rol || 'cliente';
 
             const formatDateOnly = (date: Date | string | undefined) => {
                 if (!date) return null;
@@ -74,7 +74,7 @@ export async function POST(request: Request) {
             name: data.name,
             email: data.email,
             password: data.password_hash || data.password,
-            rol: data.rol || data.role,  // 👈 aceptar 'rol' o 'role'
+            rol: data.rol || data.role, 
             isActive: data.isActive,
             employmentDetails: data.employmentDetails || {
                 phone: '',

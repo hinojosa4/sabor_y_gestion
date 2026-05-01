@@ -140,28 +140,28 @@ export default function StaffManagementPage() {
   const groupUsersByRole = (users: CombinedUser[]) => {
     const grouped: Record<string, CombinedUser[]> = {};
     users.forEach(user => {
-      const role = user.rol || "cliente";
-      if (!grouped[role]) grouped[role] = [];
-      grouped[role].push(user);
+      const rol = user.rol || "cliente";
+      if (!grouped[rol]) grouped[rol] = [];
+      grouped[rol].push(user);
     });
     return grouped;
   };
 
   const getRolePriority = (role: string) => {
     if (role === 'cliente') return 100;
-    const order = ['admin', 'manager', 'waiter', 'chef', 'driver'];
+    const order = ['admin', 'gerente', 'mesero', 'cocinero', 'delivery', 'cajero' , 'cliente'];
     const index = order.indexOf(role);
     return index === -1 ? 50 : index;
   };
 
   const roleNames: Record<string, string> = {
     admin: "👑 Administradores",
-    manager: "📋 Gerentes",
-    waiter: "🍽️ Meseros",
-    chef: "🧑‍🍳 Chefs",
-    driver: "🚚 Delivery",
-    cliente: "👥 Clientes",
+    gerente: "📋 Gerentes",
+    mesero: "🍽️ Meseros",
+    cocinero: "🧑‍🍳 Cocineros",
+    delivery: "🚚 Delivery",
     cajero: "💰 Cajeros",
+    cliente: "👥 Clientes",
   };
 
   const showSuccess = (msg: string) => {
