@@ -1,16 +1,468 @@
-// app/tableManage/page.tsx
 "use client";
-import { Button } from '../../components/ui/Button';
-import { Input } from '../../components/ui/Input';
-import { TableCard } from '../../components/TableCard';
-import { TableFormModal } from '../../components/TableFormModal';
-import { LayoutGrid, List, Plus, Search, ArrowLeft, MapPin, X } from 'lucide-react';
 import { useState } from "react";
 import Link from 'next/link';
+import { LayoutGrid, List, Plus, Search, MapPin, X } from 'lucide-react';
+import { Input } from '../../components/ui/Input';
+import { TableCard } from '../../components/tableCardForm/TableCard';
+import { TableFormModal } from '../../components/tableCardForm/TableFormModal';
 import { useTableData } from '@/hooks/useTableData';
 import { Table } from '@/types/table';
 import { useAuth } from "@/lib/useAuth";
 import { ADMIN } from "@/lib/roles";
+
+const pageContainerStyle: React.CSSProperties = {
+  minHeight: "100vh",
+  backgroundColor: "var(--background)",
+  fontFamily: "inherit",
+};
+
+const headerStyle: React.CSSProperties = {
+  backgroundColor: "var(--card)",
+  borderBottom: `2px solid var(--primary)`,
+  position: "sticky",
+  top: 0,
+  zIndex: 10,
+};
+
+const headerLeftStyle: React.CSSProperties = {
+  display: "flex",
+  alignItems: "center",
+  gap: 10,
+  minWidth: 0,
+};
+
+const backButtonStyle: React.CSSProperties = {
+  backgroundColor: "var(--secondary)",
+  border: `1px solid var(--border)`,
+  borderRadius: "var(--radius-md)",
+  width: 38,
+  height: 38,
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "center",
+  cursor: "pointer",
+  fontSize: 16,
+  textDecoration: "none",
+  color: "var(--foreground)",
+};
+
+const iconBoxStyle: React.CSSProperties = {
+  width: 40,
+  height: 40,
+  borderRadius: "var(--radius-lg)",
+  backgroundColor: "var(--primary)",
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "center",
+  fontSize: 22,
+};
+
+const addButtonStyle: React.CSSProperties = {
+  backgroundColor: "var(--primary)",
+  color: "var(--primary-foreground)",
+  border: "none",
+  borderRadius: "var(--radius-md)",
+  padding: "11px 22px",
+  fontSize: 13,
+  fontWeight: 600,
+  cursor: "pointer",
+  display: "inline-flex",
+  alignItems: "center",
+  gap: 6,
+  fontFamily: "inherit",
+};
+
+const mainContentStyle: React.CSSProperties = {
+  maxWidth: 1280,
+  margin: "0 auto",
+  padding: "24px 32px",
+};
+
+const statsGridStyle: React.CSSProperties = {
+  display: "grid",
+  gridTemplateColumns: "repeat(4, 1fr)",
+  gap: 20,
+  marginBottom: 32,
+};
+
+const statsCardStyle: React.CSSProperties = {
+  borderRadius: "var(--radius-lg)",
+  border: `1px solid var(--border)`,
+  backgroundColor: "var(--card)",
+  padding: "calc(var(--radius-lg) * 2)",
+};
+
+const statsLabelStyle: React.CSSProperties = {
+  margin: 0,
+  fontSize: 11,
+  color: "#888",
+  marginBottom: 4,
+};
+
+const statsValueStyle: React.CSSProperties = {
+  margin: 0,
+  fontSize: "1.5rem",
+  fontWeight: "var(--font-weight-medium)",
+  color: "var(--foreground)",
+};
+
+const statsValueGreenStyle: React.CSSProperties = {
+  ...statsValueStyle,
+  color: "#27ae60",
+};
+
+const toggleContainerStyle: React.CSSProperties = {
+  backgroundColor: "var(--muted)",
+  borderRadius: "var(--radius-lg)",
+  display: "flex",
+  padding: 3,
+  width: "100%",
+  maxWidth: 320,
+  margin: "0 auto 24px",
+};
+
+const toggleButtonStyle = (active: boolean): React.CSSProperties => ({
+  flex: 1,
+  display: "inline-flex",
+  alignItems: "center",
+  justifyContent: "center",
+  borderRadius: "calc(var(--radius-lg) - 2px)",
+  padding: "8px 12px",
+  fontSize: 14,
+  fontWeight: 600,
+  gap: 8,
+  border: "none",
+  backgroundColor: active ? "var(--card)" : "transparent",
+  color: active ? "var(--foreground)" : "var(--muted-foreground)",
+  cursor: "pointer",
+  transition: "all 0.2s",
+  boxShadow: active ? "0 1px 3px rgba(0,0,0,0.1)" : "none",
+});
+
+const filterContainerStyle: React.CSSProperties = {
+  backgroundColor: "var(--card)",
+  borderRadius: "var(--radius-lg)",
+  border: `1px solid var(--border)`,
+  marginBottom: 24,
+  padding: "1rem",
+};
+
+const filterFlexStyle: React.CSSProperties = {
+  display: "flex",
+  flexDirection: "column",
+  gap: "1rem",
+};
+
+const searchRelativeStyle: React.CSSProperties = {
+  position: "relative",
+  flex: 1,
+};
+
+const searchIconStyle: React.CSSProperties = {
+  position: "absolute",
+  left: 14,
+  top: "50%",
+  transform: "translateY(-50%)",
+  color: "var(--muted-foreground)",
+};
+
+const locationButtonsStyle: React.CSSProperties = {
+  display: "flex",
+  gap: 8,
+  flexWrap: "wrap",
+};
+
+const locationButtonStyle = (selected: boolean): React.CSSProperties => ({
+  padding: "8px 18px",
+  borderRadius: 30,
+  border: "1.5px solid",
+  borderColor: selected ? "#1a1a1a" : "#e0e0e0",
+  background: selected ? "#1a1a1a" : "#fff",
+  color: selected ? "#fff" : "#555",
+  fontSize: 13,
+  fontWeight: 600,
+  cursor: "pointer",
+  fontFamily: "inherit",
+  whiteSpace: "nowrap",
+});
+
+const distributionCardStyle: React.CSSProperties = {
+  backgroundColor: "var(--card)",
+  borderRadius: "var(--radius-lg)",
+  border: `1px solid var(--border)`,
+  marginBottom: 24,
+  padding: "1rem",
+};
+
+const distributionTitleStyle: React.CSSProperties = {
+  margin: 0,
+  fontSize: "1rem",
+  fontWeight: "var(--font-weight-medium)",
+  color: "var(--foreground)",
+};
+
+const distributionSubtitleStyle: React.CSSProperties = {
+  margin: "0.25rem 0 0",
+  fontSize: "0.875rem",
+  color: "var(--muted-foreground)",
+  marginBottom: "1rem",
+};
+
+const distributionGridStyle: React.CSSProperties = {
+  display: "grid",
+  gridTemplateColumns: "repeat(2, 1fr)",
+  gap: 12,
+};
+
+const distributionItemStyle: React.CSSProperties = {
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "space-between",
+  padding: "0.75rem",
+  borderRadius: "var(--radius-lg)",
+  border: `1px solid var(--border)`,
+  backgroundColor: "var(--muted)",
+};
+
+const distributionLeftStyle: React.CSSProperties = {
+  display: "flex",
+  alignItems: "center",
+  gap: 8,
+};
+
+const distributionCountStyle: React.CSSProperties = {
+  backgroundColor: "#1a1a1a",
+  color: "white",
+  borderRadius: 9999,
+  padding: "2px 10px",
+  fontSize: 12,
+  fontWeight: 500,
+};
+
+const listContainerStyle: React.CSSProperties = {
+  backgroundColor: "var(--card)",
+  borderRadius: "var(--radius-lg)",
+  border: `1px solid var(--border)`,
+  padding: "1rem",
+};
+
+const listHeaderStyle: React.CSSProperties = {
+  display: "flex",
+  justifyContent: "space-between",
+  alignItems: "center",
+  marginBottom: "1rem",
+};
+
+const listTitleStyle: React.CSSProperties = {
+  margin: 0,
+  fontSize: "1rem",
+  fontWeight: "var(--font-weight-medium)",
+  color: "var(--foreground)",
+};
+
+const listSubtitleStyle: React.CSSProperties = {
+  margin: 0,
+  fontSize: "0.875rem",
+  color: "var(--muted-foreground)",
+};
+
+const emptyStateStyle: React.CSSProperties = {
+  textAlign: "center",
+  padding: "3rem",
+  color: "var(--muted-foreground)",
+};
+
+const tableGridStyle: React.CSSProperties = {
+  display: "grid",
+  gridTemplateColumns: "repeat(auto-fill, minmax(340px, 1fr))",
+  gap: 20,
+};
+
+const floorplanContainerStyle: React.CSSProperties = {
+  backgroundColor: "var(--card)",
+  borderRadius: "var(--radius-lg)",
+  border: `1px solid var(--border)`,
+  padding: "1rem",
+};
+
+const floorplanHeaderStyle: React.CSSProperties = {
+  display: "flex",
+  flexDirection: "column",
+  gap: "1.5rem",
+};
+
+const floorplanTitleStyle: React.CSSProperties = {
+  margin: 0,
+  fontSize: "1rem",
+  fontWeight: "var(--font-weight-medium)",
+  color: "var(--foreground)",
+};
+
+const floorplanSubtitleStyle: React.CSSProperties = {
+  margin: "0.25rem 0 0",
+  fontSize: "0.875rem",
+  color: "var(--muted-foreground)",
+};
+
+const floorCanvasStyle: React.CSSProperties = {
+  position: "relative",
+  width: "100%",
+  paddingBottom: "75%",
+  backgroundColor: "var(--background)",
+  borderRadius: "var(--radius-lg)",
+  border: `2px solid var(--border)`,
+  overflow: "hidden",
+};
+
+const floorCanvasInnerStyle: React.CSSProperties = {
+  position: "absolute",
+  inset: 0,
+  backgroundImage: "linear-gradient(rgba(0, 0, 0, 0.05) 1px, transparent 1px), linear-gradient(90deg, rgba(0, 0, 0, 0.05) 1px, transparent 1px)",
+  backgroundSize: "20px 20px",
+};
+
+const regionLabelStyle: React.CSSProperties = {
+  position: "absolute",
+  backgroundColor: "rgba(255,255,255,0.8)",
+  padding: "0.25rem 0.75rem",
+  borderRadius: "var(--radius-md)",
+  fontSize: "0.75rem",
+  fontWeight: 500,
+  border: `1px solid var(--border)`,
+  color: "var(--foreground)",
+};
+
+const legendStyle: React.CSSProperties = {
+  display: "flex",
+  flexWrap: "wrap",
+  gap: "1rem",
+  justifyContent: "center",
+};
+
+const legendItemStyle: React.CSSProperties = {
+  display: "flex",
+  alignItems: "center",
+  gap: "0.5rem",
+};
+
+const legendColorStyle: React.CSSProperties = {
+  width: "2rem",
+  height: "2rem",
+  borderRadius: "9999px",
+  borderWidth: "2px",
+  borderStyle: "solid",
+};
+
+// Modal interno sin cambios (solo estilos, ya está bien)
+const overlayStyle: React.CSSProperties = {
+  position: "fixed",
+  inset: 0,
+  backgroundColor: "rgba(0,0,0,0.5)",
+  zIndex: 50,
+  display: "flex",
+  justifyContent: "center",
+  padding: "1rem",
+  overflowY: "auto",
+};
+
+const modalStyle: React.CSSProperties = {
+  position: "relative",
+  backgroundColor: "var(--card)",
+  borderRadius: "var(--radius-lg)",
+  boxShadow: "0 20px 60px rgba(0,0,0,0.18)",
+  width: "100%",
+  maxWidth: "32rem",
+  maxHeight: "90vh",
+  display: "flex",
+  flexDirection: "column",
+  overflow: "hidden",
+  margin: "auto",
+};
+
+const modalHeaderStyle: React.CSSProperties = {
+  padding: "1rem 1.5rem",
+  borderBottom: `1px solid var(--border)`,
+  position: "sticky",
+  top: 0,
+  backgroundColor: "var(--card)",
+  zIndex: 10,
+};
+
+const closeButtonStyle: React.CSSProperties = {
+  position: "absolute",
+  top: "1rem",
+  right: "1rem",
+  borderRadius: "var(--radius-md)",
+  padding: "0.25rem",
+  cursor: "pointer",
+  display: "inline-flex",
+  alignItems: "center",
+  justifyContent: "center",
+  color: "var(--muted-foreground)",
+  transition: "background 0.2s",
+  background: "none",
+  border: "none",
+};
+
+const titleStyle: React.CSSProperties = {
+  margin: 0,
+  fontSize: "1.125rem",
+  fontWeight: "var(--font-weight-medium)",
+  color: "var(--foreground)",
+};
+
+const subtitleStyle: React.CSSProperties = {
+  margin: "0.25rem 0 0",
+  fontSize: "0.875rem",
+  color: "var(--muted-foreground)",
+};
+
+const modalContentStyle: React.CSSProperties = {
+  padding: "1.5rem",
+  display: "flex",
+  flexDirection: "column",
+  alignItems: "center",
+  justifyContent: "center",
+  minHeight: "200px",
+  textAlign: "center",
+};
+
+const emptyIconContainer: React.CSSProperties = {
+  width: "4rem",
+  height: "4rem",
+  margin: "0 auto 1rem",
+  borderRadius: "9999px",
+  backgroundColor: "var(--muted)",
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "center",
+};
+
+const emptyIconSvg: React.CSSProperties = {
+  width: "2rem",
+  height: "2rem",
+  color: "var(--muted-foreground)",
+};
+
+const emptyTitleStyle: React.CSSProperties = {
+  margin: "0 0 0.5rem",
+  fontSize: "1.125rem",
+  fontWeight: 500,
+  color: "var(--foreground)",
+};
+
+const emptyTextStyle: React.CSSProperties = {
+  margin: 0,
+  fontSize: "0.875rem",
+  color: "var(--muted-foreground)",
+};
+
+const modalFooterStyle: React.CSSProperties = {
+  padding: "1rem 1.5rem",
+  borderTop: `1px solid var(--border)`,
+  display: "flex",
+  justifyContent: "flex-end",
+};
 
 const OrderModal = ({
   isOpen,
@@ -24,41 +476,42 @@ const OrderModal = ({
   if (!isOpen || !table) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex justify-center p-4 md:p-10 overflow-y-auto">
-      <div className="fixed inset-0 bg-black/50" onClick={onClose} />
-      <div className="relative bg-white rounded-lg shadow-lg w-full max-w-lg h-fit max-h-full overflow-hidden flex flex-col my-auto">
-        <div className="px-6 py-4 border-b sticky top-0 bg-white z-10">
+    <div style={overlayStyle} onClick={onClose}>
+      <div style={modalStyle} onClick={(e) => e.stopPropagation()}>
+        <div style={modalHeaderStyle}>
           <button
             type="button"
             onClick={onClose}
-            className="absolute top-4 right-4 rounded-md p-1 hover:bg-gray-100 transition-colors"
+            style={closeButtonStyle}
+            onMouseEnter={(e) => e.currentTarget.style.backgroundColor = "var(--muted)"}
+            onMouseLeave={(e) => e.currentTarget.style.backgroundColor = "transparent"}
           >
-            <X className="size-5 text-gray-500 hover:text-gray-700" />
+            <X size={20} style={{ color: "var(--muted-foreground)" }} />
           </button>
-          <h2 className="text-lg font-semibold text-black">
-            Mesa {table.number} - {table.status}
-          </h2>
-          <p className="text-sm text-gray-500 mt-1">
-            Detalles de la orden
-          </p>
+          <h2 style={titleStyle}>Mesa {table.number} - {table.status}</h2>
+          <p style={subtitleStyle}>Detalles de la orden</p>
         </div>
-        <div className="p-6 flex flex-col items-center justify-center min-h-[200px]">
-          <div className="text-center">
-            <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-gray-100 flex items-center justify-center">
-              <svg className="w-8 h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-              </svg>
-            </div>
-            <h3 className="text-lg font-medium text-gray-900 mb-2">En desarrollo</h3>
-            <p className="text-gray-500">
-              Próximamente: Lista de platos para la mesa {table.number}
-            </p>
+        <div style={modalContentStyle}>
+          <div style={emptyIconContainer}>
+            <svg style={emptyIconSvg} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+            </svg>
           </div>
+          <h3 style={emptyTitleStyle}>En desarrollo</h3>
+          <p style={emptyTextStyle}>Próximamente: Lista de platos para la mesa {table.number}</p>
         </div>
-        <div className="px-6 py-4 border-t flex justify-end">
-          <Button onClick={onClose} variant="outline">
-            Cerrar
-          </Button>
+        <div style={modalFooterStyle}>
+          <button onClick={onClose} style={{
+            backgroundColor: "transparent",
+            border: `1px solid var(--border)`,
+            borderRadius: "var(--radius-md)",
+            padding: "0.5rem 1rem",
+            fontSize: "0.875rem",
+            fontWeight: "var(--font-weight-medium)",
+            cursor: "pointer",
+            color: "var(--foreground)",
+            fontFamily: "inherit",
+          }}>Cerrar</button>
         </div>
       </div>
     </div>
@@ -68,13 +521,12 @@ const OrderModal = ({
 export default function TableManagementPage() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isOrderModalOpen, setIsOrderModalOpen] = useState(false);
-  const [editingTable, setEditingTable] = useState<Table | null>(null);  // ✅ Cambiar any por Table | null
-  const [selectedTable, setSelectedTable] = useState<Table | null>(null);  // ✅ Cambiar any por Table | null
+  const [editingTable, setEditingTable] = useState<Table | null>(null);
+  const [selectedTable, setSelectedTable] = useState<Table | null>(null);
   const [viewMode, setViewMode] = useState<'list' | 'floorplan'>('list');
   const { user, loading: userLoading } = useAuth(ADMIN);
 
-  // Obtener restaurantId del contexto/session 
-  const restaurantId = "69e170e941daf8c2b2f76677"; // TODO: Obtener del usuario logueado
+  const restaurantId = "69e170e941daf8c2b2f76677";
 
   const {
     tables,
@@ -91,14 +543,12 @@ export default function TableManagementPage() {
     deleteTable
   } = useTableData(restaurantId);
 
-  // ✅ Tipar tableData con Partial<Table>
   const handleSubmitTable = async (tableData: Partial<Table>) => {
     try {
       let result;
       if (editingTable) {
         result = await updateTable(editingTable._id, tableData);
       } else {
-        // ✅ Crear el objeto con el tipo correcto sin usar 'as any'
         const newTableData = {
           restaurantId: restaurantId,
           number: tableData.number!,
@@ -110,17 +560,12 @@ export default function TableManagementPage() {
         };
         result = await addTable(newTableData);
       }
-
-      if (result === null) {
-        return;
-      }
-
+      if (result === null) return;
       setIsModalOpen(false);
       setEditingTable(null);
     } catch (error) {
       console.error('Error al guardar:', error);
-      const errorMessage = error instanceof Error ? error.message : 'Error al guardar la mesa';
-      alert(errorMessage);
+      alert(error instanceof Error ? error.message : 'Error al guardar la mesa');
     }
   };
 
@@ -135,316 +580,313 @@ export default function TableManagementPage() {
     }
   };
 
-  // ✅ Tipar table con Table
   const handleTableClick = (table: Table) => {
-    // Estados que abren el formulario de edición
     if (table.status === 'Libre' || table.status === 'Reservada') {
       setEditingTable(table);
       setIsModalOpen(true);
     } else {
-      // Ocupada o Cuenta solicitada: abrir modal de orden
       setSelectedTable(table);
       setIsOrderModalOpen(true);
     }
   };
 
-  if (userLoading) {
-    return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="text-center font-semibold text-gray-700">
-          Verificando sesión...
-        </div>
-      </div>
-    );
-  }
+  if (userLoading || loading || !user) return null;
+  const isMobile = typeof window !== "undefined" ? window.innerWidth < 640 : false;
 
-  if (!user) return null;
-
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="text-center font-semibold text-gray-700">Cargando mesas...</div>
-      </div>
-    );
-  }
+  // Ajustes responsivos similares a StaffManagement
+  const responsiveHeaderPadding = isMobile ? "14px 16px" : "18px 40px";
+  const responsiveMainPadding = isMobile ? "16px" : "24px 32px";
+  const responsiveStatsGrid = {
+    ...statsGridStyle,
+    gridTemplateColumns: isMobile ? "1fr 1fr" : "repeat(4, 1fr)",
+    gap: isMobile ? 12 : 20,
+    marginBottom: isMobile ? 24 : 32,
+  };
+  const responsiveDistributionGrid = {
+    ...distributionGridStyle,
+    gridTemplateColumns: isMobile ? "1fr" : "repeat(2, 1fr)",
+    gap: isMobile ? 12 : 12,
+  };
+  const responsiveTableGrid = {
+    ...tableGridStyle,
+    gridTemplateColumns: isMobile ? "1fr" : "repeat(auto-fill, minmax(340px, 1fr))",
+    gap: isMobile ? 14 : 20,
+  };
+  const toggleWidth = isMobile ? "100%" : 320;
 
   return (
-    <div className="min-h-screen bg-gray-50" style={{ zoom: 1.25 }}>
-      {/* Header */}
-      <header className="bg-white border-b border-gray-200 sticky top-0 z-10">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3 md:py-4">
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-            <div className="flex items-center gap-3">
-              <Link
-                href="/dashboard"
-                className="inline-flex items-center justify-center whitespace-nowrap text-black font-medium transition-colors hover:bg-gray-100 rounded-md h-8 px-3"
-              >
-                <ArrowLeft className="size-5" />
-              </Link>
-              <div className="flex items-center gap-3">
-                <div className="size-10 bg-orange-600 rounded-lg flex items-center justify-center">
-                  <LayoutGrid className="size-6 text-white" />
-                </div>
-                <div>
-                  <h1 className="text-black leading-none font-semibold">Gestión de Mesas</h1>
-                  <p className="text-xs md:text-sm text-gray-500">Administra la distribución de tu restaurante</p>
-                </div>
-              </div>
-            </div>
-            <Button onClick={() => {
-              setEditingTable(null);
-              setIsModalOpen(true);
-            }}>
-              <Plus className="size-4 mr-2" />
-              Agregar Mesa
-            </Button>
+    <div style={pageContainerStyle}>
+      {/* Header exactamente como StaffManagement */}
+      <div style={{
+        ...headerStyle,
+        padding: responsiveHeaderPadding,
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "space-between",
+        gap: 10,
+      }}>
+        <div style={headerLeftStyle}>
+          <Link href="/dashboard" style={backButtonStyle}>←</Link>
+          <div style={iconBoxStyle}>
+            <LayoutGrid size={isMobile ? 18 : 22} color="white" />
           </div>
+          {isMobile ? (
+            <h1 style={{ margin: 0, fontSize: 15, fontWeight: 700, color: "#1a1a1a", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+              Gestión de Mesas
+            </h1>
+          ) : (
+            <div>
+              <h1 style={{ margin: 0 }}>Gestión de Mesas</h1>
+              <p style={{ margin: 0, fontSize: "0.75rem", color: "var(--muted-foreground)" }}>Administra la distribución de tu restaurante</p>
+            </div>
+          )}
         </div>
-      </header>
+        <button
+          onClick={() => {
+            setEditingTable(null);
+            setIsModalOpen(true);
+          }}
+          style={addButtonStyle}
+        >
+          <Plus size={16} /> Agregar Mesa
+        </button>
+      </div>
 
-      {/* Resto del JSX se mantiene igual */}
-      <main className="max-w-7xl mx-auto px-3 sm:px-4 lg:px-6 py-3 md:py-5">
+      <main style={{ ...mainContentStyle, padding: responsiveMainPadding }}>
         {/* Stats Cards */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-6 mb-6 md:mb-8">
-          <div className="rounded-xl border border-gray-200 bg-white shadow">
-            <div className="p-6">
-              <p className="text-xs md:text-sm text-gray-500">Total de Mesas</p>
-              <p className="mt-10 text-2xl md:text-3xl text-black">{stats.total}</p>
-            </div>
+        <div style={responsiveStatsGrid}>
+          <div style={statsCardStyle}>
+            <p style={statsLabelStyle}>Total de Mesas</p>
+            <p style={statsValueStyle}>{stats.total}</p>
           </div>
-
-          <div className="rounded-xl border border-gray-200 bg-white shadow">
-            <div className="p-6">
-              <p className="text-xs md:text-sm text-gray-500">Mesas Libres</p>
-              <p className="mt-10 text-2xl md:text-3xl font-light text-green-600">{stats.libre}</p>
-            </div>
+          <div style={statsCardStyle}>
+            <p style={statsLabelStyle}>Mesas Libres</p>
+            <p style={statsValueGreenStyle}>{stats.libre}</p>
           </div>
-
-          <div className="rounded-xl border border-gray-200 bg-white shadow">
-            <div className="p-6">
-              <p className="text-xs md:text-sm text-gray-500">Total de Asientos</p>
-              <p className="mt-10 text-2xl md:text-3xl font-light text-black">{stats.totalSeats}</p>
-            </div>
+          <div style={statsCardStyle}>
+            <p style={statsLabelStyle}>Total de Asientos</p>
+            <p style={statsValueStyle}>{stats.totalSeats}</p>
           </div>
-
-          <div className="rounded-xl border border-gray-200 bg-white shadow">
-            <div className="p-6">
-              <p className="text-xs md:text-sm text-gray-500">Ubicaciones</p>
-              <p className="mt-10 text-2xl md:text-3xl text-black">{stats.locations}</p>
-            </div>
+          <div style={statsCardStyle}>
+            <p style={statsLabelStyle}>Ubicaciones</p>
+            <p style={statsValueStyle}>{stats.locations}</p>
           </div>
         </div>
 
-        {/* Vista toggle */}
-        <div className="bg-gray-100 h-9 items-center justify-center rounded-xl p-[3px] grid w-full grid-cols-2 mb-4 md:mb-6 max-w-xs mx-auto">
-          <button
-            onClick={() => setViewMode('list')}
-            className={`inline-flex h-[calc(100%-1px)] flex-1 items-center justify-center rounded-xl px-2 py-1 text-sm font-semibold transition-all gap-2 ${viewMode === 'list'
-              ? 'bg-white text-gray-900 shadow-sm'
-              : 'text-gray-500 hover:text-gray-900'
-              }`}
-          >
-            <List className="size-4" />
-            Lista
+        {/* Toggle */}
+        <div style={{ ...toggleContainerStyle, maxWidth: toggleWidth, marginBottom: 24 }}>
+          <button onClick={() => setViewMode('list')} style={toggleButtonStyle(viewMode === 'list')}>
+            <List size={16} /> Lista
           </button>
-          <button
-            onClick={() => setViewMode('floorplan')}
-            className={`inline-flex h-[calc(100%-1px)] flex-1 items-center justify-center rounded-xl px-2 py-1 text-sm font-semibold transition-all gap-2 ${viewMode === 'floorplan'
-              ? 'bg-white text-gray-900 shadow-sm'
-              : 'text-gray-500 hover:text-gray-900'
-              }`}
-          >
-            <LayoutGrid className="size-4" />
-            Plano
+          <button onClick={() => setViewMode('floorplan')} style={toggleButtonStyle(viewMode === 'floorplan')}>
+            <LayoutGrid size={16} /> Plano
           </button>
         </div>
 
-        {/* Vista condicional: Lista o Plano */}
         {viewMode === 'list' ? (
           <>
             {/* Buscador y Filtros */}
-            <div className="bg-white rounded-xl border border-gray-200 shadow mb-6">
-              <div className="p-4 md:p-6">
-                <div className="flex flex-col md:flex-row gap-4">
-                  <div className="flex-1">
-                    <div className="relative">
-                      <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 size-4 text-gray-400" />
-                      <Input
-                        placeholder="Buscar por número o ubicación..."
-                        value={searchQuery}
-                        onChange={(e) => setSearchQuery(e.target.value)}
-                        className="pl-10 text-black font-light"
-                      />
-                    </div>
-                  </div>
-                  <div className="flex gap-2 flex-wrap">
-                    {locations.map(loc => (
-                      <button
-                        key={loc}
-                        onClick={() => setSelectedLocation(loc)}
-                        className={`inline-flex items-center justify-center whitespace-nowrap text-sm font-medium transition-colors rounded-md px-3 py-1.5 ${selectedLocation === loc
-                          ? 'bg-gray-800 text-white'
-                          : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                          }`}
-                      >
-                        {loc}
-                      </button>
-                    ))}
-                  </div>
+            <div style={filterContainerStyle}>
+              <div style={filterFlexStyle}>
+                <div style={searchRelativeStyle}>
+                  <Search size={16} style={searchIconStyle} />
+                  <Input
+                    placeholder="Buscar por número o ubicación..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    style={{ paddingLeft: "2.5rem" }}
+                  />
                 </div>
-              </div>
-            </div>
-
-            {/* Distribución por Ubicación */}
-            <div className="bg-white rounded-xl border border-gray-200 shadow mb-6">
-              <div className="p-4 md:p-6">
-                <h3 className="text-black font-semibold mb-2">Distribución por Ubicación</h3>
-                <p className="text-sm text-gray-500 mb-4">Cantidad de mesas en cada área del restaurante</p>
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-                  {Object.entries(stats.distributionByLocation).map(([location, count]) => (
-                    <div key={location} className="flex items-center justify-between p-3 rounded-lg border border-gray-100 bg-gray-50">
-                      <div className="flex items-center gap-2">
-                        <MapPin className="size-4 text-gray-400" />
-                        <span className="text-sm text-gray-700">{location}</span>
-                      </div>
-                      <span className="inline-flex items-center rounded-full bg-black px-2.5 py-0.5 text-xs font-medium text-white">
-                        {count} {count === 1 ? 'mesa' : 'mesas'}
-                      </span>
-                    </div>
+                <div style={locationButtonsStyle}>
+                  {locations.map(loc => (
+                    <button
+                      key={loc}
+                      onClick={() => setSelectedLocation(loc)}
+                      style={locationButtonStyle(selectedLocation === loc)}
+                    >
+                      {loc}
+                    </button>
                   ))}
                 </div>
               </div>
             </div>
 
-            {/* Listado de Mesas */}
-            <div className="bg-white rounded-xl border border-gray-200 shadow">
-              <div className="p-4 md:p-6">
-                <div className="flex justify-between items-center mb-4">
-                  <div>
-                    <h3 className="text-black font-semibold">Todas las Mesas</h3>
-                    <p className="text-sm text-gray-500">{filteredTables.length} mesas encontradas</p>
-                  </div>
-                </div>
-
-                {filteredTables.length === 0 ? (
-                  <div className="text-center py-12">
-                    <p className="text-gray-500">No se encontraron mesas</p>
-                  </div>
-                ) : (
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                    {filteredTables.map((table) => (
-                      <TableCard
-                        key={table._id}
-                        table={{
-                          id: table._id,
-                          number: Number(table.number),
-                          seats: Number(table.capacity),
-                          location: table.location,
-                          status: table.status,
-                          xPosition: table.xPosition,
-                          yPosition: table.yPosition
-                        }}
-                        onEdit={() => {
-                          setEditingTable(table);
-                          setIsModalOpen(true);
-                        }}
-                        onDelete={() => handleDeleteTable(table._id)}
-                      />
-                    ))}
-                  </div>
-                )}
+            {/* Distribución por Ubicación */}
+            <div style={distributionCardStyle}>
+              <div>
+                <h3 style={distributionTitleStyle}>Distribución por Ubicación</h3>
+                <p style={distributionSubtitleStyle}>Cantidad de mesas en cada área del restaurante</p>
               </div>
+              <div style={responsiveDistributionGrid}>
+                {Object.entries(stats.distributionByLocation).map(([location, count]) => (
+                  <div key={location} style={distributionItemStyle}>
+                    <div style={distributionLeftStyle}>
+                      <MapPin size={16} color="var(--muted-foreground)" />
+                      <span style={{ fontSize: "0.875rem", color: "var(--foreground)" }}>{location}</span>
+                    </div>
+                    <span style={distributionCountStyle}>
+                      {count} {count === 1 ? 'mesa' : 'mesas'}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Listado de Mesas */}
+            <div style={listContainerStyle}>
+              <div style={listHeaderStyle}>
+                <div>
+                  <h3 style={listTitleStyle}>Todas las Mesas</h3>
+                  <p style={listSubtitleStyle}>{filteredTables.length} mesas encontradas</p>
+                </div>
+              </div>
+              {filteredTables.length === 0 ? (
+                <div style={emptyStateStyle}>No se encontraron mesas</div>
+              ) : (
+                <div style={responsiveTableGrid}>
+                  {filteredTables.map((table) => (
+                    <TableCard
+                      key={table._id}
+                      table={{
+                        id: table._id,
+                        number: Number(table.number),
+                        seats: Number(table.capacity),
+                        location: table.location,
+                        status: table.status,
+                        xPosition: table.xPosition,
+                        yPosition: table.yPosition
+                      }}
+                      onEdit={() => {
+                        setEditingTable(table);
+                        setIsModalOpen(true);
+                      }}
+                      onDelete={() => handleDeleteTable(table._id)}
+                    />
+                  ))}
+                </div>
+              )}
             </div>
           </>
         ) : (
           /* Vista de Plano */
-          <div className="bg-white rounded-xl border border-gray-200 shadow">
-            <div className="p-4 md:p-6">
-              <div className="flex flex-col gap-6">
-                <div>
-                  <h3 className="text-black font-semibold">Plano del Restaurante</h3>
-                  <p className="text-sm text-gray-500 mt-1">
-                    Haz clic en cualquier mesa para ver sus detalles o editarla
-                  </p>
-                </div>
+          <div style={floorplanContainerStyle}>
+            <div style={floorplanHeaderStyle}>
+              <div>
+                <h3 style={floorplanTitleStyle}>Plano del Restaurante</h3>
+                <p style={floorplanSubtitleStyle}>Haz clic en cualquier mesa para ver sus detalles o editarla</p>
+              </div>
+              <div style={floorCanvasStyle}>
+                <div style={floorCanvasInnerStyle} />
+                <div style={{ ...regionLabelStyle, top: "0.5rem", left: "0.5rem" }}>Salón Principal</div>
+                <div style={{ ...regionLabelStyle, top: "0.5rem", right: "0.5rem" }}>Terraza</div>
+                <div style={{ ...regionLabelStyle, bottom: "0.5rem", left: "0.5rem" }}>VIP</div>
+                <div style={{ ...regionLabelStyle, bottom: "0.5rem", right: "0.5rem" }}>Jardín</div>
 
-                {/* Contenedor del Plano */}
-                <div className="relative w-full bg-gradient-to-br from-amber-50 to-orange-50 rounded-lg border-2 border-gray-200 overflow-hidden" style={{ paddingBottom: '75%' }}>
-                  <div className="absolute inset-0" style={{ backgroundImage: 'linear-gradient(rgba(0, 0, 0, 0.05) 1px, transparent 1px), linear-gradient(90deg, rgba(0, 0, 0, 0.05) 1px, transparent 1px)', backgroundSize: '20px 20px' }} />
+                {filteredTables.map((table) => {
+                  let size = { width: "3rem", height: "3rem" };
+                  if (table.capacity >= 8) size = { width: "4rem", height: "4rem" };
+                  else if (table.capacity >= 6) size = { width: "3.5rem", height: "3.5rem" };
+                  else if (table.capacity >= 4) size = { width: "3rem", height: "3rem" };
+                  else size = { width: "2.5rem", height: "2.5rem" };
 
-                  <div className="text-black absolute top-2 left-2 bg-white/80 px-3 py-1 rounded-md text-xs font-medium border">Salón Principal</div>
-                  <div className="text-black absolute top-2 right-2 bg-white/80 px-3 py-1 rounded-md text-xs font-medium border">Terraza</div>
-                  <div className="text-black absolute bottom-2 left-2 bg-white/80 px-3 py-1 rounded-md text-xs font-medium border">VIP</div>
-                  <div className="text-black absolute bottom-2 right-2 bg-white/80 px-3 py-1 rounded-md text-xs font-medium border">Jardín</div>
+                  const bgStyle: React.CSSProperties = {
+                    backgroundColor:
+                      table.status === 'Libre' ? '#22c55e' :
+                        table.status === 'Ocupada' ? '#ef4444' :
+                          table.status === 'Reservada' ? '#eab308' :
+                            table.status === 'Cuenta solicitada' ? '#f97316' : '#22c55e',
+                    borderColor:
+                      table.status === 'Libre' ? '#16a34a' :
+                        table.status === 'Ocupada' ? '#dc2626' :
+                          table.status === 'Reservada' ? '#ca8a04' :
+                            table.status === 'Cuenta solicitada' ? '#ea580c' : '#16a34a',
+                    borderWidth: "4px",
+                    borderStyle: "solid",
+                    borderRadius: "9999px",
+                    boxShadow: "0 4px 6px -1px rgba(0,0,0,0.1)",
+                    width: "100%",
+                    height: "100%",
+                    display: "flex",
+                    flexDirection: "column",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    color: "white",
+                  };
 
-                  {filteredTables.map((table) => {
-                    let sizeClass = 'w-12 h-12';
-                    if (table.capacity >= 8) sizeClass = 'w-16 h-16';
-                    else if (table.capacity >= 6) sizeClass = 'w-14 h-14';
-                    else if (table.capacity >= 4) sizeClass = 'w-12 h-12';
-                    else sizeClass = 'w-10 h-10';
-
-                    const getStatusColor = (status: string) => {
-                      const colors: Record<string, string> = {
-                        'Libre': 'bg-green-500 border-green-600',
-                        'Ocupada': 'bg-red-500 border-red-600',
-                        'Reservada': 'bg-yellow-500 border-yellow-600',
-                        'Cuenta solicitada': 'bg-orange-500 border-orange-600',
-                      };
-                      return colors[status] || 'bg-green-500 border-green-600';
-                    };
-
-                    const bgColor = getStatusColor(table.status);
-
-                    return (
-                      <button
-                        key={table._id}
-                        className="absolute transform -translate-x-1/2 -translate-y-1/2 transition-all hover:scale-110 cursor-pointer"
-                        style={{ left: `${table.xPosition || 50}%`, top: `${table.yPosition || 50}%` }}
-                        onClick={() => handleTableClick(table)}
-                      >
-                        <div className={`relative group ${sizeClass}`}>
-                          <div className={`w-full h-full rounded-full shadow-lg border-4 transition-all ${bgColor} group-hover:opacity-90`}>
-                            <div className="w-full h-full flex flex-col items-center justify-center text-white">
-                              <span className="text-xs font-bold">{table.number}</span>
-                              <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="size-3 mt-0.5">
-                                <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"></path>
-                                <circle cx="9" cy="7" r="4"></circle>
-                                <path d="M22 21v-2a4 4 0 0 0-3-3.87"></path>
-                                <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
-                              </svg>
-                            </div>
-                          </div>
-                          <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10">
-                            <div className="bg-gray-900 text-white text-xs rounded px-2 py-1 whitespace-nowrap">
-                              Mesa {table.number} - {table.capacity} {table.capacity === 1 ? 'persona' : 'personas'}
-                              <div className="text-gray-300 text-xs">{table.location}</div>
-                            </div>
+                  return (
+                    <button
+                      key={table._id}
+                      style={{
+                        position: "absolute",
+                        transform: "translate(-50%, -50%)",
+                        left: `${table.xPosition || 50}%`,
+                        top: `${table.yPosition || 50}%`,
+                        transition: "transform 0.2s",
+                        cursor: "pointer",
+                        background: "none",
+                        border: "none",
+                        padding: 0,
+                      }}
+                      onMouseEnter={(e) => e.currentTarget.style.transform = "translate(-50%, -50%) scale(1.1)"}
+                      onMouseLeave={(e) => e.currentTarget.style.transform = "translate(-50%, -50%) scale(1)"}
+                      onClick={() => handleTableClick(table)}
+                    >
+                      <div style={size}>
+                        <div style={bgStyle}>
+                          <span style={{ fontSize: "0.75rem", fontWeight: "bold" }}>{table.number}</span>
+                          <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ marginTop: "0.125rem" }}>
+                            <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
+                            <circle cx="9" cy="7" r="4" />
+                            <path d="M22 21v-2a4 4 0 0 0-3-3.87" />
+                            <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+                          </svg>
+                        </div>
+                        <div style={{
+                          position: "absolute",
+                          bottom: "100%",
+                          left: "50%",
+                          transform: "translateX(-50%)",
+                          marginBottom: "0.5rem",
+                          opacity: 0,
+                          transition: "opacity 0.2s",
+                          pointerEvents: "none",
+                          zIndex: 10,
+                        }}>
+                          <div style={{
+                            backgroundColor: "var(--primary)",
+                            color: "white",
+                            fontSize: "0.75rem",
+                            borderRadius: "var(--radius-md)",
+                            padding: "0.25rem 0.5rem",
+                            whiteSpace: "nowrap",
+                          }}>
+                            Mesa {table.number} - {table.capacity} {table.capacity === 1 ? 'persona' : 'personas'}
+                            <div style={{ color: "var(--muted)", fontSize: "0.75rem" }}>{table.location}</div>
                           </div>
                         </div>
-                      </button>
-                    );
-                  })}
-                </div>
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
 
-                {/* Leyenda */}
-                <div className="flex flex-wrap gap-4 justify-center text-sm">
-                  <div className="flex items-center gap-2">
-                    <div className="w-8 h-8 rounded-full bg-green-500 border-2 border-green-600"></div>
-                    <span className="text-black">Libre</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <div className="w-8 h-8 rounded-full bg-red-500 border-2 border-red-600"></div>
-                    <span className="text-black">Ocupada</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <div className="w-8 h-8 rounded-full bg-yellow-500 border-2 border-yellow-600"></div>
-                    <span className="text-black">Reservada</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <div className="w-8 h-8 rounded-full bg-orange-500 border-2 border-orange-600"></div>
-                    <span className="text-black">Cuenta Solicitada</span>
-                  </div>
+              {/* Leyenda */}
+              <div style={legendStyle}>
+                <div style={legendItemStyle}>
+                  <div style={{ ...legendColorStyle, backgroundColor: "#22c55e", borderColor: "#16a34a" }} />
+                  <span>Libre</span>
+                </div>
+                <div style={legendItemStyle}>
+                  <div style={{ ...legendColorStyle, backgroundColor: "#ef4444", borderColor: "#dc2626" }} />
+                  <span>Ocupada</span>
+                </div>
+                <div style={legendItemStyle}>
+                  <div style={{ ...legendColorStyle, backgroundColor: "#eab308", borderColor: "#ca8a04" }} />
+                  <span>Reservada</span>
+                </div>
+                <div style={legendItemStyle}>
+                  <div style={{ ...legendColorStyle, backgroundColor: "#f97316", borderColor: "#ea580c" }} />
+                  <span>Cuenta Solicitada</span>
                 </div>
               </div>
             </div>
@@ -452,7 +894,6 @@ export default function TableManagementPage() {
         )}
       </main>
 
-      {/* Modal de formulario para editar/crear mesa */}
       <TableFormModal
         isOpen={isModalOpen}
         onClose={() => {
@@ -472,7 +913,6 @@ export default function TableManagementPage() {
         existingTables={tables}
       />
 
-      {/* Modal de orden */}
       <OrderModal
         isOpen={isOrderModalOpen}
         onClose={() => setIsOrderModalOpen(false)}

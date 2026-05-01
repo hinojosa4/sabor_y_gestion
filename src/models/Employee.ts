@@ -1,4 +1,3 @@
-// models/Employee.ts
 import mongoose from 'mongoose';
 import bcrypt from 'bcryptjs';
 
@@ -7,10 +6,10 @@ const EmployeeSchema = new mongoose.Schema({
     name: { type: String, required: true, trim: true, minlength: 2, maxlength: 100 },
     email: { type: String, required: true, unique: true, lowercase: true, trim: true, match: [/^\S+@\S+\.\S+$/, "Email inválido"] },
     password: { type: String, required: true, minlength: 8, select: false },
-    role: {
+    rol: {
         type: String,
         required: true,
-        enum: ['admin', 'manager', 'waiter', 'chef', 'driver']
+        enum: ['admin', 'manager', 'waiter', 'chef', 'driver', 'cajero']
     },
     isActive: { type: Boolean, default: true },
     employmentDetails: {
@@ -22,14 +21,12 @@ const EmployeeSchema = new mongoose.Schema({
     }
 }, { timestamps: true });
 
-// ✅ Mismo estilo que User (sin next, con this, salt 12)
 EmployeeSchema.pre("save", async function () {
     if (!this.isModified("password")) return;
     const salt = await bcrypt.genSalt(12);
     this.password = await bcrypt.hash(this.password, salt);
 });
 
-// ✅ Mismo estilo que User
 EmployeeSchema.methods.comparePassword = async function (
     candidatePassword: string
 ): Promise<boolean> {
