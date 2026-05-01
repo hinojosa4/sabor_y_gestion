@@ -1,5 +1,9 @@
 import mongoose, { Document, Schema } from "mongoose";
 
+export interface IDishIngredient {
+  ingredient_id: mongoose.Types.ObjectId;
+  quantity: number;
+}
 export interface IDish extends Document {
   name: string;
   description?: string;
@@ -7,7 +11,7 @@ export interface IDish extends Document {
   category_id: mongoose.Types.ObjectId | null;
   isAvailable: boolean;
   image_url?: string;
-  ingredients: string[];   // ← nuevo
+  ingredients: IDishIngredient[];   // ← nuevo
   createdAt: Date;
   updatedAt: Date;
 }
@@ -46,8 +50,21 @@ const DishSchema = new Schema<IDish>(
       type: String,
       default: "",
     },
-    ingredients: {          // ← nuevo
-      type: [String],
+    ingredients: {         
+      type: [
+        {
+          ingredient_id: {
+            type: Schema.Types.ObjectId,
+            ref: "Ingredient",
+            required: true,
+          },
+          quantity: {
+            type: Number,
+            required: true,
+            min: [0.001, "La cantidad debe ser mayor a 0"],
+          },
+        },
+      ],
       default: [],
     },
   },
