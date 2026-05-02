@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { connectDB } from "@/lib/db";
 import Dish from "@/models/Dish";
+import "@/models/Ingredient"; 
 import mongoose from "mongoose";
 
 interface Params {
@@ -14,7 +15,9 @@ export async function GET(_req: NextRequest, { params }: Params) {
     if (!mongoose.Types.ObjectId.isValid(id)) {
       return NextResponse.json({ ok: false, message: "ID de plato no válido" }, { status: 400 });
     }
-    const dish = await Dish.findById(id).populate("category_id", "nombre");
+    const dish = await Dish.findById(id)
+      .populate("category_id", "nombre")
+      .populate("ingredients.ingredient_id", "nombre unidad");
     if (!dish) {
       return NextResponse.json({ ok: false, message: "Plato no encontrado" }, { status: 404 });
     }
@@ -46,8 +49,6 @@ export async function PUT(req: NextRequest, { params }: Params) {
     if (price === undefined || price < 0) {
       return NextResponse.json({ ok: false, message: "El precio es obligatorio y no puede ser negativo" }, { status: 400 });
     }
-
-    // ✅ category_id ya NO es obligatorio
 
     const existingDish = await Dish.findOne({ name: name.trim(), _id: { $ne: id } });
     if (existingDish) {

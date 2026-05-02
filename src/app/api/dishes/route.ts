@@ -1,12 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import { connectDB } from "@/lib/db";
 import Dish from "@/models/Dish";
+import "@/models/Ingredient";
 
 export async function GET() {
   try {
     await connectDB();
     const dishes = await Dish.find()
       .populate("category_id", "nombre")
+      .populate("ingredients.ingredient_id", "nombre unidad")
       .sort({ createdAt: -1 });
     return NextResponse.json({ ok: true, data: dishes });
   } catch (error) {
@@ -31,9 +33,6 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ ok: false, message: "El precio es obligatorio y no puede ser negativo" }, { status: 400 });
     }
 
-    // ✅ category_id ya NO es obligatorio
-    // ✅ ingredients es opcional, default []
-
     const existingDish = await Dish.findOne({ name: name.trim() });
     if (existingDish) {
       return NextResponse.json({ ok: false, message: "Ya existe un plato con ese nombre" }, { status: 409 });
@@ -43,10 +42,10 @@ export async function POST(req: NextRequest) {
       name: name.trim(),
       description: description?.trim() || "",
       price,
-      category_id: category_id || null,   // ← null si no viene
+      category_id: category_id || null,
       isAvailable: isAvailable ?? true,
       image_url: image_url || "",
-      ingredients: ingredients || [],       // ← nuevo campo
+      ingredients: ingredients || [],
     });
 
     return NextResponse.json({ ok: true, message: "Plato creado correctamente", data: dish }, { status: 201 });
