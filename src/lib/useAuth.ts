@@ -1,6 +1,6 @@
 "use client";
-
-import { useEffect, useState } from "react";
+// src/lib/useAuth.ts
+import { useEffect, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
 
 export interface AuthUser {
@@ -12,14 +12,24 @@ export interface AuthUser {
 }
 
 /**
- * Hook para obtener el usuario autenticado desde localStorage.
- * Si no hay sesión válida, redirige al login.
- * Si se pasa `allowedRoles`, verifica que el usuario tenga el rol correcto.
+ * Hook para obtener el usuario autenticado.
+ * Verifica el token contra el backend al montar.
+ * Si expiró o es inválido, limpia localStorage y redirige al login.
+ * Si se pasa allowedRoles, verifica que el usuario tenga el rol correcto.
  */
 export function useAuth(allowedRoles?: AuthUser["rol"][]) {
   const router = useRouter();
   const [user, setUser] = useState<AuthUser | null>(null);
   const [loading, setLoading] = useState(true);
+
+  const logout = useCallback(
+    (expired = false) => {
+      localStorage.removeItem("token");
+      localStorage.removeItem("user");
+      router.push(expired ? "/login?expired=true" : "/login");
+    },
+    [router]
+  );
 
   useEffect(() => {
     const token = localStorage.getItem("token");
@@ -30,37 +40,53 @@ export function useAuth(allowedRoles?: AuthUser["rol"][]) {
       return;
     }
 
+    let parsed: AuthUser;
     try {
-      const parsed: AuthUser = JSON.parse(raw);
-
-      if (allowedRoles && !allowedRoles.includes(parsed.rol)) {
-        // Redirigir al dashboard propio si el rol no coincide
-        const routes: Record<string, string> = {
-          admin: "/dashboard",
-          cajero: "/dashboard/cajero",
-          cocinero: "/dashboard/cocinero",
-          mesero: "/dashboard/mesero",
-          cliente: "/dashboard/cliente",
-        };
-        router.replace(routes[parsed.rol] ?? "/login");
-        return;
-      }
-
-      setUser(parsed);
+      parsed = JSON.parse(raw);
     } catch {
       localStorage.clear();
       router.replace("/login");
-    } finally {
-      setLoading(false);
+      return;
     }
-  
-  }, [allowedRoles, router]);
 
-  const logout = () => {
-    localStorage.removeItem("token");
-    localStorage.removeItem("user");
-    router.push("/login");
-  };
+    // Verificar rol antes de llamar al backend
+    if (allowedRoles && !allowedRoles.includes(parsed.rol)) {
+      const routes: Record<string, string> = {
+        admin: "/dashboard",
+        cajero: "/dashboard/cajero",
+        cocinero: "/dashboard/cocinero",
+        mesero: "/dashboard/mesero",
+        cliente: "/dashboard/cliente",
+      };
+      router.replace(routes[parsed.rol] ?? "/login");
+      return;
+    }
+
+    // Validar token contra el backend
+    fetch("/api/auth/verify", {
+      method: "GET",
+      headers: { Authorization: `Bearer ${token}` },
+    })
+      .then(async (res) => {
+        if (res.status === 401) {
+          // Token expirado o inválido
+          logout(true);
+          return;
+        }
+        if (!res.ok) {
+          logout();
+          return;
+        }
+        setUser(parsed);
+      })
+      .catch(() => {
+        // Error de red — no cerrar sesión, mostrar lo que hay en localStorage
+        setUser(parsed);
+      })
+      .finally(() => {
+        setLoading(false);
+      });
+  }, [allowedRoles, router, logout]);
 
   return { user, loading, logout };
 }
