@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { connectDB } from "@/lib/db";
 import Ingredient from "@/models/Ingredient";
+import "@/models/IngredientCategory";
 import mongoose from "mongoose";
 
 interface Params {

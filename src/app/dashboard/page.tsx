@@ -60,56 +60,49 @@ export default function DashboardPage() {
   }, []);
 
   useEffect(() => {
-  if (userLoading || !user) return;
+    if (userLoading || !user) return;
 
-  const fetchStats = async () => {
-    setLoading(true);
-    try {
-      const [dishRes, catRes, userRes, tableRes] = await Promise.all([
-        fetch("/api/dishes"),
-        fetch("/api/categories"),
-        fetch("/api/users"),
-        fetch("/api/tables"),
-      ]);
+    const fetchStats = async () => {
+      try {
+        const [dishRes, catRes, userRes, tableRes] = await Promise.all([
+          fetch("/api/dishes"),
+          fetch("/api/categories"),
+          fetch("/api/users"),
+          fetch("/api/tables"),
+        ]);
+        const dishData = await dishRes.json();
+        const catData = await catRes.json();
+        const userData = await userRes.json();
+        const tableData = await tableRes.json();
 
-      const [dishData, catData, userData, tableData] = await Promise.all([
-        dishRes.json(),
-        catRes.json(),
-        userRes.json(),
-        tableRes.json(),
-      ]);
+        const dishes = dishData.ok ? dishData.data : [];
+        const cats = catData.ok ? catData.data : [];
+        const users = Array.isArray(userData) ? userData : [];
+        const tables = Array.isArray(tableData) ? tableData : [];
 
-      const dishes = dishData.ok ? dishData.data : [];
-      const cats = catData.ok ? catData.data : [];
-      const users = Array.isArray(userData) ? userData : (userData?.data ?? []);
-      const tables = Array.isArray(tableData) ? tableData : (tableData?.data ?? []);
+        setStats({
+          totalDishes: dishes.length,
+          availableDishes: dishes.filter((d: { isAvailable: boolean }) => d.isAvailable).length,
+          totalCategories: cats.length,
+          activeCategories: cats.filter((c: { activo: boolean }) => c.activo).length,
+          totalUsers: users.length,
+          activeUsers: users.filter((u: { activo: boolean }) => u.activo).length,
+          totalTables: tables.length,
+          availableTables: tables.filter((t: { status: string }) => t.status === "Libre").length,
+          occupiedTables: tables.filter((t: { status: string }) => t.status === "Ocupada").length,
+          reservedTables: tables.filter((t: { status: string }) => t.status === "Reservada").length,
+          adminCount:    users.filter((u: { rol: string }) => u.rol === "admin").length,
+          cajeroCount:   users.filter((u: { rol: string }) => u.rol === "cajero").length,
+          cocineroCount: users.filter((u: { rol: string }) => u.rol === "cocinero").length,
+          meseroCount:   users.filter((u: { rol: string }) => u.rol === "mesero").length,
+          clienteCount:  users.filter((u: { rol: string }) => u.rol === "cliente").length,
+        });
+      } catch { /* silencioso */ }
+      finally { setLoading(false); }
+    };
 
-      setStats({
-        totalDishes:       dishes.length,
-        availableDishes:   dishes.filter((d: { isAvailable: boolean }) => d.isAvailable).length,
-        totalCategories:   cats.length,
-        activeCategories:  cats.filter((c: { activo: boolean }) => c.activo).length,
-        totalUsers:        users.length,
-        activeUsers:       users.filter((u: { activo: boolean }) => u.activo).length,
-        totalTables:       tables.length,
-        availableTables:   tables.filter((t: { status: string }) => t.status === "Libre").length,
-        occupiedTables:    tables.filter((t: { status: string }) => t.status === "Ocupada").length,
-        reservedTables:    tables.filter((t: { status: string }) => t.status === "Reservada").length,
-        adminCount:        users.filter((u: { rol: string }) => u.rol === "admin").length,
-        cajeroCount:       users.filter((u: { rol: string }) => u.rol === "cajero").length,
-        cocineroCount:     users.filter((u: { rol: string }) => u.rol === "cocinero").length,
-        meseroCount:       users.filter((u: { rol: string }) => u.rol === "mesero").length,
-        clienteCount:      users.filter((u: { rol: string }) => u.rol === "cliente").length,
-      });
-    } catch {
-      /* silencioso */
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  fetchStats();
-}, [userLoading, user?._id]);
+    fetchStats();
+  }, [userLoading, user?._id]);
 
   const greeting = () => {
     const h = time.getHours();

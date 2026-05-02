@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { connectDB } from "@/lib/db";
 import Dish from "@/models/Dish";
+import "@/models/Ingredient"; 
 import mongoose from "mongoose";
 
 interface Params {
@@ -14,7 +15,9 @@ export async function GET(_req: NextRequest, { params }: Params) {
     if (!mongoose.Types.ObjectId.isValid(id)) {
       return NextResponse.json({ ok: false, message: "ID de plato no válido" }, { status: 400 });
     }
-    const dish = await Dish.findById(id).populate("category_id", "nombre");
+    const dish = await Dish.findById(id)
+      .populate("category_id", "nombre")
+      .populate("ingredients.ingredient_id", "nombre unidad");
     if (!dish) {
       return NextResponse.json({ ok: false, message: "Plato no encontrado" }, { status: 404 });
     }

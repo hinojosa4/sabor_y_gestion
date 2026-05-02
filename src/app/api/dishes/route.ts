@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { connectDB } from "@/lib/db";
 import Dish from "@/models/Dish";
+import "@/models/Ingredient";
 
 export async function GET() {
   try {
@@ -41,10 +42,10 @@ export async function POST(req: NextRequest) {
       name: name.trim(),
       description: description?.trim() || "",
       price,
-      category_id: category_id || null,   // ← null si no viene
+      category_id: category_id || null,
       isAvailable: isAvailable ?? true,
       image_url: image_url || "",
-      ingredients: ingredients || [],       // ← nuevo campo
+      ingredients: ingredients || [],
     });
 
     return NextResponse.json({ ok: true, message: "Plato creado correctamente", data: dish }, { status: 201 });

@@ -220,11 +220,11 @@ export default function CategoriesPage() {
           isAvailable: dish.isAvailable,
           description: dish.description || "",
           ingredients: (dish.ingredients || []).map((ing) => ({
-            ingredient_id: typeof ing.ingredient_id === "object"
-              ? ing.ingredient_id._id
-              : ing.ingredient_id,
-            quantity: ing.quantity,
-          })),
+          ingredient_id: typeof ing.ingredient_id === "object"
+            ? ing.ingredient_id._id
+            : ing.ingredient_id,
+          quantity: ing.quantity,
+        })),
           image_url: dish.image_url || "",
         }),
       });
@@ -622,11 +622,9 @@ export default function CategoriesPage() {
                 <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
                   {selectedDish.ingredients.map((ing, i) => {
                     const nombre = typeof ing.ingredient_id === "object"
-                      ? ing.ingredient_id.nombre
-                      : ing.ingredient_id;
+                      ? ing.ingredient_id.nombre : ing.ingredient_id;
                     const unidad = typeof ing.ingredient_id === "object"
-                      ? ing.ingredient_id.unidad
-                      : "";
+                      ? ing.ingredient_id.unidad : "";
                     return (
                       <span key={i} style={{
                         background: "#fff8f5", border: "1px solid #e85d26",
@@ -803,11 +801,9 @@ function DishCard({ dish, onClick, categories, onRemove, onAssign }: {
             <p style={{ margin: "3px 0 0", fontSize: 11, color: "#aaa", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
               {dish.ingredients.slice(0, 3).map((ing) => {
                 const nombre = typeof ing.ingredient_id === "object"
-                  ? ing.ingredient_id.nombre
-                  : ing.ingredient_id;
+                  ? ing.ingredient_id.nombre : ing.ingredient_id;
                 const unidad = typeof ing.ingredient_id === "object"
-                  ? ing.ingredient_id.unidad
-                  : "";
+                  ? ing.ingredient_id.unidad : "";
                 return `${nombre} ${ing.quantity}${unidad}`;
               }).join(", ")}
               {dish.ingredients.length > 3 ? "..." : ""}
