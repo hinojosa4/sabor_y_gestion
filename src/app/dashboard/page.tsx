@@ -207,7 +207,7 @@ export default function DashboardPage() {
           <div title={user.email} style={{ width: isMobile ? 32 : 38, height: isMobile ? 32 : 38, borderRadius: "50%", background: "#1a1a1a", display: "flex", alignItems: "center", justifyContent: "center", fontSize: isMobile ? 13 : 16, color: "#fff", fontWeight: 700, flexShrink: 0 }}>
             {user.name.trim().charAt(0).toUpperCase()}
           </div>
-          <button onClick={logout} style={{ background: "#fff0ee", border: "1.5px solid #e85d26", borderRadius: 8, padding: isMobile ? "5px 10px" : "6px 14px", cursor: "pointer", fontSize: isMobile ? 11 : 12, fontWeight: 600, color: "#e85d26", fontFamily: "inherit", whiteSpace: "nowrap" }}>
+          <button onClick={() => logout()} style={{ background: "#fff0ee", border: "1.5px solid #e85d26", borderRadius: 8, padding: isMobile ? "5px 10px" : "6px 14px", cursor: "pointer", fontSize: isMobile ? 11 : 12, fontWeight: 600, color: "#e85d26", fontFamily: "inherit", whiteSpace: "nowrap" }}>
             Salir
           </button>
         </div>

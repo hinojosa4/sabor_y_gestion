@@ -284,7 +284,7 @@ export default function CajeroDashboard() {
 
                     {/* Botón Salir */}
                     <button
-                        onClick={logout}
+                        onClick={() => logout()}
                         style={{
                             backgroundColor: "transparent",
                             border: `1px solid var(--border)`,
