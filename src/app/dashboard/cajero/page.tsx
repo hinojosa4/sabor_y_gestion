@@ -2,7 +2,7 @@
 import { useState } from 'react';
 import { useAuth } from '@/lib/useAuth';
 import { CAJERO } from '@/lib/roles';
-import { Search, DollarSign, Receipt, Clock, ArrowLeft } from 'lucide-react';
+import { Search, DollarSign, Receipt, Clock } from 'lucide-react';
 import Link from 'next/link';
 import { useTableData } from '@/hooks/useTableData';
 import { PreinvoiceModal } from '@/components/caja/PreinvoiceModal';
@@ -180,7 +180,7 @@ const spinnerStyle: React.CSSProperties = {
 };
 
 export default function CajeroDashboard() {
-    const { user, loading: userLoading } = useAuth(CAJERO);
+    const { user, loading: userLoading, logout } = useAuth(CAJERO);
     const restaurantId = "69e170e941daf8c2b2f76677";
     const [searchQuery, setSearchQuery] = useState('');
     const [selectedTable, setSelectedTable] = useState<{ id: string; number: number } | null>(null);
@@ -245,23 +245,7 @@ export default function CajeroDashboard() {
                 gap: 10,
             }}>
                 <div style={{ display: "flex", alignItems: "center", gap: isMobile ? 10 : 14, minWidth: 0 }}>
-                    <Link href="/dashboard" style={{
-                        backgroundColor: "var(--secondary)",
-                        border: `1px solid var(--border)`,
-                        borderRadius: "var(--radius-md)",
-                        width: 38,
-                        height: 38,
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "center",
-                        cursor: "pointer",
-                        fontSize: 16,
-                        textDecoration: "none",
-                        color: "var(--foreground)",
-                    }}>
-                        <ArrowLeft size={20} />
-                    </Link>
-                    {/* Icono añadido aquí */}
+                    {/* Icono */}
                     <div style={{
                         width: 40,
                         height: 40,
@@ -279,22 +263,44 @@ export default function CajeroDashboard() {
                         <p style={{ margin: 0, fontSize: "0.75rem", color: "var(--muted-foreground)" }}>Gestiona pagos y facturación</p>
                     </div>
                 </div>
-                <Link href="/dashboard/cajero/cierre-caja" style={{
-                    backgroundColor: "var(--primary)",
-                    color: "var(--primary-foreground)",
-                    border: "none",
-                    borderRadius: "var(--radius-md)",
-                    padding: isMobile ? "10px 16px" : "11px 22px",
-                    cursor: "pointer",
-                    display: "inline-flex",
-                    alignItems: "center",
-                    gap: 6,
-                    fontFamily: "inherit",
-                    textDecoration: "none",
-                }}>
-                    <Receipt size={16} />
-                    Cierre de Caja
-                </Link>
+
+                <div style={{ display: "flex", gap: "0.75rem" }}>
+                    <Link href="/dashboard/cajero/cierre-caja" style={{
+                        backgroundColor: "var(--primary)",
+                        color: "var(--primary-foreground)",
+                        border: "none",
+                        borderRadius: "var(--radius-md)",
+                        padding: isMobile ? "10px 16px" : "11px 22px",
+                        cursor: "pointer",
+                        display: "inline-flex",
+                        alignItems: "center",
+                        gap: 6,
+                        fontFamily: "inherit",
+                        textDecoration: "none",
+                    }}>
+                        <Receipt size={16} />
+                        Cierre de Caja
+                    </Link>
+
+                    {/* Botón Salir */}
+                    <button
+                        onClick={() => logout()}
+                        style={{
+                            backgroundColor: "transparent",
+                            border: `1px solid var(--border)`,
+                            borderRadius: "var(--radius-md)",
+                            padding: isMobile ? "10px 16px" : "11px 22px",
+                            cursor: "pointer",
+                            display: "inline-flex",
+                            alignItems: "center",
+                            gap: 6,
+                            fontFamily: "inherit",
+                            color: "var(--foreground)",
+                        }}
+                    >
+                        Salir
+                    </button>
+                </div>
             </header>
 
             <main style={mainStyle}>

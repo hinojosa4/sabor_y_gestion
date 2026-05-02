@@ -4,7 +4,7 @@ export interface IOrder extends Document {
   restaurantId: string;
   table_id?: string;
   customer_id?: string;
-  waiter_id: string;
+  mesero_id: string;
   driver_id?: string;
   service_type: 'dine_in' | 'delivery' | 'pick_up';
   status: 'pending' | 'in_kitchen' | 'ready' | 'delivered' | 'paid' | 'cancelled';
@@ -17,7 +17,7 @@ const OrderSchema = new Schema<IOrder>({
   restaurantId: { type: String, required: true },
   table_id: { type: String },
   customer_id: { type: String },
-  waiter_id: { type: String, required: true },
+  mesero_id: { type: String, required: true },
   driver_id: { type: String },
   service_type: { type: String, enum: ['dine_in', 'delivery', 'pick_up'], default: 'dine_in' },
   status: { type: String, enum: ['pending', 'in_kitchen', 'ready', 'delivered', 'paid', 'cancelled'], default: 'pending' },
