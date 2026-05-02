@@ -279,7 +279,6 @@ function IngredientSelector({
   const [error, setError] = useState("");
 
   useEffect(() => {
-    setLoading(true);
     fetch("/api/ingredients", { cache: "no-store" })
       .then((r) => r.json())
       .then((d) => {

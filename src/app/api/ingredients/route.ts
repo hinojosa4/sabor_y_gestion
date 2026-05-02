@@ -11,7 +11,7 @@ export async function GET() {
       .sort({ nombre: 1 });
 
     return NextResponse.json({ ok: true, data: ingredients });
-  } catch (error) {
+  } catch  {
     return NextResponse.json(
       { ok: false, message: "Error al obtener ingredientes" },
       { status: 500 }

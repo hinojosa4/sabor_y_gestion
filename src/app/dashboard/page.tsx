@@ -102,7 +102,7 @@ export default function DashboardPage() {
     };
 
     fetchStats();
-  }, [userLoading, user?._id]);
+  }, [userLoading, user?._id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const greeting = () => {
     const h = time.getHours();
