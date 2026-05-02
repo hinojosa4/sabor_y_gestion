@@ -47,8 +47,6 @@ export async function PUT(req: NextRequest, { params }: Params) {
       return NextResponse.json({ ok: false, message: "El precio es obligatorio y no puede ser negativo" }, { status: 400 });
     }
 
-    // ✅ category_id ya NO es obligatorio
-
     const existingDish = await Dish.findOne({ name: name.trim(), _id: { $ne: id } });
     if (existingDish) {
       return NextResponse.json({ ok: false, message: "Ya existe otro plato con ese nombre" }, { status: 409 });

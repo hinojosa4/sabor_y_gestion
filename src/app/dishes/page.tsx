@@ -10,6 +10,11 @@ interface ICategory {
   activo: boolean;
 }
 
+interface IDishIngredient {
+  ingredient_id: { _id: string; nombre: string; unidad: string } | string;
+  quantity: number;
+}
+
 interface IDish {
   _id: string;
   name: string;
@@ -17,7 +22,7 @@ interface IDish {
   price: number;
   isAvailable: boolean;
   image_url?: string;
-  ingredients: string[];
+  ingredients: IDishIngredient[];
   category_id: { _id: string; nombre: string } | string | null;
 }
 
@@ -175,27 +180,199 @@ function Modal({ title, children, onClose, wide = false, isMobile = false }: {
   );
 }
 
-function IngredientTags({ ingredients, onRemove }: {
-  ingredients: string[]; onRemove?: (i: number) => void;
+interface IIngredientOption {
+  _id: string;
+  nombre: string;
+  unidad: string;
+  stock_actual: number;
+  stockStatus: "ok" | "bajo" | "critico";
+}
+
+const statusColor: Record<string, string> = {
+  ok: "#27ae60",
+  bajo: "#f39c12",
+  critico: "#e85d26",
+};
+
+function IngredientSelector({
+  selected,
+  onChange,
+}: {
+  selected: { ingredient_id: string; quantity: number }[];
+  onChange: (items: { ingredient_id: string; quantity: number }[]) => void;
 }) {
-  if (ingredients.length === 0) return <p style={{ fontSize: 12, color: "#bbb", margin: 0 }}>Sin ingredientes</p>;
+  const [options, setOptions] = useState<IIngredientOption[]>([]);
+  const [loadingOpts, setLoadingOpts] = useState(true);
+  const [search, setSearch] = useState("");
+  const [showDropdown, setShowDropdown] = useState(false);
+  const [qty, setQty] = useState("1");
+  const [pendingId, setPendingId] = useState("");
+
+  useEffect(() => {
+    fetch("/api/ingredients")
+      .then((r) => r.json())
+      .then((d) => { if (d.ok) setOptions(d.data); })
+      .finally(() => setLoadingOpts(false));
+  }, []);
+
+  const filtered = options.filter(
+    (o) =>
+      o.nombre.toLowerCase().includes(search.toLowerCase()) &&
+      !selected.some((s) => s.ingredient_id === o._id)
+  );
+
+  const getOption = (id: string) => options.find((o) => o._id === id);
+
+  const select = (o: IIngredientOption) => {
+    setPendingId(o._id);
+    setSearch(o.nombre);
+    setShowDropdown(false);
+  };
+
+  const add = () => {
+    if (!pendingId || !qty || Number(qty) <= 0) return;
+    onChange([...selected, { ingredient_id: pendingId, quantity: Number(qty) }]);
+    setPendingId("");
+    setSearch("");
+    setQty("1");
+  };
+
+  const remove = (id: string) =>
+    onChange(selected.filter((s) => s.ingredient_id !== id));
+
   return (
-    <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
-      {ingredients.map((ing, i) => (
-        <span key={i} style={{
-          background: "#fff8f5", border: "1px solid #e85d26", color: "#e85d26",
-          borderRadius: 20, padding: "3px 10px", fontSize: 12, fontWeight: 600,
-          display: "flex", alignItems: "center", gap: 5,
-        }}>
-          {ing}
-          {onRemove && (
-            <button onClick={() => onRemove(i)} style={{
-              background: "none", border: "none", cursor: "pointer",
-              color: "#e85d26", fontSize: 12, padding: 0, lineHeight: 1,
-            }}>✕</button>
+    <div>
+      {/* Buscador + cantidad + botón */}
+      <div style={{ display: "flex", gap: 8, marginBottom: 10, flexWrap: "wrap" }}>
+        
+        {/* Buscador con dropdown */}
+        <div style={{ position: "relative", flex: 2, minWidth: 160 }}>
+          <input
+            value={search}
+            onChange={(e) => {
+              setSearch(e.target.value);
+              setPendingId("");
+              setShowDropdown(true);
+            }}
+            onFocus={() => setShowDropdown(true)}
+            onBlur={() => setTimeout(() => setShowDropdown(false), 150)}
+            placeholder={loadingOpts ? "Cargando..." : "Buscar ingrediente..."}
+            disabled={loadingOpts}
+            style={{ ...inputStyle, width: "100%" }}
+          />
+
+          {/* Dropdown */}
+          {showDropdown && search.length > 0 && (
+            <div style={{
+              position: "absolute", top: "calc(100% + 4px)", left: 0, right: 0,
+              background: "#fff", border: "1.5px solid #e0e0e0", borderRadius: 9,
+              boxShadow: "0 8px 24px rgba(0,0,0,0.1)", zIndex: 100,
+              maxHeight: 200, overflowY: "auto",
+            }}>
+              {filtered.length === 0 ? (
+                <p style={{ margin: 0, padding: "12px 14px", fontSize: 13, color: "#aaa" }}>
+                  Sin resultados
+                </p>
+              ) : (
+                filtered.map((o) => (
+                  <div
+                    key={o._id}
+                    onMouseDown={() => select(o)}
+                    style={{
+                      padding: "10px 14px", cursor: "pointer", fontSize: 13,
+                      display: "flex", alignItems: "center", justifyContent: "space-between",
+                      borderBottom: "1px solid #f5f5f5",
+                    }}
+                    onMouseEnter={e => (e.currentTarget.style.background = "#fff8f5")}
+                    onMouseLeave={e => (e.currentTarget.style.background = "#fff")}
+                  >
+                    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                      <span style={{
+                        width: 8, height: 8, borderRadius: "50%", flexShrink: 0,
+                        display: "inline-block",
+                        background: statusColor[o.stockStatus] ?? "#ccc",
+                      }} />
+                      <span style={{ fontWeight: 600, color: "#1a1a1a" }}>{o.nombre}</span>
+                    </div>
+                    <span style={{ fontSize: 11, color: "#aaa" }}>
+                      Stock: {o.stock_actual} {o.unidad}
+                    </span>
+                  </div>
+                ))
+              )}
+            </div>
           )}
-        </span>
-      ))}
+        </div>
+
+        {/* Cantidad */}
+        <input
+          type="number"
+          min="0.001"
+          step="0.001"
+          value={qty}
+          onChange={(e) => setQty(e.target.value)}
+          placeholder="Cant."
+          style={{ ...inputStyle, width: 90, flex: "none" }}
+        />
+
+        {/* Botón añadir */}
+        <button
+          onClick={add}
+          disabled={!pendingId || Number(qty) <= 0}
+          style={{
+            background: "#e85d26", color: "#fff", border: "none",
+            borderRadius: 9, padding: "0 18px", fontSize: 20,
+            cursor: !pendingId ? "not-allowed" : "pointer",
+            flexShrink: 0, opacity: !pendingId || Number(qty) <= 0 ? 0.4 : 1,
+          }}
+        >
+          +
+        </button>
+      </div>
+
+      {/* Lista seleccionados */}
+      {selected.length === 0 ? (
+        <p style={{ fontSize: 12, color: "#bbb", margin: 0 }}>Sin ingredientes agregados</p>
+      ) : (
+        <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+          {selected.map((s) => {
+            const opt = getOption(s.ingredient_id);
+            return (
+              <div
+                key={s.ingredient_id}
+                style={{
+                  display: "flex", alignItems: "center", justifyContent: "space-between",
+                  background: "#fff8f5", border: "1px solid #ffd4bc",
+                  borderRadius: 9, padding: "8px 12px",
+                }}
+              >
+                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                  {opt && (
+                    <span style={{
+                      width: 8, height: 8, borderRadius: "50%",
+                      background: statusColor[opt.stockStatus] ?? "#ccc",
+                      display: "inline-block", flexShrink: 0,
+                    }} />
+                  )}
+                  <span style={{ fontSize: 13, fontWeight: 600, color: "#1a1a1a" }}>
+                    {opt?.nombre ?? s.ingredient_id}
+                  </span>
+                  <span style={{ fontSize: 12, color: "#888" }}>
+                    {s.quantity} {opt?.unidad ?? ""}
+                  </span>
+                </div>
+                <button
+                  onClick={() => remove(s.ingredient_id)}
+                  style={{
+                    background: "none", border: "none", cursor: "pointer",
+                    color: "#e85d26", fontSize: 16, padding: 0, lineHeight: 1,
+                  }}
+                >✕</button>
+              </div>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 }
@@ -204,7 +381,8 @@ function IngredientTags({ ingredients, onRemove }: {
 type DishFormData = {
   name: string; description: string; price: string;
   isAvailable: boolean; category_id: string;
-  ingredients: string[]; image_url: string;
+  ingredients: { ingredient_id: string; quantity: number }[];
+  image_url: string;
 };
 
 function DishForm({ initial, categories, onSubmit, onCancel, error, submitLabel, isMobile }: {
@@ -217,14 +395,8 @@ function DishForm({ initial, categories, onSubmit, onCancel, error, submitLabel,
   isMobile?: boolean;
 }) {
   const [form, setForm] = useState<DishFormData>(initial);
-  const [newIng, setNewIng] = useState("");
   const [uploading, setUploading] = useState(false);
 
-  const addIng = () => {
-    if (!newIng.trim()) return;
-    setForm(f => ({ ...f, ingredients: [...f.ingredients, newIng.trim()] }));
-    setNewIng("");
-  };
 
   const handleImageUpload = async (file: File) => {
     setUploading(true);
@@ -384,18 +556,9 @@ function DishForm({ initial, categories, onSubmit, onCancel, error, submitLabel,
         {/* Ingredientes */}
         <div style={{ gridColumn: "1 / -1" }}>
           <Field label="Ingredientes">
-            <div style={{ display: "flex", gap: 8, marginBottom: 8 }}>
-              <input value={newIng} onChange={e => setNewIng(e.target.value)}
-                onKeyDown={e => { if (e.key === "Enter") { e.preventDefault(); addIng(); } }}
-                placeholder="Escribe y presiona Enter..." style={inputStyle} />
-              <button onClick={addIng} style={{
-                background: "#e85d26", color: "#fff", border: "none",
-                borderRadius: 9, padding: "0 18px", fontSize: 20, cursor: "pointer", flexShrink: 0,
-              }}>+</button>
-            </div>
-            <IngredientTags
-              ingredients={form.ingredients}
-              onRemove={i => setForm(f => ({ ...f, ingredients: f.ingredients.filter((_, idx) => idx !== i) }))}
+            <IngredientSelector
+              selected={form.ingredients}
+              onChange={(items) => setForm((f) => ({ ...f, ingredients: items }))}
             />
           </Field>
         </div>
@@ -776,7 +939,13 @@ export default function DishesPage() {
               price: String(editDish.price),
               isAvailable: editDish.isAvailable,
               category_id: getCatId(editDish) || "",
-              ingredients: editDish.ingredients || [],
+              ingredients: (editDish.ingredients ?? []).map((ing) => ({
+                ingredient_id:
+                  typeof ing.ingredient_id === "object"
+                    ? (ing.ingredient_id as { _id: string })._id
+                    : ing.ingredient_id,
+                quantity: ing.quantity,
+              })),
               image_url: editDish.image_url || "",
             }}
             categories={categories}
@@ -890,12 +1059,18 @@ function DishCard({ dish, onEdit, onDelete }: {
           <div style={{ marginBottom: 12 }}>
             <p style={{ margin: "0 0 6px", fontSize: 11, color: "#aaa" }}>Ingredientes:</p>
             <div style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>
-              {dish.ingredients.map((ing, i) => (
-                <span key={i} style={{
-                  background: "#f5f5f5", color: "#555", borderRadius: 20,
-                  padding: "2px 8px", fontSize: 11, fontWeight: 600,
-                }}>{ing}</span>
-              ))}
+              {dish.ingredients.map((ing, i) => {
+                if (typeof ing.ingredient_id !== "object" || !ing.ingredient_id) return null;
+                const { nombre, unidad } = ing.ingredient_id;
+                return (
+                  <span key={i} style={{
+                    background: "#f5f5f5", color: "#555", borderRadius: 20,
+                    padding: "2px 8px", fontSize: 11, fontWeight: 600,
+                  }}>
+                    {nombre} · {ing.quantity} {unidad}   {/* ← espacio antes de unidad */}
+                  </span>
+                );
+              })}
             </div>
           </div>
         )}

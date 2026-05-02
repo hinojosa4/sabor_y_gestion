@@ -12,6 +12,11 @@ interface ICategory {
   createdAt: string;
 }
 
+interface IDishIngredient {
+  ingredient_id: { _id: string; nombre: string; unidad: string } | string;
+  quantity: number;
+}
+
 interface IDish {
   _id: string;
   name: string;
@@ -19,7 +24,7 @@ interface IDish {
   price: number;
   isAvailable: boolean;
   image_url?: string;
-  ingredients: string[];
+  ingredients: IDishIngredient[];
   category_id: { _id: string; nombre: string } | string | null;
 }
 
@@ -214,7 +219,12 @@ export default function CategoriesPage() {
           category_id: catId,
           isAvailable: dish.isAvailable,
           description: dish.description || "",
-          ingredients: dish.ingredients || [],
+          ingredients: (dish.ingredients || []).map((ing) => ({
+            ingredient_id: typeof ing.ingredient_id === "object"
+              ? ing.ingredient_id._id
+              : ing.ingredient_id,
+            quantity: ing.quantity,
+          })),
           image_url: dish.image_url || "",
         }),
       });
@@ -610,12 +620,22 @@ export default function CategoriesPage() {
                   Ingredientes
                 </p>
                 <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
-                  {selectedDish.ingredients.map((ing, i) => (
-                    <span key={i} style={{
-                      background: "#fff8f5", border: "1px solid #e85d26",
-                      color: "#e85d26", borderRadius: 20, padding: "4px 12px", fontSize: 12, fontWeight: 600,
-                    }}>{ing}</span>
-                  ))}
+                  {selectedDish.ingredients.map((ing, i) => {
+                    const nombre = typeof ing.ingredient_id === "object"
+                      ? ing.ingredient_id.nombre
+                      : ing.ingredient_id;
+                    const unidad = typeof ing.ingredient_id === "object"
+                      ? ing.ingredient_id.unidad
+                      : "";
+                    return (
+                      <span key={i} style={{
+                        background: "#fff8f5", border: "1px solid #e85d26",
+                        color: "#e85d26", borderRadius: 20, padding: "4px 12px", fontSize: 12, fontWeight: 600,
+                      }}>
+                        {nombre} · {ing.quantity}{unidad}
+                      </span>
+                    );
+                  })}
                 </div>
               </div>
             )}
@@ -781,7 +801,16 @@ function DishCard({ dish, onClick, categories, onRemove, onAssign }: {
           </div>
           {dish.ingredients && dish.ingredients.length > 0 && (
             <p style={{ margin: "3px 0 0", fontSize: 11, color: "#aaa", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-              {dish.ingredients.slice(0, 3).join(", ")}{dish.ingredients.length > 3 ? "..." : ""}
+              {dish.ingredients.slice(0, 3).map((ing) => {
+                const nombre = typeof ing.ingredient_id === "object"
+                  ? ing.ingredient_id.nombre
+                  : ing.ingredient_id;
+                const unidad = typeof ing.ingredient_id === "object"
+                  ? ing.ingredient_id.unidad
+                  : "";
+                return `${nombre} ${ing.quantity}${unidad}`;
+              }).join(", ")}
+              {dish.ingredients.length > 3 ? "..." : ""}
             </p>
           )}
         </div>

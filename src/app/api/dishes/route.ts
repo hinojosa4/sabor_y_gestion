@@ -7,6 +7,7 @@ export async function GET() {
     await connectDB();
     const dishes = await Dish.find()
       .populate("category_id", "nombre")
+      .populate("ingredients.ingredient_id", "nombre unidad")
       .sort({ createdAt: -1 });
     return NextResponse.json({ ok: true, data: dishes });
   } catch (error) {
@@ -30,9 +31,6 @@ export async function POST(req: NextRequest) {
     if (price === undefined || price < 0) {
       return NextResponse.json({ ok: false, message: "El precio es obligatorio y no puede ser negativo" }, { status: 400 });
     }
-
-    // ✅ category_id ya NO es obligatorio
-    // ✅ ingredients es opcional, default []
 
     const existingDish = await Dish.findOne({ name: name.trim() });
     if (existingDish) {
