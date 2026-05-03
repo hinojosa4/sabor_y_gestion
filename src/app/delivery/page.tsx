@@ -364,19 +364,20 @@ export default function DeliveryPage() {
   const repartidorName = "Roberto Martínez";
 
   const handleAdvance = (id: string) => {
-    setOrders((prev) => {
-      const target = prev.find((o) => o.id === id);
-      if (!target) return prev;
-      const next = getNextStatus(target.status);
-      if (!next) return prev;
+    const target = orders.find((o) => o.id === id);
+    if (!target) return;
+    const next = getNextStatus(target.status);
+    if (!next) return;
 
-      if (next === "Entregado") {
-        setCompleted((c) => [{ ...target, status: "Entregado" }, ...c]);
-        return prev.filter((o) => o.id !== id);
-      }
+    if (next === "Entregado") {
+      setCompleted((c) => [{ ...target, status: "Entregado" }, ...c]);
+      setOrders((prev) => prev.filter((o) => o.id !== id));
+      return;
+    }
 
-      return prev.map((o) => (o.id === id ? { ...o, status: next } : o));
-    });
+    setOrders((prev) =>
+      prev.map((o) => (o.id === id ? { ...o, status: next } : o)),
+    );
   };
 
   const handleCancel = (id: string) => {
