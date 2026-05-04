@@ -1,30 +1,30 @@
 import mongoose, { Document, Schema } from "mongoose";
 
 export interface IIngredientCategory extends Document {
-  nombre: string;
-  descripcion?: string;
-  activo: boolean;
+  name: string;
+  description?: string;
+  isActive: boolean;
   createdAt: Date;
   updatedAt: Date;
 }
 
 const IngredientCategorySchema = new Schema<IIngredientCategory>(
   {
-    nombre: {
+    name: {
       type: String,
       required: true,
       trim: true,
       unique: true,
-      minlength: [2, "Mínimo 2 caracteres"],
-      maxlength: [100, "Máximo 100 caracteres"],
+      minlength: [2, "Minimum 2 characters"],
+      maxlength: [100, "Maximum 100 characters"],
     },
-    descripcion: {
+    description: {
       type: String,
       trim: true,
-      maxlength: [255, "Máximo 255 caracteres"],
+      maxlength: [255, "Maximum 255 characters"],
       default: "",
     },
-    activo: { type: Boolean, default: true },
+    isActive: { type: Boolean, default: true },
   },
   { timestamps: true, versionKey: false }
 );

@@ -2,16 +2,14 @@ import { NextRequest, NextResponse } from "next/server";
 import { connectDB } from "@/lib/db";
 import Category from "@/models/Category";
 
+// ── GET /api/categories ───────────────────────────────────────────────────────
 export async function GET() {
   try {
     await connectDB();
 
     const categories = await Category.find().sort({ createdAt: -1 });
 
-    return NextResponse.json({
-      ok: true,
-      data: categories,
-    });
+    return NextResponse.json({ ok: true, data: categories });
   } catch (error) {
     return NextResponse.json(
       {
@@ -24,49 +22,37 @@ export async function GET() {
   }
 }
 
+// ── POST /api/categories ──────────────────────────────────────────────────────
 export async function POST(req: NextRequest) {
   try {
     await connectDB();
 
     const body = await req.json();
-    const { nombre, descripcion, activo } = body;
+    const { name, description, isActive } = body;
 
-    if (!nombre || !nombre.trim()) {
+    if (!name || !name.trim()) {
       return NextResponse.json(
-        {
-          ok: false,
-          message: "El nombre es obligatorio",
-        },
+        { ok: false, message: "El nombre es obligatorio" },
         { status: 400 }
       );
     }
 
-    const existingCategory = await Category.findOne({
-      nombre: nombre.trim(),
-    });
-
+    const existingCategory = await Category.findOne({ name: name.trim() });
     if (existingCategory) {
       return NextResponse.json(
-        {
-          ok: false,
-          message: "La categoría ya existe",
-        },
+        { ok: false, message: "La categoría ya existe" },
         { status: 409 }
       );
     }
 
     const category = await Category.create({
-      nombre: nombre.trim(),
-      descripcion: descripcion?.trim() || "",
-      activo: activo ?? true,
+      name: name.trim(),
+      description: description?.trim() || "",
+      isActive: isActive ?? true,
     });
 
     return NextResponse.json(
-      {
-        ok: true,
-        message: "Categoría creada correctamente",
-        data: category,
-      },
+      { ok: true, message: "Categoría creada correctamente", data: category },
       { status: 201 }
     );
   } catch (error) {

@@ -7,12 +7,12 @@ import Image from "next/image";
 // ─── Types ────────────────────────────────────────────────────────────────────
 interface ICategory {
   _id: string;
-  nombre: string;
-  activo: boolean;
+  name: string;
+  isActive: boolean;
 }
 
 interface IDishIngredient {
-  ingredient_id: { _id: string; nombre: string; unidad: string } | string;
+  ingredient_id: { _id: string; name: string; unit: string } | string;
   quantity: number;
 }
 
@@ -24,15 +24,15 @@ interface IDish {
   isAvailable: boolean;
   image_url?: string;
   ingredients: IDishIngredient[];
-  category_id: { _id: string; nombre: string } | string | null;
+  category_id: { _id: string; name: string } | string | null;
 }
 
 interface IIngredientOption {
   _id: string;
-  nombre: string;
-  unidad: string;
-  stock_actual: number;
-  stockStatus: "ok" | "bajo" | "critico";
+  name: string;
+  unit: string;
+  currentStock: number;
+  stockStatus: "ok" | "low" | "critical";
 }
 
 type DishFormData = {
@@ -90,7 +90,7 @@ function getCatId(d: IDish): string | null {
 
 function getCatName(d: IDish): string {
   if (!d.category_id) return "Sin categoría";
-  if (typeof d.category_id === "object") return d.category_id.nombre;
+  if (typeof d.category_id === "object") return d.category_id.name;
   return "Sin categoría";
 }
 
@@ -223,16 +223,29 @@ function Modal({
           padding: isMobile ? "28px 20px 32px" : "32px 36px",
           width: isMobile ? "100%" : wide ? 620 : 480,
           maxWidth: "100%",
-          maxHeight: isMobile ? "92vh" : "90vh",
+          maxHeight: isMobile ? "96vh" : "90vh",
           overflowY: "auto",
           boxShadow: "0 20px 60px rgba(0,0,0,0.18)",
         }}
       >
+        {/* Manija visual en móvil */}
+        {isMobile && (
+          <div
+            style={{
+              width: 40,
+              height: 4,
+              background: "#ddd",
+              borderRadius: 2,
+              margin: "-12px auto 20px",
+            }}
+          />
+        )}
+
         <button
           onClick={onClose}
           style={{
             position: "absolute",
-            top: 12,
+            top: isMobile ? 20 : 12,
             right: 16,
             background: "none",
             border: "none",
@@ -290,7 +303,7 @@ function IngredientSelector({
 
   const filtered = options.filter(
     (o) =>
-      o.nombre.toLowerCase().includes(query.toLowerCase()) &&
+      o.name.toLowerCase().includes(query.toLowerCase()) &&
       !selected.some((s) => {
         const id = typeof s.ingredient_id === "object"
           ? (s.ingredient_id as { _id: string })._id
@@ -301,7 +314,7 @@ function IngredientSelector({
 
   const selectOption = (o: IIngredientOption) => {
     setSelectedOption(o);
-    setQuery(o.nombre);
+    setQuery(o.name);
     setShowDropdown(false);
     setError("");
   };
@@ -310,7 +323,7 @@ function IngredientSelector({
     const cantidad = parseFloat(qty);
     if (!selectedOption) { setError("Selecciona un ingrediente de la lista"); return; }
     if (isNaN(cantidad) || cantidad <= 0) { setError("Cantidad inválida"); return; }
-    if (cantidad > selectedOption.stock_actual) { setError("Cantidad supera el stock disponible"); return; }
+    if (cantidad > selectedOption.currentStock) { setError("Cantidad supera el stock disponible"); return; }
 
     onChange([...selected, { ingredient_id: selectedOption._id, quantity: cantidad }]);
     setSelectedOption(null);
@@ -319,7 +332,6 @@ function IngredientSelector({
     setError("");
   };
 
-  // FIX: remove correctamente cerrado como función independiente
   const remove = (id: string) => {
     onChange(
       selected.filter((s) => {
@@ -377,9 +389,9 @@ function IngredientSelector({
                       justifyContent: "space-between",
                     }}
                   >
-                    <span>{o.nombre}</span>
+                    <span>{o.name}</span>
                     <span style={{ fontSize: 11 }}>
-                      {o.stock_actual} {o.unidad}
+                      {o.currentStock} {o.unit}
                     </span>
                   </div>
                 ))
@@ -426,7 +438,6 @@ function IngredientSelector({
         {selected.map((s) => {
           const opt = options.find((o) => o._id === s.ingredient_id);
           return (
-            // FIX: key estable usando solo ingredient_id
             <div
               key={s.ingredient_id}
               style={{
@@ -439,7 +450,7 @@ function IngredientSelector({
               }}
             >
               <span style={{ fontSize: 13 }}>
-                {opt?.nombre ?? "Ingrediente"} — {s.quantity} {opt?.unidad}
+                {opt?.name ?? "Ingrediente"} — {s.quantity} {opt?.unit}
               </span>
               <button
                 onClick={() => remove(s.ingredient_id)}
@@ -482,7 +493,6 @@ function DishForm({
 }) {
   const [form, setForm] = useState<DishFormData>(initial);
   const [uploading, setUploading] = useState(false);
-  // FIX: estado de error visible al usuario para uploads fallidos
   const [uploadError, setUploadError] = useState("");
 
   const handleImageUpload = async (file: File) => {
@@ -555,7 +565,7 @@ function DishForm({
             <option value="">Sin categoría</option>
             {categories.map((c) => (
               <option key={c._id} value={c._id}>
-                {c.nombre}
+                {c.name}
               </option>
             ))}
           </select>
@@ -638,7 +648,6 @@ function DishForm({
               />
             </label>
 
-            {/* FIX: error de upload visible */}
             {uploadError && (
               <p style={{ color: "#e85d26", fontSize: 12, marginTop: 6 }}>⚠️ {uploadError}</p>
             )}
@@ -762,13 +771,249 @@ function DishCard({
   dish,
   onEdit,
   onDelete,
+  isMobile,
 }: {
   dish: IDish;
   onEdit: () => void;
   onDelete: () => void;
+  isMobile?: boolean;
 }) {
   const catName = getCatName(dish);
 
+  // ── Layout móvil: horizontal ───────────────────────────────────────────────
+  if (isMobile) {
+    return (
+      <div
+        style={{
+          background: "#fff",
+          borderRadius: 16,
+          border: "1.5px solid #eee",
+          overflow: "hidden",
+          boxShadow: "0 2px 8px rgba(0,0,0,0.04)",
+          display: "flex",
+          flexDirection: "column",
+        }}
+      >
+        {/* Fila principal: info + imagen */}
+        <div style={{ display: "flex", gap: 0 }}>
+          {/* Info izquierda */}
+          <div style={{ flex: 1, padding: "14px 14px 10px", minWidth: 0 }}>
+            {/* Categoría */}
+            <span
+              style={{
+                fontSize: 10,
+                fontWeight: 700,
+                padding: "2px 8px",
+                borderRadius: 20,
+                background: catName === "Sin categoría" ? "#f5f5f5" : "#fff8f5",
+                color: catName === "Sin categoría" ? "#999" : "#e85d26",
+                border: `1px solid ${catName === "Sin categoría" ? "#e0e0e0" : "#e85d26"}`,
+                display: "inline-block",
+                marginBottom: 6,
+              }}
+            >
+              {catName}
+            </span>
+
+            {/* Nombre */}
+            <h3
+              style={{
+                margin: "0 0 4px",
+                fontSize: 15,
+                fontWeight: 700,
+                color: "#1a1a1a",
+                lineHeight: 1.3,
+                overflow: "hidden",
+                display: "-webkit-box",
+                WebkitLineClamp: 2,
+                WebkitBoxOrient: "vertical",
+              }}
+            >
+              {dish.name}
+            </h3>
+
+            {/* Descripción */}
+            {dish.description && (
+              <p
+                style={{
+                  margin: "0 0 8px",
+                  fontSize: 12,
+                  color: "#888",
+                  lineHeight: 1.4,
+                  overflow: "hidden",
+                  display: "-webkit-box",
+                  WebkitLineClamp: 2,
+                  WebkitBoxOrient: "vertical",
+                }}
+              >
+                {dish.description}
+              </p>
+            )}
+
+            {/* Precio + estado en fila */}
+            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+              <span style={{ fontSize: 18, fontWeight: 700, color: "#e85d26" }}>
+                Bs. {dish.price.toFixed(2)}
+              </span>
+              <span
+                style={{
+                  fontSize: 11,
+                  fontWeight: 600,
+                  color: dish.isAvailable ? "#27ae60" : "#aaa",
+                  background: dish.isAvailable ? "#edfaf1" : "#f5f5f5",
+                  borderRadius: 20,
+                  padding: "2px 8px",
+                }}
+              >
+                {dish.isAvailable ? "● Disponible" : "● No disponible"}
+              </span>
+            </div>
+          </div>
+
+          {/* Imagen derecha */}
+          <div
+            style={{
+              width: 110,
+              flexShrink: 0,
+              position: "relative",
+              background: "#f5f5f5",
+            }}
+          >
+            {dish.image_url ? (
+              <Image
+                src={dish.image_url}
+                alt={dish.name}
+                fill
+                sizes="110px"
+                style={{ objectFit: "cover" }}
+              />
+            ) : (
+              <div
+                style={{
+                  width: "100%",
+                  height: "100%",
+                  minHeight: 100,
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  fontSize: 28,
+                  color: "#ddd",
+                }}
+              >
+                🍴
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Ingredientes (colapsados en chips) */}
+        {dish.ingredients && dish.ingredients.length > 0 && (
+          <div
+            style={{
+              padding: "6px 14px 8px",
+              display: "flex",
+              flexWrap: "wrap",
+              gap: 4,
+              borderTop: "1px solid #f5f5f5",
+            }}
+          >
+            {dish.ingredients.slice(0, 4).map((ing, i) => {
+              const nombre =
+                typeof ing.ingredient_id === "object"
+                  ? ing.ingredient_id.name
+                  : ing.ingredient_id;
+              const unidad =
+                typeof ing.ingredient_id === "object" ? ing.ingredient_id.unit : "";
+              return (
+                <span
+                  key={i}
+                  style={{
+                    background: "#f5f5f5",
+                    color: "#555",
+                    borderRadius: 20,
+                    padding: "2px 8px",
+                    fontSize: 10,
+                    fontWeight: 600,
+                  }}
+                >
+                  {nombre} · {ing.quantity}{unidad}
+                </span>
+              );
+            })}
+            {dish.ingredients.length > 4 && (
+              <span
+                style={{
+                  background: "#f0f0f0",
+                  color: "#999",
+                  borderRadius: 20,
+                  padding: "2px 8px",
+                  fontSize: 10,
+                  fontWeight: 600,
+                }}
+              >
+                +{dish.ingredients.length - 4} más
+              </span>
+            )}
+          </div>
+        )}
+
+        {/* Botones — full width en móvil */}
+        <div
+          style={{
+            padding: "10px 14px 14px",
+            display: "flex",
+            gap: 8,
+            borderTop: "1.5px solid #f5f5f5",
+          }}
+        >
+          <button
+            onClick={onEdit}
+            style={{
+              flex: 1,
+              padding: "10px",
+              borderRadius: 9,
+              border: "1.5px solid #e0e0e0",
+              background: "#fff",
+              fontSize: 13,
+              fontWeight: 600,
+              cursor: "pointer",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              gap: 6,
+              color: "#333",
+              fontFamily: "inherit",
+            }}
+          >
+            ✏️ Editar
+          </button>
+          <button
+            onClick={onDelete}
+            style={{
+              flex: 1,
+              padding: "10px",
+              borderRadius: 9,
+              border: "1.5px solid #e85d26",
+              background: "#fff0ee",
+              fontSize: 13,
+              fontWeight: 600,
+              cursor: "pointer",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              gap: 6,
+              color: "#e85d26",
+              fontFamily: "inherit",
+            }}
+          >
+            🗑️ Eliminar
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  // ── Layout desktop: vertical (original) ───────────────────────────────────
   return (
     <div
       style={{
@@ -890,10 +1135,10 @@ function DishCard({
               {dish.ingredients.map((ing, i) => {
                 const nombre =
                   typeof ing.ingredient_id === "object"
-                    ? ing.ingredient_id.nombre
+                    ? ing.ingredient_id.name
                     : ing.ingredient_id;
                 const unidad =
-                  typeof ing.ingredient_id === "object" ? ing.ingredient_id.unidad : "";
+                  typeof ing.ingredient_id === "object" ? ing.ingredient_id.unit : "";
                 return (
                   <span
                     key={i}
@@ -990,7 +1235,6 @@ export default function DishesPage() {
   const [deleteDishId, setDeleteDishId] = useState<string | null>(null);
   const [formError, setFormError] = useState("");
 
-  // FIX: useCallback para evitar re-renders innecesarios
   const fetchData = useCallback(async () => {
     setLoading(true);
     try {
@@ -1124,7 +1368,7 @@ export default function DishesPage() {
   const filterTabs = [
     { id: "all",  label: "Todos" },
     { id: "none", label: "Sin categoría" },
-    ...categories.map((c) => ({ id: c._id, label: c.nombre })),
+    ...categories.map((c) => ({ id: c._id, label: c.name })),
   ];
 
   const px = isMobile ? "16px" : "40px";
@@ -1145,7 +1389,16 @@ export default function DishesPage() {
           gap: 10,
         }}
       >
-        <div style={{ display: "flex", alignItems: "center", gap: isMobile ? 10 : 14, minWidth: 0 }}>
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: isMobile ? 10 : 14,
+            minWidth: 0,
+            maxWidth: isMobile ? "calc(100% - 56px)" : undefined,
+            flex: 1,
+          }}
+        >
           <button
             onClick={() => router.push("/dashboard")}
             style={{
@@ -1298,6 +1551,11 @@ export default function DishesPage() {
           flexWrap: isMobile ? "nowrap" : "wrap",
           overflowX: isMobile ? "auto" : "visible",
           paddingBottom: isMobile ? 4 : 0,
+          // Mejoras móvil: snap + ocultar scrollbar
+          scrollSnapType: isMobile ? "x mandatory" : undefined,
+          WebkitOverflowScrolling: isMobile ? "touch" : undefined,
+          msOverflowStyle: isMobile ? "none" : undefined,
+          scrollbarWidth: isMobile ? "none" : undefined,
         }}
       >
         {stats.map((s) => (
@@ -1310,6 +1568,8 @@ export default function DishesPage() {
               padding: isMobile ? "12px 16px" : "16px 24px",
               minWidth: isMobile ? 100 : 130,
               flexShrink: 0,
+              // Snap por card
+              scrollSnapAlign: isMobile ? "start" : undefined,
             }}
           >
             <p style={{ margin: 0, fontSize: isMobile ? 10 : 11, color: "#888", marginBottom: 4 }}>
@@ -1370,6 +1630,11 @@ export default function DishesPage() {
             flexWrap: isMobile ? "nowrap" : "wrap",
             overflowX: isMobile ? "auto" : "visible",
             paddingBottom: isMobile ? 4 : 0,
+            // Mejoras móvil: snap + ocultar scrollbar
+            scrollSnapType: isMobile ? "x mandatory" : undefined,
+            WebkitOverflowScrolling: isMobile ? "touch" : undefined,
+            msOverflowStyle: isMobile ? "none" : undefined,
+            scrollbarWidth: isMobile ? "none" : undefined,
           }}
         >
           {filterTabs.map((tab) => (
@@ -1389,6 +1654,7 @@ export default function DishesPage() {
                 fontFamily: "inherit",
                 flexShrink: 0,
                 whiteSpace: "nowrap",
+                scrollSnapAlign: isMobile ? "start" : undefined,
               }}
             >
               {tab.label}
@@ -1441,6 +1707,7 @@ export default function DishesPage() {
               <DishCard
                 key={dish._id}
                 dish={dish}
+                isMobile={isMobile}
                 onEdit={() => { setFormError(""); setEditDish(dish); }}
                 onDelete={() => setDeleteDishId(dish._id)}
               />
@@ -1449,7 +1716,7 @@ export default function DishesPage() {
         )}
       </div>
 
-      {/* Modal crear — FIX: key para resetear form al abrir */}
+      {/* Modal crear */}
       {showCreateModal && (
         <Modal
           key="create-modal"
@@ -1470,7 +1737,7 @@ export default function DishesPage() {
         </Modal>
       )}
 
-      {/* Modal editar — FIX: key={editDish._id} para resetear form al cambiar plato */}
+      {/* Modal editar */}
       {editDish && (
         <Modal
           key={`edit-modal-${editDish._id}`}
