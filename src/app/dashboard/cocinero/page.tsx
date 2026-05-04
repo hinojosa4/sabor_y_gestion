@@ -1,13 +1,16 @@
 "use client";
 
+
 import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/useAuth";
 import type { AuthUser } from "@/lib/useAuth";
 
+
 // ─── Types ────────────────────────────────────────────────────────────────────
 type OrderStatus = "pending" | "in_kitchen" | "ready" | "delivered" | "paid" | "cancelled";
 type ItemStatus  = "pending" | "in_kitchen" | "ready" | "served" | "cancelled";
+
 
 interface OrderItem {
   _id: string;
@@ -23,6 +26,7 @@ interface OrderItem {
   } | null;
 }
 
+
 interface KitchenOrder {
   _id: string;
   status: OrderStatus;
@@ -33,9 +37,11 @@ interface KitchenOrder {
   total_amount: number;
 }
 
+
 // ─── Constantes ───────────────────────────────────────────────────────────────
 // ✅ Sin cast doble
 const ALLOWED_ROLES: AuthUser["rol"][] = ["cocinero", "admin"];
+
 
 const STATUS_CONFIG = {
   pending:    { label: "Pendiente",      bg: "#fffbeb", border: "#fbbf24", accent: "#d97706", dot: "#f59e0b" },
@@ -43,11 +49,13 @@ const STATUS_CONFIG = {
   ready:      { label: "Listo",          bg: "#f0fdf4", border: "#4ade80", accent: "#16a34a", dot: "#22c55e" },
 };
 
+
 const SERVICE_CONFIG = {
   dine_in:  { label: "Mesa",     icon: "🪑", color: "#6366f1" },
   delivery: { label: "Delivery", icon: "🛵", color: "#8b5cf6" },
   pick_up:  { label: "Pickup",   icon: "🏃", color: "#f59e0b" },
 };
+
 
 // ─── Hook responsive ──────────────────────────────────────────────────────────
 function useIsMobile() {
@@ -61,6 +69,7 @@ function useIsMobile() {
   return isMobile;
 }
 
+
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 function getElapsed(createdAt: string): string {
   const diff = Math.floor((Date.now() - new Date(createdAt).getTime()) / 1000);
@@ -69,9 +78,11 @@ function getElapsed(createdAt: string): string {
   return `${Math.floor(diff / 3600)}h ${Math.floor((diff % 3600) / 60)}min`;
 }
 
+
 function getOrderNumber(id: string): string {
   return "#" + id.slice(-4).toUpperCase();
 }
+
 
 function getUrgency(createdAt: string): "normal" | "warning" | "critical" {
   const mins = Math.floor((Date.now() - new Date(createdAt).getTime()) / 60000);
@@ -80,21 +91,25 @@ function getUrgency(createdAt: string): "normal" | "warning" | "critical" {
   return "normal";
 }
 
+
 const URGENCY_COLORS = {
   normal:   { timer: "#888" },
   warning:  { timer: "#d97706" },
   critical: { timer: "#dc2626" },
 };
 
+
 // ─── Componente: Timer vivo ───────────────────────────────────────────────────
 function LiveTimer({ createdAt }: { createdAt: string }) {
   const [elapsed, setElapsed] = useState(getElapsed(createdAt));
   const urgency = getUrgency(createdAt);
 
+
   useEffect(() => {
     const t = setInterval(() => setElapsed(getElapsed(createdAt)), 1000);
     return () => clearInterval(t);
   }, [createdAt]);
+
 
   return (
     <span style={{
@@ -113,6 +128,7 @@ function LiveTimer({ createdAt }: { createdAt: string }) {
   );
 }
 
+
 // ─── Componente: Badge de estado ──────────────────────────────────────────────
 function StatusBadge({ status }: { status: OrderStatus }) {
   const cfg = STATUS_CONFIG[status as keyof typeof STATUS_CONFIG];
@@ -127,6 +143,7 @@ function StatusBadge({ status }: { status: OrderStatus }) {
     </span>
   );
 }
+
 
 // ─── Componente: Tarjeta de orden ─────────────────────────────────────────────
 function OrderCard({
@@ -143,6 +160,7 @@ function OrderCard({
   const activeItems = order.items.filter(i => i.status !== "cancelled");
   const readyItems  = activeItems.filter(i => i.status === "ready" || i.status === "served");
   const allReady    = activeItems.length > 0 && readyItems.length === activeItems.length;
+
 
   return (
     <div style={{
@@ -181,6 +199,7 @@ function OrderCard({
         </div>
       </div>
 
+
       {/* Items */}
       <div style={{ padding: "12px 16px", flex: 1 }}>
         {activeItems.length === 0 ? (
@@ -192,6 +211,7 @@ function OrderCard({
             const isReady = item.status === "ready" || item.status === "served";
             // ✅ "dish" → "dish_id", "nombre" → "name"
             const catName = item.dish_id?.category_id?.name;
+
 
             return (
               <div key={item._id}>
@@ -223,6 +243,7 @@ function OrderCard({
                     )}
                   </div>
 
+
                   {/* Toggle item — solo en in_kitchen */}
                   {order.status === "in_kitchen" && (
                     <button
@@ -249,6 +270,7 @@ function OrderCard({
         )}
       </div>
 
+
       {/* Progress bar — in_kitchen */}
       {order.status === "in_kitchen" && activeItems.length > 0 && (
         <div style={{ padding: "0 16px 8px" }}>
@@ -267,6 +289,7 @@ function OrderCard({
           </div>
         </div>
       )}
+
 
       {/* Footer CTA */}
       <div style={{ padding: "12px 16px", borderTop: "1.5px solid #f3f4f6" }}>
@@ -287,6 +310,7 @@ function OrderCard({
             🔥 Comenzar a Preparar
           </button>
         )}
+
 
         {order.status === "in_kitchen" && (
           <button
@@ -309,6 +333,7 @@ function OrderCard({
           </button>
         )}
 
+
         {order.status === "ready" && (
           <div style={{
             textAlign: "center", padding: "8px", fontSize: 13,
@@ -323,12 +348,14 @@ function OrderCard({
   );
 }
 
+
 // ─── Page principal ───────────────────────────────────────────────────────────
 export default function CocineroPage() {
   const router = useRouter();
   const isMobile = useIsMobile();
   // ✅ Sin cast doble
   const { user, loading: userLoading, logout } = useAuth(ALLOWED_ROLES);
+
 
   const [orders, setOrders]           = useState<KitchenOrder[]>([]);
   const [loading, setLoading]         = useState(true);
@@ -337,12 +364,14 @@ export default function CocineroPage() {
   const [filterCat, setFilterCat]     = useState("all");
   const [lastUpdate, setLastUpdate]   = useState(new Date());
 
+
   // ✅ useCallback para showToast
   const showToast = useCallback((msg: string) => {
     setToast(msg);
     const t = setTimeout(() => setToast(""), 3000);
     return () => clearTimeout(t);
   }, []);
+
 
   const fetchOrders = useCallback(async () => {
     try {
@@ -359,6 +388,7 @@ export default function CocineroPage() {
     }
   }, []);
 
+
   // Fetch inicial + polling cada 15 segundos
   useEffect(() => {
     if (userLoading || !user) return;
@@ -366,6 +396,7 @@ export default function CocineroPage() {
     const interval = setInterval(fetchOrders, 15000);
     return () => clearInterval(interval);
   }, [userLoading, user, fetchOrders]);
+
 
   const handleStatusChange = async (orderId: string, newStatus: OrderStatus) => {
     setActionLoading(true);
@@ -377,6 +408,7 @@ export default function CocineroPage() {
       });
       const data = await res.json();
       if (!data.ok) { showToast("❌ " + data.message); return; }
+
 
       const msgs: Record<string, string> = {
         in_kitchen: "🔥 Orden en preparación — inventario descontado",
@@ -392,6 +424,7 @@ export default function CocineroPage() {
       setActionLoading(false);
     }
   };
+
 
   const handleItemToggle = async (itemId: string, currentStatus: ItemStatus) => {
     const newStatus: ItemStatus = currentStatus === "ready" ? "in_kitchen" : "ready";
@@ -413,10 +446,12 @@ export default function CocineroPage() {
     }
   };
 
+
   // ── Filtros ───────────────────────────────────────────────────────────────
   const pendingOrders   = orders.filter(o => o.status === "pending");
   const inKitchenOrders = orders.filter(o => o.status === "in_kitchen");
   const readyOrders     = orders.filter(o => o.status === "ready");
+
 
   // ✅ Categorías únicas — campo .name corregido
   const allCategories = Array.from(
@@ -429,6 +464,7 @@ export default function CocineroPage() {
     )
   );
 
+
   // ✅ Filtro por categoría — campo .name corregido
   const filterByCategory = (orderList: KitchenOrder[]) => {
     if (filterCat === "all") return orderList;
@@ -437,7 +473,9 @@ export default function CocineroPage() {
     );
   };
 
+
   const px = isMobile ? "12px" : "24px";
+
 
   if (userLoading) {
     return (
@@ -452,14 +490,17 @@ export default function CocineroPage() {
   }
   if (!user) return null;
 
+
   const columns = [
     { key: "pending" as const,    title: "Pendientes",     orders: filterByCategory(pendingOrders),   color: "#d97706", dot: "#f59e0b" },
     { key: "in_kitchen" as const, title: "En Preparación", orders: filterByCategory(inKitchenOrders), color: "#2563eb", dot: "#3b82f6" },
     { key: "ready" as const,      title: "Listos",         orders: filterByCategory(readyOrders),     color: "#16a34a", dot: "#22c55e" },
   ];
 
+
   return (
     <div style={{ minHeight: "100vh", background: "#f1f5f9", fontFamily: "'Georgia', serif" }}>
+
 
       {/* ── Header ── */}
       <div style={{
@@ -500,6 +541,7 @@ export default function CocineroPage() {
           </div>
         </div>
 
+
         {/* Stats + usuario + salir */}
         <div style={{ display: "flex", gap: isMobile ? 6 : 12, alignItems: "center", flexShrink: 0 }}>
           {/* Stats resumen */}
@@ -527,6 +569,7 @@ export default function CocineroPage() {
             ))}
           </div>
 
+
           {/* Usuario + salir */}
           <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
             {!isMobile && (
@@ -551,6 +594,7 @@ export default function CocineroPage() {
         </div>
       </div>
 
+
       {/* ── Toast ── */}
       {toast && (
         <div style={{
@@ -566,6 +610,7 @@ export default function CocineroPage() {
           {toast}
         </div>
       )}
+
 
       {/* ── Filtros de categoría ── */}
       {allCategories.length > 0 && (
@@ -596,6 +641,7 @@ export default function CocineroPage() {
             </button>
           ))}
 
+
           {/* Botón refresh manual */}
           <button
             onClick={fetchOrders}
@@ -614,6 +660,7 @@ export default function CocineroPage() {
           </button>
         </div>
       )}
+
 
       {/* ── Contenido principal ── */}
       <div style={{ padding: `16px ${px} 48px` }}>
@@ -667,6 +714,7 @@ export default function CocineroPage() {
   );
 }
 
+
 // ─── Columna Kanban (desktop) ─────────────────────────────────────────────────
 function KanbanColumn({ col, onStatusChange, onItemToggle, actionLoading }: {
   col: { key: string; title: string; orders: KitchenOrder[]; color: string; dot: string };
@@ -695,6 +743,7 @@ function KanbanColumn({ col, onStatusChange, onItemToggle, actionLoading }: {
         </span>
       </div>
 
+
       {/* Tarjetas */}
       <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
         {col.orders.length === 0 ? (
@@ -721,6 +770,7 @@ function KanbanColumn({ col, onStatusChange, onItemToggle, actionLoading }: {
   );
 }
 
+
 // ─── Vista mobile: tabs por estado ───────────────────────────────────────────
 function MobileKanban({ columns, onStatusChange, onItemToggle, actionLoading }: {
   columns: { key: string; title: string; orders: KitchenOrder[]; color: string; dot: string }[];
@@ -730,6 +780,7 @@ function MobileKanban({ columns, onStatusChange, onItemToggle, actionLoading }: 
 }) {
   const [activeTab, setActiveTab] = useState(0);
   const col = columns[activeTab];
+
 
   return (
     <div>
@@ -772,6 +823,7 @@ function MobileKanban({ columns, onStatusChange, onItemToggle, actionLoading }: 
           </button>
         ))}
       </div>
+
 
       {/* Tarjetas del tab activo */}
       <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
