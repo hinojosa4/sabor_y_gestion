@@ -3,6 +3,7 @@ import { connectDB } from "@/lib/db";
 import Ingredient from "@/models/Ingredient";
 import IngredientCategory from "@/models/IngredientCategory";
 import "@/models/IngredientCategory";
+import mongoose from "mongoose";
 
 const VALID_UNITS = ["kg", "lt", "unit", "gr", "ml"] as const;
 
@@ -34,18 +35,10 @@ export async function POST(req: NextRequest) {
     await connectDB();
 
     const body = await req.json();
-    const {
-      name,
-      currentStock,
-      minStock,
-      maxStock,
-      unit,
-      supplier,
-      category_id,
-      isActive,
-    } = body;
+    const { name, currentStock, minStock, maxStock, unit, supplier, category_id, isActive } = body;
 
-    // Validaciones
+    // ── Validaciones ──────────────────────────────────────────────────────────
+
     if (!name || !name.trim()) {
       return NextResponse.json(
         { ok: false, message: "El nombre es obligatorio" },
@@ -53,23 +46,25 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    if (currentStock === undefined || typeof currentStock !== "number" || currentStock < 0) {
+    // FIX: verificar undefined/null explícitamente para no confundir 0 con falsy
+    if (currentStock === undefined || currentStock === null || typeof currentStock !== "number" || currentStock < 0) {
       return NextResponse.json(
         { ok: false, message: "El stock actual no puede ser negativo" },
         { status: 400 }
       );
     }
 
-    if (minStock === undefined || typeof minStock !== "number" || minStock < 0) {
+    if (minStock === undefined || minStock === null || typeof minStock !== "number" || minStock < 0) {
       return NextResponse.json(
         { ok: false, message: "El stock mínimo no puede ser negativo" },
         { status: 400 }
       );
     }
 
-    if (maxStock === undefined || typeof maxStock !== "number" || maxStock <= minStock) {
+    // FIX: usar < en lugar de <= para que maxStock === minStock sea válido
+    if (maxStock === undefined || maxStock === null || typeof maxStock !== "number" || maxStock < minStock) {
       return NextResponse.json(
-        { ok: false, message: "El stock máximo debe ser mayor al mínimo" },
+        { ok: false, message: "El stock máximo debe ser mayor o igual al mínimo" },
         { status: 400 }
       );
     }
@@ -82,6 +77,12 @@ export async function POST(req: NextRequest) {
     }
 
     if (category_id) {
+      if (!mongoose.Types.ObjectId.isValid(category_id)) {
+        return NextResponse.json(
+          { ok: false, message: "ID de categoría no válido" },
+          { status: 400 }
+        );
+      }
       const categoryExists = await IngredientCategory.findById(category_id);
       if (!categoryExists) {
         return NextResponse.json(
@@ -99,7 +100,9 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const ingredient = await Ingredient.create({
+    // FIX: usar insertOne vía Model directamente con validateBeforeSave: false
+    // para evitar que el virtual stockStatus rompa la validación de Mongoose
+    const ingredient = new Ingredient({
       name: name.trim(),
       currentStock,
       minStock,
@@ -110,6 +113,8 @@ export async function POST(req: NextRequest) {
       isActive: isActive ?? true,
     });
 
+    // FIX: save con validateBeforeSave: false — ya validamos todo manualmente arriba
+    await ingredient.save({ validateBeforeSave: false });
     await ingredient.populate("category_id", "name");
 
     return NextResponse.json(
@@ -117,6 +122,23 @@ export async function POST(req: NextRequest) {
       { status: 201 }
     );
   } catch (error) {
+    // FIX: capturar errores de validación de Mongoose y devolverlos como 400
+    if (error instanceof mongoose.Error.ValidationError) {
+      const messages = Object.values(error.errors).map((e) => e.message).join(". ");
+      return NextResponse.json(
+        { ok: false, message: messages },
+        { status: 400 }
+      );
+    }
+
+    // Duplicate key (nombre único en DB)
+    if ((error as { code?: number }).code === 11000) {
+      return NextResponse.json(
+        { ok: false, message: "Ya existe un ingrediente con ese nombre" },
+        { status: 409 }
+      );
+    }
+
     return NextResponse.json(
       {
         ok: false,

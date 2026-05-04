@@ -56,6 +56,14 @@ export async function POST(req: NextRequest) {
       { status: 201 }
     );
   } catch (error) {
+    // Duplicate key por índice único en DB
+    if ((error as { code?: number }).code === 11000) {
+      return NextResponse.json(
+        { ok: false, message: "La categoría ya existe" },
+        { status: 409 }
+      );
+    }
+
     return NextResponse.json(
       {
         ok: false,

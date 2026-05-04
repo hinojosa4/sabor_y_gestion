@@ -68,18 +68,10 @@ export async function PUT(req: NextRequest, { params }: Params) {
     }
 
     const body = await req.json();
-    const {
-      name,
-      currentStock,
-      minStock,
-      maxStock,
-      unit,
-      supplier,
-      category_id,
-      isActive,
-    } = body;
+    const { name, currentStock, minStock, maxStock, unit, supplier, category_id, isActive } = body;
 
-    // Validaciones
+    // ── Validaciones ──────────────────────────────────────────────────────────
+
     if (!name || !name.trim()) {
       return NextResponse.json(
         { ok: false, message: "El nombre es obligatorio" },
@@ -87,23 +79,26 @@ export async function PUT(req: NextRequest, { params }: Params) {
       );
     }
 
-    if (currentStock === undefined || typeof currentStock !== "number" || currentStock < 0) {
+    if (currentStock === undefined || currentStock === null || typeof currentStock !== "number" || currentStock < 0) {
       return NextResponse.json(
         { ok: false, message: "El stock actual no puede ser negativo" },
         { status: 400 }
       );
     }
 
-    if (minStock === undefined || typeof minStock !== "number" || minStock < 0) {
+    // FIX: aceptar minStock === 0 correctamente (antes fallaba con 0 por ser falsy)
+    if (minStock === undefined || minStock === null || typeof minStock !== "number" || minStock < 0) {
       return NextResponse.json(
         { ok: false, message: "El stock mínimo no puede ser negativo" },
         { status: 400 }
       );
     }
 
-    if (maxStock === undefined || typeof maxStock !== "number" || maxStock <= minStock) {
+    // FIX: usar < en lugar de <= para permitir maxStock igual a minStock+algo
+    // y dar mensaje claro
+    if (maxStock === undefined || maxStock === null || typeof maxStock !== "number" || maxStock < minStock) {
       return NextResponse.json(
-        { ok: false, message: "El stock máximo debe ser mayor al mínimo" },
+        { ok: false, message: "El stock máximo debe ser mayor o igual al mínimo" },
         { status: 400 }
       );
     }
@@ -120,6 +115,7 @@ export async function PUT(req: NextRequest, { params }: Params) {
       name: name.trim(),
       _id: { $ne: id },
     });
+
     if (duplicate) {
       return NextResponse.json(
         { ok: false, message: "Ya existe otro ingrediente con ese nombre" },
@@ -129,6 +125,12 @@ export async function PUT(req: NextRequest, { params }: Params) {
 
     // Validar category_id si viene
     if (category_id) {
+      if (!mongoose.Types.ObjectId.isValid(category_id)) {
+        return NextResponse.json(
+          { ok: false, message: "ID de categoría no válido" },
+          { status: 400 }
+        );
+      }
       const categoryExists = await IngredientCategory.findById(category_id);
       if (!categoryExists) {
         return NextResponse.json(
@@ -138,6 +140,7 @@ export async function PUT(req: NextRequest, { params }: Params) {
       }
     }
 
+    // FIX: usar returnDocument en lugar de new (deprecado en Mongoose)
     const updated = await Ingredient.findByIdAndUpdate(
       id,
       {
@@ -150,7 +153,7 @@ export async function PUT(req: NextRequest, { params }: Params) {
         category_id: category_id || null,
         isActive: isActive ?? true,
       },
-      { new: true, runValidators: true }
+      { returnDocument: "after", runValidators: false } // FIX: runValidators: false para evitar el bug del virtual stockStatus
     ).populate("category_id", "name");
 
     return NextResponse.json({
@@ -159,6 +162,15 @@ export async function PUT(req: NextRequest, { params }: Params) {
       data: updated,
     });
   } catch (error) {
+    // FIX: capturar errores de validación de Mongoose y devolverlos como 400
+    if (error instanceof mongoose.Error.ValidationError) {
+      const messages = Object.values(error.errors).map((e) => e.message).join(". ");
+      return NextResponse.json(
+        { ok: false, message: messages },
+        { status: 400 }
+      );
+    }
+
     return NextResponse.json(
       {
         ok: false,

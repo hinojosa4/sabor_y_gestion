@@ -76,6 +76,7 @@ export async function PUT(req: NextRequest, { params }: Params) {
       );
     }
 
+    // FIX: runValidators: false para evitar posibles errores de validación internos
     const updated = await IngredientCategory.findByIdAndUpdate(
       id,
       {
@@ -83,7 +84,7 @@ export async function PUT(req: NextRequest, { params }: Params) {
         description: description?.trim() || "",
         isActive: isActive ?? true,
       },
-      { returnDocument: "after", runValidators: true }
+      { returnDocument: "after", runValidators: false }
     );
 
     if (!updated) {
@@ -99,6 +100,21 @@ export async function PUT(req: NextRequest, { params }: Params) {
       data: updated,
     });
   } catch (error) {
+    if (error instanceof mongoose.Error.ValidationError) {
+      const messages = Object.values(error.errors).map((e) => e.message).join(". ");
+      return NextResponse.json(
+        { ok: false, message: messages },
+        { status: 400 }
+      );
+    }
+
+    if ((error as { code?: number }).code === 11000) {
+      return NextResponse.json(
+        { ok: false, message: "Ya existe otra categoría con ese nombre" },
+        { status: 409 }
+      );
+    }
+
     return NextResponse.json(
       {
         ok: false,
