@@ -1,7 +1,7 @@
 // src/components/caja/FacturaFinal.tsx
 import { useRef } from 'react';
 import { X, Printer, Mail } from 'lucide-react';
-import { QRCodeCanvas } from 'qrcode.react';
+//import { QRCodeCanvas } from 'qrcode.react';
 
 interface OrderItem {
     dish: { name: string; price: number };
