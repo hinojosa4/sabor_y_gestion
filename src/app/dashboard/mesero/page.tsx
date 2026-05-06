@@ -5,7 +5,6 @@ import { useAuth } from "@/lib/useAuth";
 import type { AuthUser } from "@/lib/useAuth";
 
 // ─── Types ────────────────────────────────────────────────────────
-type TableStatus = "available" | "occupied" | "reserved";
 type OrderStatus = "pending" | "in_kitchen" | "ready" | "delivered" | "paid" | "cancelled";
 
 interface Table {
@@ -574,33 +573,79 @@ export default function MeseroPage() {
     setTimeout(() => setToast(""), 3000);
   }, []);
 
+  const [refreshKey, setRefreshKey] = useState(0);
   const fetchData = useCallback(async () => {
-    try {
-      const [tablesRes, ordersRes] = await Promise.all([
-        fetch("/api/tables"),
-        fetch("/api/orders/active"),
-      ]);
-      const tablesRaw = await tablesRes.json();
-      const ordersData = await ordersRes.json();
+  try {
+    const [tablesRes, ordersRes] = await Promise.all([
+      fetch("/api/tables"),
+      fetch("/api/orders/active"),
+    ]);
+    const tablesRaw = await tablesRes.json();
+    const ordersData = await ordersRes.json();
 
-      // Tu /api/tables devuelve el array directo, no { ok, data }
-      const tablesArray = Array.isArray(tablesRaw) ? tablesRaw : [];
-      setTables(tablesArray);
+    const tablesArray = Array.isArray(tablesRaw) ? tablesRaw : [];
+    setTables(tablesArray);
 
-      if (ordersData.ok) setActiveOrders(ordersData.data);
-    } catch {
-      // silencioso en polling
-    } finally {
-      setLoadingData(false);
+    if (ordersData.ok) {
+      setActiveOrders(ordersData.data);
+      setRefreshKey(k => k + 1);
     }
-  }, []);
+  } catch {
+    // silencioso
+  } finally {
+    setLoadingData(false);
+  }
+}, []);
 
-  useEffect(() => {
-    if (userLoading || !user) return;
-    fetchData();
-    const interval = setInterval(fetchData, 10000); // polling cada 10s
-    return () => clearInterval(interval);
-  }, [userLoading, user, fetchData]);
+// ← agrega esto justo después
+const fetchDataRef = useRef(fetchData);
+useEffect(() => {
+  fetchDataRef.current = fetchData;
+}, [fetchData]);
+
+// websocket
+useEffect(() => {
+  if (userLoading || !user) return;
+
+  fetchData();
+
+  let pusherInstance: InstanceType<typeof import("pusher-js")["default"]> | null = null;
+  let mounted = true;
+
+  const setup = async () => {
+    const { default: Pusher } = await import("pusher-js");
+    if (!mounted) return;
+
+    pusherInstance = new Pusher(process.env.NEXT_PUBLIC_PUSHER_KEY!, {
+      cluster: process.env.NEXT_PUBLIC_PUSHER_CLUSTER!,
+    });
+
+    pusherInstance.connection.bind("connected", () => {
+      console.log("Pusher conectado en mesero ✓");
+    });
+
+    const channel = pusherInstance.subscribe("restaurant");
+
+    channel.bind("order:new", () => {
+      if (mounted) fetchDataRef.current();
+    });
+
+    channel.bind("order:updated", (data: { newStatus: string }) => {
+      if (!mounted) return;
+      console.log("Evento recibido en mesero:", data);
+      fetchDataRef.current();
+      if (data.newStatus === "ready") showToast("🔔 ¡Una orden está lista para servir!");
+    });
+  };
+
+  setup();
+
+  return () => {
+    mounted = false;
+    pusherInstance?.unsubscribe("restaurant");
+    pusherInstance?.disconnect();
+  };
+}, [userLoading, user, fetchData, showToast]);
 
   const handleMarkServed = async (orderId: string) => {
     setActionLoading(true);
@@ -720,15 +765,15 @@ export default function MeseroPage() {
 
           {/* Órdenes activas */}
           {activeOrders.filter(o => !["paid", "cancelled", "delivered"].includes(o.status)).length > 0 && (
-            <div style={{ background: "#fff", borderRadius: 20, border: "1.5px solid #f3f4f6", padding: "24px" }}>
+            <div key={refreshKey} style={{ background: "#fff", borderRadius: 20, border: "1.5px solid #f3f4f6", padding: "24px" }}>
               <h2 style={{ margin: "0 0 4px", fontSize: 16, fontWeight: 800, color: "#111" }}>Órdenes Activas</h2>
               <p style={{ margin: "0 0 20px", fontSize: 13, color: "#9ca3af" }}>Seguimiento de órdenes en proceso</p>
-              <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+              <div key={refreshKey} style={{ display: "flex", flexDirection: "column", gap: 12 }}>
                 {activeOrders
                   .filter(o => !["paid", "cancelled", "delivered"].includes(o.status))
                   .map(order => (
                     <ActiveOrderCard
-                      key={order._id}
+                      key={`${order._id}-${order.status}`}
                       order={order}
                       onMarkServed={handleMarkServed}
                       loading={actionLoading}

@@ -4,6 +4,7 @@ import Order from "@/models/Order";
 import OrderItem from "@/models/OrderItem";
 import Table from "@/models/Table";
 import { verifyToken } from "@/lib/jwt";
+import { pusherServer } from "@/lib/pusher";
 
 export async function POST(req: NextRequest) {
   try {
@@ -65,6 +66,10 @@ export async function POST(req: NextRequest) {
     if (table_id && service_type === "dine_in") {
       await Table.findByIdAndUpdate(table_id, { status: "occupied" });
     }
+    // Al final del POST, antes del return:
+    await pusherServer.trigger("restaurant", "order:new", {
+      order: { ...order.toObject(), items: orderItems },
+    });
 
     return NextResponse.json(
       { ok: true, message: "Orden creada", data: { order, items: orderItems } },

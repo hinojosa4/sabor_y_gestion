@@ -32,6 +32,7 @@ interface KitchenOrder {
   status: OrderStatus;
   service_type: "dine_in" | "delivery" | "pick_up";
   table_id?: string;
+  table_number?: number | null; // ← agregar
   createdAt: string;
   items: OrderItem[];
   total_amount: number;
@@ -161,6 +162,7 @@ function OrderCard({
   const readyItems  = activeItems.filter(i => i.status === "ready" || i.status === "served");
   const allReady    = activeItems.length > 0 && readyItems.length === activeItems.length;
 
+  console.log("Order:", order._id, "activeItems:", activeItems.map(i => ({ id: i._id, status: i.status })), "allReady:", allReady);
 
   return (
     <div style={{
@@ -189,8 +191,10 @@ function OrderCard({
           }}>
             {svc.icon} {svc.label}
           </span>
-          {order.service_type === "dine_in" && order.table_id && (
-            <span style={{ fontSize: 11, color: "#888" }}>Mesa {order.table_id}</span>
+          {order.service_type === "dine_in" && (
+            <span style={{ fontSize: 11, color: "#888" }}>
+              Mesa {order.table_number ?? order.table_id}
+            </span>
           )}
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
@@ -389,13 +393,30 @@ export default function CocineroPage() {
   }, []);
 
 
-  // Fetch inicial + polling cada 15 segundos
   useEffect(() => {
-    if (userLoading || !user) return;
-    fetchOrders();
-    const interval = setInterval(fetchOrders, 15000);
-    return () => clearInterval(interval);
-  }, [userLoading, user, fetchOrders]);
+  if (userLoading || !user) return;
+
+  fetchOrders();
+
+  let pusherInstance: InstanceType<typeof import("pusher-js")["default"]> | null = null;
+
+  const setup = async () => {
+    const { default: Pusher } = await import("pusher-js");
+    pusherInstance = new Pusher(process.env.NEXT_PUBLIC_PUSHER_KEY!, {
+      cluster: process.env.NEXT_PUBLIC_PUSHER_CLUSTER!,
+    });
+    const channel = pusherInstance.subscribe("restaurant");
+    channel.bind("order:new", () => fetchOrders());
+    channel.bind("order:updated", () => fetchOrders());
+  };
+
+  setup();
+
+  return () => {
+    pusherInstance?.unsubscribe("restaurant");
+    pusherInstance?.disconnect();
+  };
+}, [userLoading, user, fetchOrders]);
 
 
   const handleStatusChange = async (orderId: string, newStatus: OrderStatus) => {
@@ -436,13 +457,17 @@ export default function CocineroPage() {
         body: JSON.stringify({ status: newStatus, chef_id: user?._id }),
       });
       const data = await res.json();
-      if (!data.ok) { showToast("❌ " + data.message); return; }
-      await fetchOrders();
+      console.log("Item toggle response:", data);
+      if (!data.ok) {
+        showToast("❌ " + data.message);
+      } else {
+        await fetchOrders();
+      }
     } catch (error) {
       console.error("Error al actualizar ítem:", error);
       showToast("❌ Error al actualizar ítem");
     } finally {
-      setActionLoading(false);
+      setActionLoading(false); // ← siempre corre ahora
     }
   };
 
@@ -756,13 +781,13 @@ function KanbanColumn({ col, onStatusChange, onItemToggle, actionLoading }: {
           </div>
         ) : (
           col.orders.map(order => (
-            <OrderCard
-              key={order._id}
-              order={order}
-              onStatusChange={onStatusChange}
-              onItemToggle={onItemToggle}
-              loading={actionLoading}
-            />
+          <OrderCard
+            key={order._id + order.items.map(i => i.status).join("")}  // ← así
+            order={order}
+            onStatusChange={onStatusChange}
+            onItemToggle={onItemToggle}
+            loading={actionLoading}
+          />
           ))
         )}
       </div>
@@ -838,7 +863,7 @@ function MobileKanban({ columns, onStatusChange, onItemToggle, actionLoading }: 
         ) : (
           col.orders.map(order => (
             <OrderCard
-              key={order._id}
+              key={order._id + order.items.map(i => i.status).join("")}
               order={order}
               onStatusChange={onStatusChange}
               onItemToggle={onItemToggle}

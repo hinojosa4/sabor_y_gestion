@@ -3,6 +3,7 @@ import { connectDB } from "@/lib/db";
 import OrderItem from "@/models/OrderItem";
 import Order from "@/models/Order";
 import mongoose from "mongoose";
+import { pusherServer } from "@/lib/pusher"; 
 
 interface Params {
   params: Promise<{ id: string }>;
@@ -71,6 +72,10 @@ export async function PATCH(req: NextRequest, { params }: Params) {
     const allReady = allItems.length > 0 && allItems.every((i) => i.status === "ready");
     if (allReady) {
       await Order.findByIdAndUpdate(item.order_id, { status: "ready" });
+      await pusherServer.trigger("restaurant", "order:updated", {
+        orderId: String(item.order_id),
+        newStatus: "ready",
+      });
     }
 
     return NextResponse.json({ ok: true, data: item });

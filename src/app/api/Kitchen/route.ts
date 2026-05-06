@@ -2,16 +2,17 @@ import { NextRequest, NextResponse } from "next/server";
 import { connectDB } from "@/lib/db";
 import Order from "@/models/Order";
 import OrderItem from "@/models/OrderItem";
-import Ingredient, { IIngredient } from "@/models/Ingredient"; 
+import Ingredient from "@/models/Ingredient"; 
 import "@/models/Dish";
 import "@/models/Category";
 import mongoose, { Types } from "mongoose";
+import Table from "@/models/Table";
+import { pusherServer } from "@/lib/pusher";
 
 // ── GET /api/orders/kitchen ───────────────────────────────────────────────────
 export async function GET() {
   try {
     await connectDB();
-
     const orders = await Order.find({
       status: { $in: ["pending", "in_kitchen", "ready"] },
     })
@@ -19,21 +20,20 @@ export async function GET() {
       .lean();
 
     const orderIds = orders.map((o) => o._id);
-
     const items = await OrderItem.find({ order_id: { $in: orderIds } })
       .populate({
         path: "dish_id",
         model: "Dish",
         select: "name category_id",
-        populate: {
-          path: "category_id",
-          model: "Category",
-          select: "name",
-        },
+        populate: { path: "category_id", model: "Category", select: "name" },
       })
       .lean();
 
-    // Agrupar items por orden
+    // Resolver números de mesa
+    const tableIds = [...new Set(orders.map(o => o.table_id).filter(Boolean))];
+    const tables = await Table.find({ _id: { $in: tableIds } }).lean();
+    const tableMap = new Map(tables.map(t => [String(t._id), t.number]));
+
     const itemsByOrder: Record<string, typeof items> = {};
     for (const item of items) {
       const key = String(item.order_id);
@@ -43,6 +43,7 @@ export async function GET() {
 
     const result = orders.map((order) => ({
       ...order,
+      table_number: order.table_id ? tableMap.get(String(order.table_id)) ?? null : null,
       items: itemsByOrder[String(order._id)] ?? [],
     }));
 
@@ -50,11 +51,7 @@ export async function GET() {
   } catch (error) {
     console.error("Kitchen GET error:", error);
     return NextResponse.json(
-      {
-        ok: false,
-        message: "Error al obtener órdenes",
-        error: error instanceof Error ? error.message : String(error),
-      },
+      { ok: false, message: "Error al obtener órdenes", error: error instanceof Error ? error.message : String(error) },
       { status: 500 }
     );
   }
@@ -223,6 +220,12 @@ export async function PATCH(req: NextRequest) {
 
     order.status = newStatus;
     await order.save();
+
+        // Al final del PATCH, antes del return:
+    await pusherServer.trigger("restaurant", "order:updated", {
+      orderId,
+      newStatus,
+    });
 
     return NextResponse.json({
       ok: true,

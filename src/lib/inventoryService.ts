@@ -2,7 +2,6 @@ import { connectDB } from "@/lib/db";
 import Ingredient from "@/models/Ingredient";
 import Dish from "@/models/Dish";
 import OrderItem from "@/models/OrderItem";
-import mongoose from "mongoose";
 
 /**
  * Descuenta stock al confirmar items en cocina.
@@ -17,7 +16,7 @@ export async function descontarStockPorOrdenItem(
   if (!orderItem) throw new Error("OrderItem no encontrado");
 
   // Busca el plato con sus ingredientes
-  const dish = await Dish.findById(orderItem.menu_item_id).populate(
+  const dish = await Dish.findById(orderItem.dish_id).populate(  // ← menu_item_id → dish_id
     "ingredients.ingredient_id"
   );
   if (!dish) throw new Error("Plato no encontrado");
@@ -29,18 +28,18 @@ export async function descontarStockPorOrdenItem(
 
     const ingrediente = await Ingredient.findByIdAndUpdate(
       item.ingredient_id,
-      { $inc: { stock_actual: -cantidadADescontar } },
+      { $inc: { currentStock: -cantidadADescontar } },  // ← stock_actual → currentStock
       { new: true }
     );
 
     if (!ingrediente) continue;
 
     // Revisar estado post-descuento
-    if (ingrediente.stock_actual <= 0) {
-      alertas.push(`🔴 CRÍTICO: "${ingrediente.nombre}" sin stock`);
-    } else if (ingrediente.stock_actual <= ingrediente.stock_minimo) {
+    if (ingrediente.currentStock <= 0) {
+      alertas.push(`🔴 CRÍTICO: "${ingrediente.name}" sin stock`);  // ← nombre → name
+    } else if (ingrediente.currentStock <= ingrediente.minStock) {  // ← stock_minimo → minStock
       alertas.push(
-        `🟡 BAJO: "${ingrediente.nombre}" con ${ingrediente.stock_actual} ${ingrediente.unidad}`
+        `🟡 BAJO: "${ingrediente.name}" con ${ingrediente.currentStock} ${ingrediente.unit}`  // ← campos actualizados
       );
     }
   }
@@ -55,23 +54,22 @@ export async function descontarStockPorOrdenItem(
 export async function obtenerAlertasInventario() {
   await connectDB();
 
-  const ingredientes = await Ingredient.find({ activo: true })
-    .populate("category_id", "nombre")
+  const ingredientes = await Ingredient.find({ isActive: true })  // ← activo → isActive
+    .populate("category_id", "name")                               // ← nombre → name
     .lean();
 
   return ingredientes
     .map((ing) => ({
       ...ing,
       stockStatus:
-        ing.stock_actual <= 0
+        ing.currentStock <= 0                          // ← stock_actual → currentStock
           ? "critico"
-          : ing.stock_actual <= ing.stock_minimo
+          : ing.currentStock <= ing.minStock           // ← stock_minimo → minStock
           ? "bajo"
           : "ok",
     }))
     .filter((ing) => ing.stockStatus !== "ok")
     .sort((a, b) => {
-      // Críticos primero
       if (a.stockStatus === "critico" && b.stockStatus !== "critico") return -1;
       if (b.stockStatus === "critico" && a.stockStatus !== "critico") return 1;
       return 0;
