@@ -56,6 +56,7 @@ export async function GET(
       subtotal,
       iva,
       total,
+      orderId: order._id,
     });
   } catch (error) {
     console.error('[Preinvoice] Error:', error);
