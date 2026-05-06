@@ -10,11 +10,11 @@
 !.yarn/releases
 !.yarn/versions
 
-# claude
-./claude
-
 # testing
 /coverage
+
+# claude
+/.claude
 
 # next.js
 /.next/
