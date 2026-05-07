@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
+import { useRouter } from "next/navigation";
 import { ClientHeader } from "@/components/clientScreen/ClientHeader";
 import { ClientInfoCard, ClientStats } from "@/components/clientScreen/ClientInfoCard";
 import { ConsumoHistory } from "@/components/clientScreen/ConsumoHistory";
@@ -74,6 +75,7 @@ const MOCK_ORDERS: Order[] = [
 ];
 
 export default function ClientePage() {
+    const router = useRouter();
     const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
     const [modalOpen, setModalOpen] = useState(false);
 
@@ -90,7 +92,7 @@ export default function ClientePage() {
     return (
         <main style={styles.main}>
             <ClientHeader
-                onDelivery={() => console.log("Pedir Delivery")}
+                onDelivery={() => router.push("/cliente/delivery")}
                 onLogout={() => console.log("Salir")}
             />
 

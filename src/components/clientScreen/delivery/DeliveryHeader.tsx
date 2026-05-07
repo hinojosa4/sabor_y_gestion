@@ -1,32 +1,37 @@
-// src/components/clientScreen/ClientHeader.tsx
+// src/components/clientScreen/delivery/DeliveryHeader.tsx
 import React from "react";
-import { User, Truck, LogOut } from "lucide-react";
+import { Truck, Store, ArrowLeft } from "lucide-react";
 
-interface ClientHeaderProps {
-    onDelivery?: () => void;
+interface DeliveryHeaderProps {
+    clientName?: string;
+    onComerEnRestaurante?: () => void;
     onLogout?: () => void;
 }
 
-export function ClientHeader({ onDelivery, onLogout }: ClientHeaderProps) {
+export function DeliveryHeader({
+    clientName = "Cliente",
+    onComerEnRestaurante,
+    onLogout,
+}: DeliveryHeaderProps) {
     return (
         <header style={styles.header}>
             <div style={styles.left}>
                 <div style={styles.iconBox}>
-                    <User size={22} color="#ffffff" />
+                    <Truck size={22} color="#ffffff" />
                 </div>
                 <div>
-                    <h1 style={styles.title}>Mi Cuenta</h1>
-                    <p style={styles.subtitle}>Panel de Cliente</p>
+                    <h1 style={styles.title}>Delivery</h1>
+                    <p style={styles.subtitle}>Hola, {clientName}</p>
                 </div>
             </div>
 
             <div style={styles.right}>
-                <button style={styles.outlineBtn} onClick={onDelivery}>
-                    <Truck size={16} />
-                    <span>Pedir delivery</span>
+                <button style={styles.outlineBtn} onClick={onComerEnRestaurante}>
+                    <Store size={16} />
+                    <span>Ver mis datos</span>
                 </button>
                 <button style={styles.outlineBtn} onClick={onLogout}>
-                    <LogOut size={16} />
+                    <ArrowLeft size={16} />
                     <span>Salir</span>
                 </button>
             </div>
@@ -54,7 +59,7 @@ const styles: { [key: string]: React.CSSProperties } = {
         width: 40,
         height: 40,
         borderRadius: 10,
-        backgroundColor: "#f97316",
+        backgroundColor: "#8b5cf6",
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
