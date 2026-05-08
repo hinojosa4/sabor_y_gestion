@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react"; // 
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/useAuth";
 import { ADMIN } from "@/lib/roles";
@@ -59,51 +59,61 @@ export default function DashboardPage() {
     return () => clearInterval(t);
   }, []);
 
+  // ── fetchStats extraído con useCallback ───────────────────────────────────
+  const fetchStats = useCallback(async () => {
+    try {
+      const [dishRes, catRes, userRes, tableRes] = await Promise.all([
+        fetch("/api/dishes"),
+        fetch("/api/categories"),
+        fetch("/api/users"),
+        fetch("/api/tables"),
+      ]);
+
+      const [dishData, catData, userData, tableData] = await Promise.all([
+        dishRes.json(),
+        catRes.json(),
+        userRes.json(),
+        tableRes.json(),
+      ]);
+
+      // dishes y categories usan { ok, data }
+      const dishes = dishData.ok ? dishData.data : [];
+      const cats   = catData.ok  ? catData.data  : [];
+
+      // users y tables devuelven array directo (código de otros devs, no tocar)
+      const users  = Array.isArray(userData)  ? userData  : [];
+      const tables = Array.isArray(tableData) ? tableData : [];
+
+      setStats({
+        totalDishes:      dishes.length,
+        availableDishes:  dishes.filter((d: { isAvailable: boolean }) => d.isAvailable).length,
+        totalCategories:  cats.length,
+        activeCategories: cats.filter((c: { isActive: boolean }) => c.isActive).length, // ← "activo" → "isActive"
+        totalUsers:       users.length,
+        activeUsers:      users.filter((u: { activo: boolean }) => u.activo).length,    // ← activo se mantiene (modelo User sin migrar)
+        totalTables:      tables.length,
+        availableTables:  tables.filter((t: { status: string }) => t.status === "Libre").length,
+        occupiedTables:   tables.filter((t: { status: string }) => t.status === "Ocupada").length,
+        reservedTables:   tables.filter((t: { status: string }) => t.status === "Reservada").length,
+        adminCount:    users.filter((u: { rol: string }) => u.rol === "admin").length,
+        cajeroCount:   users.filter((u: { rol: string }) => u.rol === "cajero").length,
+        cocineroCount: users.filter((u: { rol: string }) => u.rol === "cocinero").length,
+        meseroCount:   users.filter((u: { rol: string }) => u.rol === "mesero").length,
+        clienteCount:  users.filter((u: { rol: string }) => u.rol === "cliente").length,
+      });
+    } catch (error) {
+      console.error("Error al obtener estadísticas del dashboard:", error);
+    } finally {
+      setLoading(false);
+    }
+  }, []); // sin dependencias — solo llama APIs públicas
+
   useEffect(() => {
     if (userLoading || !user) return;
-
-    const fetchStats = async () => {
-      try {
-        const [dishRes, catRes, userRes, tableRes] = await Promise.all([
-          fetch("/api/dishes"),
-          fetch("/api/categories"),
-          fetch("/api/users"),
-          fetch("/api/tables"),
-        ]);
-        const dishData = await dishRes.json();
-        const catData = await catRes.json();
-        const userData = await userRes.json();
-        const tableData = await tableRes.json();
-
-        const dishes = dishData.ok ? dishData.data : [];
-        const cats = catData.ok ? catData.data : [];
-        const users = Array.isArray(userData) ? userData : [];
-        const tables = Array.isArray(tableData) ? tableData : [];
-
-        setStats({
-          totalDishes: dishes.length,
-          availableDishes: dishes.filter((d: { isAvailable: boolean }) => d.isAvailable).length,
-          totalCategories: cats.length,
-          activeCategories: cats.filter((c: { activo: boolean }) => c.activo).length,
-          totalUsers: users.length,
-          activeUsers: users.filter((u: { activo: boolean }) => u.activo).length,
-          totalTables: tables.length,
-          availableTables: tables.filter((t: { status: string }) => t.status === "Libre").length,
-          occupiedTables: tables.filter((t: { status: string }) => t.status === "Ocupada").length,
-          reservedTables: tables.filter((t: { status: string }) => t.status === "Reservada").length,
-          adminCount:    users.filter((u: { rol: string }) => u.rol === "admin").length,
-          cajeroCount:   users.filter((u: { rol: string }) => u.rol === "cajero").length,
-          cocineroCount: users.filter((u: { rol: string }) => u.rol === "cocinero").length,
-          meseroCount:   users.filter((u: { rol: string }) => u.rol === "mesero").length,
-          clienteCount:  users.filter((u: { rol: string }) => u.rol === "cliente").length,
-        });
-      } catch { /* silencioso */ }
-      finally { setLoading(false); }
-    };
-
     fetchStats();
-  }, [userLoading, user?._id]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [userLoading, user, fetchStats]); // ← sin eslint-disable, dependencias correctas
 
+  // ── resto del componente sin cambios ──────────────────────────────────────
   const greeting = () => {
     const h = time.getHours();
     if (h < 12) return "Buenos días";

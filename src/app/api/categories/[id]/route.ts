@@ -8,6 +8,7 @@ interface Params {
   params: Promise<{ id: string }>;
 }
 
+// ── GET /api/categories/[id] ──────────────────────────────────────────────────
 export async function GET(_req: NextRequest, { params }: Params) {
   try {
     await connectDB();
@@ -42,6 +43,7 @@ export async function GET(_req: NextRequest, { params }: Params) {
   }
 }
 
+// ── PUT /api/categories/[id] ──────────────────────────────────────────────────
 export async function PUT(req: NextRequest, { params }: Params) {
   try {
     await connectDB();
@@ -55,9 +57,9 @@ export async function PUT(req: NextRequest, { params }: Params) {
     }
 
     const body = await req.json();
-    const { nombre, descripcion, activo } = body;
+    const { name, description, isActive } = body;
 
-    if (!nombre || !nombre.trim()) {
+    if (!name || !name.trim()) {
       return NextResponse.json(
         { ok: false, message: "El nombre es obligatorio" },
         { status: 400 }
@@ -65,7 +67,7 @@ export async function PUT(req: NextRequest, { params }: Params) {
     }
 
     const existingCategory = await Category.findOne({
-      nombre: nombre.trim(),
+      name: name.trim(),
       _id: { $ne: id },
     });
 
@@ -79,9 +81,9 @@ export async function PUT(req: NextRequest, { params }: Params) {
     const updatedCategory = await Category.findByIdAndUpdate(
       id,
       {
-        nombre: nombre.trim(),
-        descripcion: descripcion?.trim() || "",
-        activo: activo ?? true,
+        name: name.trim(),
+        description: description?.trim() || "",
+        isActive: isActive ?? true,
       },
       { returnDocument: "after", runValidators: true }
     );
@@ -110,6 +112,7 @@ export async function PUT(req: NextRequest, { params }: Params) {
   }
 }
 
+// ── DELETE /api/categories/[id] ───────────────────────────────────────────────
 export async function DELETE(_req: NextRequest, { params }: Params) {
   try {
     await connectDB();
@@ -122,6 +125,7 @@ export async function DELETE(_req: NextRequest, { params }: Params) {
       );
     }
 
+    // Verificar platos asociados antes de eliminar
     const dishCount = await Dish.countDocuments({ category_id: id });
     if (dishCount > 0) {
       return NextResponse.json(
