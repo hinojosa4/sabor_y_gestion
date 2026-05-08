@@ -56,13 +56,14 @@ export async function POST(req: NextRequest) {
       { status: 201 }
     );
   } catch (error) {
-    return NextResponse.json(
-      {
-        ok: false,
-        message: "Error al crear categoría",
-        error: error instanceof Error ? error.message : "Error desconocido",
-      },
-      { status: 500 }
-    );
+  console.error("[POST /api/categories] Error completo:", error); // ← agrega esto
+  return NextResponse.json(
+    {
+      ok: false,
+      message: "Error al crear categoría",
+      error: error instanceof Error ? error.message : "Error desconocido",
+    },
+    { status: 500 }
+  );
   }
 }

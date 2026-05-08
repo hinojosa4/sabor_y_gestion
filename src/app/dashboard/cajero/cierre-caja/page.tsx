@@ -1,5 +1,5 @@
 "use client";
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { ArrowLeft, DollarSign, CreditCard, Receipt, Printer } from 'lucide-react';
 import Link from 'next/link';
 
@@ -241,10 +241,6 @@ export default function CierreCajaPage() {
     const [data, setData] = useState<CashRegisterData | null>(null);
     const [closing, setClosing] = useState(false);
 
-    useEffect(() => {
-        fetchCierreData();
-    }, []);
-
     const fetchCierreData = async () => {
         try {
             const res = await fetch('/api/cash-register/current');
@@ -257,6 +253,50 @@ export default function CierreCajaPage() {
         }
     };
 
+    // ── Pusher: escucha eventos de mesas y órdenes ────────────────────────────
+    const fetchCierreDataRef = useRef(fetchCierreData);
+    useEffect(() => {
+        fetchCierreDataRef.current = fetchCierreData;
+    });
+
+    useEffect(() => {
+        fetchCierreDataRef.current();
+
+        let pusherInstance: InstanceType<typeof import("pusher-js")["default"]> | null = null;
+        let mounted = true;
+
+        const setup = async () => {
+            const { default: Pusher } = await import("pusher-js");
+            if (!mounted) return;
+
+            pusherInstance = new Pusher(process.env.NEXT_PUBLIC_PUSHER_KEY!, {
+                cluster: process.env.NEXT_PUBLIC_PUSHER_CLUSTER!,
+            });
+
+            const channel = pusherInstance.subscribe("restaurant");
+
+            channel.bind("order:new", () => {
+                if (mounted) fetchCierreDataRef.current();
+            });
+
+            channel.bind("table:updated", () => {
+                if (mounted) fetchCierreDataRef.current();
+            });
+
+            channel.bind("table:bill_requested", () => {
+                if (mounted) fetchCierreDataRef.current();
+            });
+        };
+
+        setup();
+
+        return () => {
+            mounted = false;
+            pusherInstance?.unsubscribe("restaurant");
+            pusherInstance?.disconnect();
+        };
+    }, []); // solo al montar
+
     const handleCierre = async () => {
         if (!confirm('¿Estás seguro de realizar el cierre de caja? No podrás revertirlo.')) return;
         setClosing(true);
@@ -268,7 +308,7 @@ export default function CierreCajaPage() {
             });
             if (res.ok) {
                 alert('Cierre de caja realizado con éxito');
-                fetchCierreData();
+                fetchCierreDataRef.current();
             } else {
                 const error = await res.json();
                 alert(error.error || 'Error al cerrar caja');
@@ -306,7 +346,7 @@ export default function CierreCajaPage() {
 
     return (
         <div style={containerStyle}>
-            {/* Header actualizado */}
+            {/* Header */}
             <header
                 id="cash-closure-header"
                 style={{

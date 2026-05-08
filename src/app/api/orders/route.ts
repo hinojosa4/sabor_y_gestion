@@ -64,7 +64,7 @@ export async function POST(req: NextRequest) {
 
     // Marcar mesa como ocupada si es dine_in
     if (table_id && service_type === "dine_in") {
-      await Table.findByIdAndUpdate(table_id, { status: "occupied" });
+      await Table.findByIdAndUpdate(table_id, { status: "Ocupada" });
     }
     // Al final del POST, antes del return:
     await pusherServer.trigger("restaurant", "order:new", {

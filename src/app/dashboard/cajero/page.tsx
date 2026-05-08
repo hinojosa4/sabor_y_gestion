@@ -1,5 +1,5 @@
 "use client";
-import { useState } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { useAuth } from '@/lib/useAuth';
 import { CAJERO } from '@/lib/roles';
 import { Search, DollarSign, Receipt, Clock } from 'lucide-react';
@@ -205,7 +205,50 @@ export default function CajeroDashboard() {
             setIsPreinvoiceOpen(true);
         }
     };
+    const refreshTablesRef = useRef(refreshTables);
+    useEffect(() => {
+    refreshTablesRef.current = refreshTables;
+    }, [refreshTables]);
 
+    useEffect(() => {
+    let pusherInstance: InstanceType<typeof import("pusher-js")["default"]> | null = null;
+    let mounted = true;
+
+    const setup = async () => {
+        const { default: Pusher } = await import("pusher-js");
+        if (!mounted) return;
+
+        pusherInstance = new Pusher(process.env.NEXT_PUBLIC_PUSHER_KEY!, {
+        cluster: process.env.NEXT_PUBLIC_PUSHER_CLUSTER!,
+        });
+
+        const channel = pusherInstance.subscribe("restaurant");
+
+        // Nueva orden creada → puede cambiar estado de mesa
+        channel.bind("order:new", () => {
+        if (mounted) refreshTablesRef.current();
+        });
+
+        // Mesa actualizada (pagado, cuenta solicitada)
+        channel.bind("table:updated", () => {
+        if (mounted) refreshTablesRef.current();
+        });
+
+        // Mesero pide cuenta
+        channel.bind("table:bill_requested", () => {
+        if (mounted) refreshTablesRef.current();
+        });
+    };
+
+    setup();
+
+    return () => {
+        mounted = false;
+        pusherInstance?.unsubscribe("restaurant");
+        pusherInstance?.disconnect();
+    };
+    }, []); // solo al montar
+    
     if (userLoading || loading) {
         return (
             <div style={loadingContainerStyle}>
