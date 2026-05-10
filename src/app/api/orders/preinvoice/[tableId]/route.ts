@@ -49,7 +49,13 @@ export async function GET(
     const iva = subtotal * 0.13;
     const total = subtotal + iva;
 
-    return NextResponse.json({ items: formattedItems, subtotal, iva, total });
+    return NextResponse.json({
+      items: formattedItems,
+      subtotal,
+      iva,
+      total,
+      orderId: order._id,
+    });
   } catch (error) {
     console.error('[Preinvoice] Error:', error);
     return NextResponse.json({ error: 'Error interno del servidor' }, { status: 500 });

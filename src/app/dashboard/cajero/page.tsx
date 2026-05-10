@@ -1,3 +1,4 @@
+// src/app/dashboard/cajero/page.tsx
 "use client";
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useAuth } from '@/lib/useAuth';
@@ -6,6 +7,7 @@ import { Search, DollarSign, Receipt, Clock } from 'lucide-react';
 import Link from 'next/link';
 import { useTableData } from '@/hooks/useTableData';
 import { PreinvoiceModal } from '@/components/caja/PreinvoiceModal';
+import { PaymentModal } from '@/components/caja/PaymentModal';
 
 const containerStyle: React.CSSProperties = {
     minHeight: "100vh",
@@ -185,6 +187,11 @@ export default function CajeroDashboard() {
     const [searchQuery, setSearchQuery] = useState('');
     const [selectedTable, setSelectedTable] = useState<{ id: string; number: number } | null>(null);
     const [isPreinvoiceOpen, setIsPreinvoiceOpen] = useState(false);
+
+    const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
+    const [currentOrderId, setCurrentOrderId] = useState('');
+    const [currentTotal, setCurrentTotal] = useState(0);
+    const [currentTableId, setCurrentTableId] = useState('');
 
     const { tables, loading, refreshTables } = useTableData(restaurantId);
 
@@ -474,13 +481,34 @@ export default function CajeroDashboard() {
                 }}
                 tableId={selectedTable?.id || ''}
                 tableNumber={selectedTable?.number || 0}
-                onPay={() => {
+                onPay={(orderId, total) => {
                     setIsPreinvoiceOpen(false);
-                    // modal de pago
-                    // setIsPaymentOpen(true);
+                    setCurrentOrderId(orderId);
+                    setCurrentTotal(total);
+                    setCurrentTableId(selectedTable?.id || '');
+                    setIsPaymentModalOpen(true);
                 }}
                 onPrint={() => {
                     window.print();
+                }}
+            />
+
+            <PaymentModal
+                isOpen={isPaymentModalOpen}
+                onClose={() => {
+                    setIsPaymentModalOpen(false);
+                    setCurrentOrderId('');
+                    setCurrentTableId('');
+                    setSelectedTable(null);
+                }}
+                orderId={currentOrderId}
+                tableId={currentTableId}
+                tableNumber={selectedTable?.number || 0}  // 👈 agregar esta línea
+                totalAmount={currentTotal}
+                onSuccess={() => {
+                    setIsPaymentModalOpen(false);
+                    refreshTables();
+                    alert('Pago registrado exitosamente');
                 }}
             />
 
