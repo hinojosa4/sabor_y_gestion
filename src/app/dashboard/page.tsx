@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react"; // 
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/useAuth";
 import { ADMIN } from "@/lib/roles";
@@ -59,51 +59,61 @@ export default function DashboardPage() {
     return () => clearInterval(t);
   }, []);
 
+  // ── fetchStats extraído con useCallback ───────────────────────────────────
+  const fetchStats = useCallback(async () => {
+    try {
+      const [dishRes, catRes, userRes, tableRes] = await Promise.all([
+        fetch("/api/dishes"),
+        fetch("/api/categories"),
+        fetch("/api/users"),
+        fetch("/api/tables"),
+      ]);
+
+      const [dishData, catData, userData, tableData] = await Promise.all([
+        dishRes.json(),
+        catRes.json(),
+        userRes.json(),
+        tableRes.json(),
+      ]);
+
+      // dishes y categories usan { ok, data }
+      const dishes = dishData.ok ? dishData.data : [];
+      const cats   = catData.ok  ? catData.data  : [];
+
+      // users y tables devuelven array directo (código de otros devs, no tocar)
+      const users  = Array.isArray(userData)  ? userData  : [];
+      const tables = Array.isArray(tableData) ? tableData : [];
+
+      setStats({
+        totalDishes:      dishes.length,
+        availableDishes:  dishes.filter((d: { isAvailable: boolean }) => d.isAvailable).length,
+        totalCategories:  cats.length,
+        activeCategories: cats.filter((c: { isActive: boolean }) => c.isActive).length, // ← "activo" → "isActive"
+        totalUsers:       users.length,
+        activeUsers:      users.filter((u: { activo: boolean }) => u.activo).length,    // ← activo se mantiene (modelo User sin migrar)
+        totalTables:      tables.length,
+        availableTables:  tables.filter((t: { status: string }) => t.status === "Libre").length,
+        occupiedTables:   tables.filter((t: { status: string }) => t.status === "Ocupada").length,
+        reservedTables:   tables.filter((t: { status: string }) => t.status === "Reservada").length,
+        adminCount:    users.filter((u: { rol: string }) => u.rol === "admin").length,
+        cajeroCount:   users.filter((u: { rol: string }) => u.rol === "cajero").length,
+        cocineroCount: users.filter((u: { rol: string }) => u.rol === "cocinero").length,
+        meseroCount:   users.filter((u: { rol: string }) => u.rol === "mesero").length,
+        clienteCount:  users.filter((u: { rol: string }) => u.rol === "cliente").length,
+      });
+    } catch (error) {
+      console.error("Error al obtener estadísticas del dashboard:", error);
+    } finally {
+      setLoading(false);
+    }
+  }, []); // sin dependencias — solo llama APIs públicas
+
   useEffect(() => {
     if (userLoading || !user) return;
-
-    const fetchStats = async () => {
-      try {
-        const [dishRes, catRes, userRes, tableRes] = await Promise.all([
-          fetch("/api/dishes"),
-          fetch("/api/categories"),
-          fetch("/api/users"),
-          fetch("/api/tables"),
-        ]);
-        const dishData = await dishRes.json();
-        const catData = await catRes.json();
-        const userData = await userRes.json();
-        const tableData = await tableRes.json();
-
-        const dishes = dishData.ok ? dishData.data : [];
-        const cats = catData.ok ? catData.data : [];
-        const users = Array.isArray(userData) ? userData : [];
-        const tables = Array.isArray(tableData) ? tableData : [];
-
-        setStats({
-          totalDishes: dishes.length,
-          availableDishes: dishes.filter((d: { isAvailable: boolean }) => d.isAvailable).length,
-          totalCategories: cats.length,
-          activeCategories: cats.filter((c: { activo: boolean }) => c.activo).length,
-          totalUsers: users.length,
-          activeUsers: users.filter((u: { activo: boolean }) => u.activo).length,
-          totalTables: tables.length,
-          availableTables: tables.filter((t: { status: string }) => t.status === "Libre").length,
-          occupiedTables: tables.filter((t: { status: string }) => t.status === "Ocupada").length,
-          reservedTables: tables.filter((t: { status: string }) => t.status === "Reservada").length,
-          adminCount:    users.filter((u: { rol: string }) => u.rol === "admin").length,
-          cajeroCount:   users.filter((u: { rol: string }) => u.rol === "cajero").length,
-          cocineroCount: users.filter((u: { rol: string }) => u.rol === "cocinero").length,
-          meseroCount:   users.filter((u: { rol: string }) => u.rol === "mesero").length,
-          clienteCount:  users.filter((u: { rol: string }) => u.rol === "cliente").length,
-        });
-      } catch { /* silencioso */ }
-      finally { setLoading(false); }
-    };
-
     fetchStats();
-  }, [userLoading, user?._id]);
+  }, [userLoading, user, fetchStats]); // ← sin eslint-disable, dependencias correctas
 
+  // ── resto del componente sin cambios ──────────────────────────────────────
   const greeting = () => {
     const h = time.getHours();
     if (h < 12) return "Buenos días";
@@ -141,6 +151,7 @@ export default function DashboardPage() {
     { icon: "🍴",  title: "Gestión de Platos",     desc: "Administra platos, precios e ingredientes",     route: "/dishes",           color: "#2563eb", bg: "#f0f6ff", border: "#bfdbfe", stats: loading ? "—" : `${stats.totalDishes} platos · ${stats.availableDishes} disponibles` },
     { icon: "👥",  title: "Gestión de Usuarios",   desc: "Administra el personal y sus permisos",         route: "/staff-management", color: "#059669", bg: "#f0fdf4", border: "#a7f3d0", stats: loading ? "—" : `${stats.totalUsers} usuarios · ${stats.activeUsers} activos` },
     { icon: "🪑",  title: "Gestión de Mesas",      desc: "Administra mesas, estados y disponibilidad",    route: "/tableManage",      color: "#7c3aed", bg: "#f5f3ff", border: "#ddd6fe", stats: loading ? "—" : `${stats.totalTables} mesas · ${stats.availableTables} libres` },
+    { icon: "📦",  title: "Control de Inventario", desc: "Gestiona stock de ingredientes y alertas",      route: "/inventario",       color: "#059669", bg: "#f0fdf4", border: "#a7f3d0", stats: "Ingredientes y suministros" },
   ];
 
   const roles = [
@@ -206,7 +217,7 @@ export default function DashboardPage() {
           <div title={user.email} style={{ width: isMobile ? 32 : 38, height: isMobile ? 32 : 38, borderRadius: "50%", background: "#1a1a1a", display: "flex", alignItems: "center", justifyContent: "center", fontSize: isMobile ? 13 : 16, color: "#fff", fontWeight: 700, flexShrink: 0 }}>
             {user.name.trim().charAt(0).toUpperCase()}
           </div>
-          <button onClick={logout} style={{ background: "#fff0ee", border: "1.5px solid #e85d26", borderRadius: 8, padding: isMobile ? "5px 10px" : "6px 14px", cursor: "pointer", fontSize: isMobile ? 11 : 12, fontWeight: 600, color: "#e85d26", fontFamily: "inherit", whiteSpace: "nowrap" }}>
+          <button onClick={() => logout()} style={{ background: "#fff0ee", border: "1.5px solid #e85d26", borderRadius: 8, padding: isMobile ? "5px 10px" : "6px 14px", cursor: "pointer", fontSize: isMobile ? 11 : 12, fontWeight: 600, color: "#e85d26", fontFamily: "inherit", whiteSpace: "nowrap" }}>
             Salir
           </button>
         </div>

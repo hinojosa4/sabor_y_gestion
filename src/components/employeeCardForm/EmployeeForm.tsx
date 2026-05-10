@@ -1,6 +1,6 @@
+// src/components/employeeCardForm/EmployeeForm.tsx
 import { useState } from 'react';
-import { Employee, Role, EmployeeStatus, WorkShift } from '../types/employee';
-import { Button } from './ui/Button';
+import { Employee, Rol, EmployeeStatus, WorkShift } from '../../types/employee';
 import { X } from 'lucide-react';
 
 interface EmployeeFormProps {
@@ -11,14 +11,15 @@ interface EmployeeFormProps {
   restaurantId?: string;
 }
 
-const roleOptions: Role[] = ['admin', 'manager', 'waiter', 'chef', 'driver'];
+const roleOptions: Rol[] = ['admin', 'gerente', 'mesero', 'cocinero', 'delivery', 'cajero'];
 const shiftOptions: WorkShift[] = ['Turno Mañana', 'Turno Tarde', 'Turno Completo'];
-const roleLabels: Record<Role, string> = {
-  'admin': 'Administrador',
-  'manager': 'Gerente',
-  'waiter': 'Mesero',
-  'chef': 'Chef',
-  'driver': 'Conductor'
+const roleLabels: Record<Rol, string> = {
+  admin: 'Administrador',
+  gerente: 'Gerente',
+  mesero: 'Mesero',
+  cocinero: 'Cocinero',
+  delivery: 'Delivery',
+  cajero: 'Cajero'
 };
 
 interface FormErrors {
@@ -31,20 +32,18 @@ interface FormErrors {
 }
 
 export function EmployeeForm({ isOpen, onClose, onSubmit, employee, restaurantId }: EmployeeFormProps) {
-  // Inicializamos el estado usando los datos del 'employee' si existe (Edición)
-  // o valores vacíos si es null (Creación).
   const [formData, setFormData] = useState({
     name: employee?.name || '',
     email: employee?.email || '',
     password: '',
-    role: (employee?.role as Role) || 'waiter',
+    rol: (employee?.rol as Rol) || 'mesero',
     employmentDetails: {
       phone: employee?.employmentDetails?.phone || '',
       shift: (employee?.employmentDetails?.shift as WorkShift) || 'Turno Mañana',
-      startDate: employee?.employmentDetails?.startDate 
-        ? (typeof employee.employmentDetails.startDate === 'string' 
-            ? employee.employmentDetails.startDate.split('T')[0] 
-            : new Date(employee.employmentDetails.startDate).toISOString().split('T')[0])
+      startDate: employee?.employmentDetails?.startDate
+        ? (typeof employee.employmentDetails.startDate === 'string'
+          ? employee.employmentDetails.startDate.split('T')[0]
+          : new Date(employee.employmentDetails.startDate).toISOString().split('T')[0])
         : new Date().toISOString().split('T')[0],
       salary: employee?.employmentDetails?.salary || 0,
       status: (employee?.employmentDetails?.status as EmployeeStatus) || 'Activo'
@@ -99,48 +98,8 @@ export function EmployeeForm({ isOpen, onClose, onSubmit, employee, restaurantId
     return Object.keys(newErrors).length === 0;
   };
 
-  /*useEffect(() => {
-  // Solo ejecutamos la lógica si el modal está abierto
-  if (!isOpen) return;
-
-  if (employee) {
-    setFormData({
-      name: employee.name,
-      email: employee.email,
-      password: '',
-      role: employee.role,
-      employmentDetails: {
-        phone: employee.employmentDetails.phone,
-        shift: employee.employmentDetails.shift,
-        startDate: typeof employee.employmentDetails.startDate === 'string'
-          ? employee.employmentDetails.startDate.split('T')[0]
-          : new Date(employee.employmentDetails.startDate).toISOString().split('T')[0],
-        salary: employee.employmentDetails.salary,
-        status: employee.employmentDetails.status
-      }
-    });
-  } else {
-    // Resetear a valores iniciales si no hay empleado (creación nueva)
-    setFormData({
-      name: '',
-      email: '',
-      password: '',
-      role: 'waiter',
-      employmentDetails: {
-        phone: '',
-        shift: 'Turno Mañana',
-        startDate: new Date().toISOString().split('T')[0],
-        salary: 0,
-        status: 'Activo'
-      }
-    });
-  }
-  
-}, [employee, isOpen]);*/
-
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-
     if (!validateForm()) return;
 
     if (employee) {
@@ -148,7 +107,7 @@ export function EmployeeForm({ isOpen, onClose, onSubmit, employee, restaurantId
         ...employee,
         name: formData.name,
         email: formData.email,
-        role: formData.role,
+        rol: formData.rol,
         employmentDetails: {
           phone: formData.employmentDetails.phone,
           shift: formData.employmentDetails.shift,
@@ -162,13 +121,12 @@ export function EmployeeForm({ isOpen, onClose, onSubmit, employee, restaurantId
         console.error('restaurantId es requerido para crear un empleado');
         return;
       }
-
       onSubmit({
         restaurantId,
         name: formData.name,
         email: formData.email,
         password_hash: formData.password,
-        role: formData.role,
+        rol: formData.rol,
         isActive: true,
         employmentDetails: {
           phone: formData.employmentDetails.phone,
@@ -183,8 +141,13 @@ export function EmployeeForm({ isOpen, onClose, onSubmit, employee, restaurantId
   };
 
   const handleChange = (field: string, value: string | number) => {
-    if (field === 'name' || field === 'email' || field === 'password' || field === 'role') {
+    if (field === 'name' || field === 'email' || field === 'password' || field === 'rol') {
       setFormData(prev => ({ ...prev, [field]: value }));
+    } else if (field === 'salary' && value === '') {
+      setFormData(prev => ({
+        ...prev,
+        employmentDetails: { ...prev.employmentDetails, salary: 0 }
+      }));
     } else {
       setFormData(prev => ({
         ...prev,
@@ -193,7 +156,6 @@ export function EmployeeForm({ isOpen, onClose, onSubmit, employee, restaurantId
     }
 
     setTouched(prev => ({ ...prev, [field]: true }));
-
     if (field in errors) {
       setErrors(prev => ({ ...prev, [field]: undefined }));
     }
@@ -205,35 +167,203 @@ export function EmployeeForm({ isOpen, onClose, onSubmit, employee, restaurantId
 
   if (!isOpen) return null;
 
-  return (
-    <div className="fixed inset-0 z-50 flex justify-center p-4 md:p-10 overflow-y-auto">
-      {/* Fondo oscuro */}
-      <div className="fixed inset-0 bg-black/50" onClick={onClose} />
+  // Estilos en línea usando variables del globals.css
+  const overlayStyle: React.CSSProperties = {
+    position: 'fixed',
+    inset: 0,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    zIndex: 50,
+    display: 'flex',
+    justifyContent: 'center',
+    padding: '1rem',
+    overflowY: 'auto',
+  };
 
-      {/* Modal */}
-      <div className="relative bg-white rounded-lg shadow-lg w-full max-w-lg h-fit max-h-full overflow-hidden flex flex-col my-auto">
-        <div className="px-6 py-4 border-b sticky top-0 bg-white z-10">
+  const modalStyle: React.CSSProperties = {
+    position: 'relative',
+    backgroundColor: 'var(--card)',
+    borderRadius: 'var(--radius-lg)',
+    boxShadow: '0 20px 60px rgba(0,0,0,0.18)',
+    width: '100%',
+    maxWidth: '32rem',
+    maxHeight: '90vh',
+    display: 'flex',
+    flexDirection: 'column',
+    overflow: 'hidden',
+    margin: 'auto',
+  };
+
+  const headerStyle: React.CSSProperties = {
+    position: 'sticky',
+    top: 0,
+    backgroundColor: 'var(--card)',
+    borderBottom: `1px solid var(--border)`,
+    padding: '1rem 1.5rem',
+    zIndex: 10,
+  };
+
+  const closeButtonStyle: React.CSSProperties = {
+    position: 'absolute',
+    top: '1rem',
+    right: '1rem',
+    background: 'none',
+    border: 'none',
+    borderRadius: 'var(--radius-md)',
+    padding: '0.25rem',
+    cursor: 'pointer',
+    display: 'inline-flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    color: 'var(--muted-foreground)',
+    transition: 'background 0.2s',
+  };
+
+  const titleStyle: React.CSSProperties = {
+    margin: 0,
+    fontSize: '1.125rem',
+    fontWeight: 'var(--font-weight-medium)',
+    color: 'var(--foreground)',
+  };
+
+  const subtitleStyle: React.CSSProperties = {
+    margin: '0.25rem 0 0',
+    fontSize: '0.875rem',
+    color: 'var(--muted-foreground)',
+  };
+
+  const formStyle: React.CSSProperties = {
+    padding: '1.5rem',
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '1rem',
+    overflowY: 'auto',
+  };
+
+  const fieldLabelStyle: React.CSSProperties = {
+    display: 'block',
+    marginBottom: '0.25rem',
+    fontWeight: 'var(--font-weight-medium)',
+    color: 'var(--foreground)',
+  };
+
+  const requiredStarStyle: React.CSSProperties = {
+    color: 'var(--destructive)',
+  };
+
+  const inputBaseStyle: React.CSSProperties = {
+    width: '100%',
+    borderRadius: 'var(--radius-md)',
+    border: `1px solid var(--border)`,
+    backgroundColor: 'var(--input-background)',
+    padding: '0.5rem 0.75rem',
+    fontSize: '0.875rem',
+    color: 'var(--foreground)',
+    outline: 'none',
+    transition: 'border-color 0.2s, box-shadow 0.2s',
+    fontFamily: 'inherit',
+  };
+
+  const inputErrorStyle: React.CSSProperties = {
+    ...inputBaseStyle,
+    borderColor: 'var(--destructive)',
+  };
+
+  const selectStyle: React.CSSProperties = {
+    width: '100%',
+    borderRadius: 'var(--radius-md)',
+    border: `1px solid var(--border)`,
+    backgroundColor: 'var(--input-background)',
+    padding: '0.5rem 0.75rem',
+    fontSize: '0.875rem',
+    color: 'var(--foreground)',
+    outline: 'none',
+    transition: 'border-color 0.2s, box-shadow 0.2s',
+    fontFamily: 'inherit',
+  };
+
+  const errorTextStyle: React.CSSProperties = {
+    margin: '0.25rem 0 0',
+    fontSize: '0.75rem',
+    color: 'var(--destructive)',
+  };
+
+  const salaryInputWrapperStyle: React.CSSProperties = {
+    position: 'relative',
+  };
+
+  const currencySymbolStyle: React.CSSProperties = {
+    position: 'absolute',
+    left: '0.75rem',
+    top: '50%',
+    transform: 'translateY(-50%)',
+    color: 'var(--muted-foreground)',
+    fontSize: '0.875rem',
+    pointerEvents: 'none',
+  };
+
+  const salaryHelperStyle: React.CSSProperties = {
+    margin: '0.25rem 0 0',
+    fontSize: '0.625rem',
+    color: 'var(--muted-foreground)',
+    fontStyle: 'italic',
+  };
+
+  const buttonContainerStyle: React.CSSProperties = {
+    display: 'flex',
+    gap: '0.75rem',
+    paddingTop: '1rem',
+  };
+
+  const cancelButtonStyle: React.CSSProperties = {
+    flex: 1,
+    backgroundColor: 'transparent',
+    border: `1px solid var(--border)`,
+    borderRadius: 'var(--radius-md)',
+    padding: '0.5rem 0',
+    fontSize: '0.875rem',
+    fontWeight: 'var(--font-weight-medium)',
+    cursor: 'pointer',
+    color: 'var(--foreground)',
+    fontFamily: 'inherit',
+  };
+
+  const submitButtonStyle: React.CSSProperties = {
+    flex: 1,
+    backgroundColor: 'var(--primary)',
+    border: 'none',
+    borderRadius: 'var(--radius-md)',
+    padding: '0.5rem 0',
+    fontSize: '0.875rem',
+    fontWeight: 'var(--font-weight-medium)',
+    cursor: 'pointer',
+    color: 'var(--primary-foreground)',
+    fontFamily: 'inherit',
+  };
+
+  return (
+    <div style={overlayStyle} onClick={onClose}>
+      <div style={modalStyle} onClick={(e) => e.stopPropagation()}>
+        <div style={headerStyle}>
           <button
             type="button"
             onClick={onClose}
-            className="absolute top-4 right-4 rounded-md p-1 hover:bg-gray-100 transition-colors"
+            style={closeButtonStyle}
+            onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = 'var(--muted)')}
+            onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
           >
-            <X className="size-5 text-gray-500 hover:text-gray-700 transition-colors" />
+            <X size={20} style={{ color: 'var(--muted-foreground)' }} />
           </button>
-          <h2 className="text-lg font-semibold text-black">
-            {employee ? 'Editar Empleado' : 'Agregar Nuevo Personal'}
-          </h2>
-          <p className="text-sm text-gray-500 mt-1">
+          <h2 style={titleStyle}>{employee ? 'Editar Empleado' : 'Agregar Nuevo Personal'}</h2>
+          <p style={subtitleStyle}>
             {employee ? 'Actualiza los datos del empleado' : 'Completa la información del nuevo miembro del equipo'}
           </p>
         </div>
 
-        {/* Formulario */}
-        <form onSubmit={handleSubmit} className="p-6 space-y-4 overflow-y-auto">
+        <form onSubmit={handleSubmit} style={formStyle}>
           {/* Nombre */}
           <div>
-            <label className="text-black font-bold mb-1 block">
-              Nombre Completo <span className="text-red-500">*</span>
+            <label style={fieldLabelStyle}>
+              Nombre Completo <span style={requiredStarStyle}>*</span>
             </label>
             <input
               type="text"
@@ -241,21 +371,16 @@ export function EmployeeForm({ isOpen, onClose, onSubmit, employee, restaurantId
               onChange={(e) => handleChange('name', e.target.value)}
               onBlur={() => setTouched(prev => ({ ...prev, name: true }))}
               placeholder="Juan Pérez"
-              className={`w-full min-w-0 rounded-md border px-3 py-2 text-sm text-gray-900 placeholder:text-gray-400 outline-none transition-all focus:ring-2 disabled:cursor-not-allowed disabled:opacity-50 ${getFieldError('name')
-                ? 'border-red-500 focus:border-red-500 focus:ring-red-500/30'
-                : 'border-gray-300 focus:border-gray-500 focus:ring-gray-500/30'
-                }`}
+              style={getFieldError('name') ? inputErrorStyle : inputBaseStyle}
               required
             />
-            {getFieldError('name') && (
-              <p className="text-red-500 text-xs mt-1">{getFieldError('name')}</p>
-            )}
+            {getFieldError('name') && <p style={errorTextStyle}>{getFieldError('name')}</p>}
           </div>
 
           {/* Email */}
           <div>
-            <label className="text-black font-bold mb-1 block">
-              Email <span className="text-red-500">*</span>
+            <label style={fieldLabelStyle}>
+              Email <span style={requiredStarStyle}>*</span>
             </label>
             <input
               type="email"
@@ -263,22 +388,17 @@ export function EmployeeForm({ isOpen, onClose, onSubmit, employee, restaurantId
               onChange={(e) => handleChange('email', e.target.value)}
               onBlur={() => setTouched(prev => ({ ...prev, email: true }))}
               placeholder="correo@ejemplo.com"
-              className={`w-full min-w-0 rounded-md border px-3 py-2 text-sm text-gray-900 placeholder:text-gray-400 outline-none transition-all focus:ring-2 disabled:cursor-not-allowed disabled:opacity-50 ${getFieldError('email')
-                ? 'border-red-500 focus:border-red-500 focus:ring-red-500/30'
-                : 'border-gray-300 focus:border-gray-500 focus:ring-gray-500/30'
-                }`}
+              style={getFieldError('email') ? inputErrorStyle : inputBaseStyle}
               required
             />
-            {getFieldError('email') && (
-              <p className="text-red-500 text-xs mt-1">{getFieldError('email')}</p>
-            )}
+            {getFieldError('email') && <p style={errorTextStyle}>{getFieldError('email')}</p>}
           </div>
 
           {/* Contraseña (solo para nuevos empleados) */}
           {!employee && (
             <div>
-              <label className="text-black font-bold mb-1 block">
-                Contraseña <span className="text-red-500">*</span>
+              <label style={fieldLabelStyle}>
+                Contraseña <span style={requiredStarStyle}>*</span>
               </label>
               <input
                 type="password"
@@ -286,27 +406,22 @@ export function EmployeeForm({ isOpen, onClose, onSubmit, employee, restaurantId
                 onChange={(e) => handleChange('password', e.target.value)}
                 onBlur={() => setTouched(prev => ({ ...prev, password: true }))}
                 placeholder="Mínimo 8 caracteres"
-                className={`w-full min-w-0 rounded-md border px-3 py-2 text-sm text-gray-900 placeholder:text-gray-400 outline-none transition-all focus:ring-2 ${getFieldError('password')
-                  ? 'border-red-500 focus:border-red-500 focus:ring-red-500/30'
-                  : 'border-gray-300 focus:border-gray-500 focus:ring-gray-500/30'
-                  }`}
+                style={getFieldError('password') ? inputErrorStyle : inputBaseStyle}
                 required
               />
-              {getFieldError('password') && (
-                <p className="text-red-500 text-xs mt-1">{getFieldError('password')}</p>
-              )}
+              {getFieldError('password') && <p style={errorTextStyle}>{getFieldError('password')}</p>}
             </div>
           )}
 
           {/* Rol */}
           <div>
-            <label className="text-black font-bold mb-1 block">
-              Rol <span className="text-red-500">*</span>
+            <label style={fieldLabelStyle}>
+              Rol <span style={requiredStarStyle}>*</span>
             </label>
             <select
-              value={formData.role}
-              onChange={(e) => handleChange('role', e.target.value as Role)}
-              className="w-full min-w-0 rounded-md border border-gray-300 bg-gray-50 px-3 py-2 text-sm text-gray-900 outline-none transition-all focus:border-gray-500 focus:ring-2 focus:ring-gray-500/30"
+              value={formData.rol}
+              onChange={(e) => handleChange('rol', e.target.value as Rol)}
+              style={selectStyle}
               required
             >
               {roleOptions.map(role => (
@@ -317,8 +432,8 @@ export function EmployeeForm({ isOpen, onClose, onSubmit, employee, restaurantId
 
           {/* Teléfono */}
           <div>
-            <label className="text-black font-bold mb-1 block">
-              Teléfono <span className="text-red-500">*</span>
+            <label style={fieldLabelStyle}>
+              Teléfono <span style={requiredStarStyle}>*</span>
             </label>
             <input
               type="tel"
@@ -326,26 +441,21 @@ export function EmployeeForm({ isOpen, onClose, onSubmit, employee, restaurantId
               onChange={(e) => handleChange('phone', e.target.value)}
               onBlur={() => setTouched(prev => ({ ...prev, phone: true }))}
               placeholder="12345678"
-              className={`w-full min-w-0 rounded-md border px-3 py-2 text-sm text-gray-900 placeholder:text-gray-400 outline-none transition-all focus:ring-2 ${getFieldError('phone')
-                ? 'border-red-500 focus:border-red-500 focus:ring-red-500/30'
-                : 'border-gray-300 focus:border-gray-500 focus:ring-gray-500/30'
-                }`}
+              style={getFieldError('phone') ? inputErrorStyle : inputBaseStyle}
               required
             />
-            {getFieldError('phone') && (
-              <p className="text-red-500 text-xs mt-1">{getFieldError('phone')}</p>
-            )}
+            {getFieldError('phone') && <p style={errorTextStyle}>{getFieldError('phone')}</p>}
           </div>
 
           {/* Turno */}
           <div>
-            <label className="text-black font-bold mb-1 block">
-              Turno <span className="text-red-500">*</span>
+            <label style={fieldLabelStyle}>
+              Turno <span style={requiredStarStyle}>*</span>
             </label>
             <select
               value={formData.employmentDetails.shift}
               onChange={(e) => handleChange('shift', e.target.value as WorkShift)}
-              className="w-full min-w-0 rounded-md border border-gray-300 bg-gray-50 px-3 py-2 text-sm text-gray-900 outline-none transition-all focus:border-gray-500 focus:ring-2 focus:ring-gray-500/30"
+              style={selectStyle}
               required
             >
               {shiftOptions.map(shift => (
@@ -356,43 +466,33 @@ export function EmployeeForm({ isOpen, onClose, onSubmit, employee, restaurantId
 
           {/* Fecha de Inicio */}
           <div>
-            <label className="text-black font-bold mb-1 block">
-              Fecha de Inicio <span className="text-red-500">*</span>
+            <label style={fieldLabelStyle}>
+              Fecha de Inicio <span style={requiredStarStyle}>*</span>
             </label>
             <input
               type="date"
               value={formData.employmentDetails.startDate}
               onChange={(e) => handleChange('startDate', e.target.value)}
               onBlur={() => setTouched(prev => ({ ...prev, startDate: true }))}
-              className={`w-full min-w-0 rounded-md border px-3 py-2 text-sm text-gray-900 placeholder:text-gray-400 outline-none transition-all focus:ring-2 ${getFieldError('startDate')
-                ? 'border-red-500 focus:border-red-500 focus:ring-red-500/30'
-                : 'border-gray-300 focus:border-gray-500 focus:ring-gray-500/30'
-                }`}
+              style={getFieldError('startDate') ? inputErrorStyle : inputBaseStyle}
               required
             />
-            {getFieldError('startDate') && (
-              <p className="text-red-500 text-xs mt-1">{getFieldError('startDate')}</p>
-            )}
+            {getFieldError('startDate') && <p style={errorTextStyle}>{getFieldError('startDate')}</p>}
           </div>
 
           {/* Salario */}
           <div>
-            <label className="text-black font-bold mb-1 block">
-              Salario Mensual (USD) <span className="text-red-500">*</span>
+            <label style={fieldLabelStyle}>
+              Salario Mensual (USD) <span style={requiredStarStyle}>*</span>
             </label>
-            <div className="relative">
-              {/* Símbolo de moneda visual */}
-              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 text-sm pointer-events-none">
-                $
-              </span>
-
+            <div style={salaryInputWrapperStyle}>
+              <span style={currencySymbolStyle}>$</span>
               <input
                 type="number"
                 value={formData.employmentDetails.salary || ''}
                 onChange={(e) => {
                   const val = e.target.value;
-                  if (val === "") return handleChange('salary', '');
-
+                  if (val === '') return handleChange('salary', '');
                   const num = parseFloat(val);
                   if (num >= 0 && num <= 20000) {
                     handleChange('salary', val);
@@ -403,21 +503,16 @@ export function EmployeeForm({ isOpen, onClose, onSubmit, employee, restaurantId
                 min="0"
                 max="20000"
                 step="0.01"
-                className={`w-full min-w-0 rounded-md border pl-7 pr-3 py-2 text-sm text-gray-900 placeholder:text-gray-400 outline-none transition-all focus:ring-2 ${getFieldError('salary')
-                  ? 'border-red-500 focus:border-red-500 focus:ring-red-500/30'
-                  : 'border-gray-300 focus:border-gray-500 focus:ring-gray-500/30'
-                  }`}
+                style={{
+                  ...(getFieldError('salary') ? inputErrorStyle : inputBaseStyle),
+                  paddingLeft: '1.75rem',
+                }}
                 required
               />
             </div>
-
-            {getFieldError('salary') && (
-              <p className="text-red-500 text-xs mt-1">{getFieldError('salary')}</p>
-            )}
-
-            {/* Ayuda visual opcional para confirmar el monto */}
+            {getFieldError('salary') && <p style={errorTextStyle}>{getFieldError('salary')}</p>}
             {formData.employmentDetails.salary > 0 && (
-              <p className="text-[10px] text-gray-400 mt-1 italic">
+              <p style={salaryHelperStyle}>
                 Monto: {new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(formData.employmentDetails.salary)}
               </p>
             )}
@@ -426,13 +521,11 @@ export function EmployeeForm({ isOpen, onClose, onSubmit, employee, restaurantId
           {/* Estado (solo visible en edición) */}
           {employee && (
             <div>
-              <label className="text-black font-bold mb-1 block">
-                Estado
-              </label>
+              <label style={fieldLabelStyle}>Estado</label>
               <select
                 value={formData.employmentDetails.status}
                 onChange={(e) => handleChange('status', e.target.value as EmployeeStatus)}
-                className="w-full min-w-0 rounded-md border border-gray-300 bg-gray-50 px-3 py-2 text-sm text-gray-900 outline-none transition-all focus:border-gray-500 focus:ring-2 focus:ring-gray-500/30"
+                style={selectStyle}
               >
                 <option value="Activo">Activo</option>
                 <option value="Vacaciones">Vacaciones</option>
@@ -442,21 +535,13 @@ export function EmployeeForm({ isOpen, onClose, onSubmit, employee, restaurantId
           )}
 
           {/* Botones */}
-          <div className="flex gap-3 pt-4">
-            <Button
-              type="button"
-              onClick={onClose}
-              variant="outline"
-              className="flex-1"
-            >
+          <div style={buttonContainerStyle}>
+            <button type="button" onClick={onClose} style={cancelButtonStyle}>
               Cancelar
-            </Button>
-            <Button
-              type="submit"
-              className="flex-1 px-4 py-2 text-white rounded-md text-sm font-medium bg-gray-800 hover:bg-gray-700 transition-colors"
-            >
+            </button>
+            <button type="submit" style={submitButtonStyle}>
               {employee ? 'Guardar Cambios' : 'Agregar Personal'}
-            </Button>
+            </button>
           </div>
         </form>
       </div>

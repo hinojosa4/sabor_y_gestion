@@ -8,7 +8,7 @@ interface MongoEmployee {
     restaurantId: string;
     name: string;
     email: string;
-    role: string;
+    rol: string;
     isActive: boolean;
     employmentDetails?: {
         phone: string;
@@ -25,18 +25,15 @@ interface MongoEmployee {
 export async function GET() {
     try {
         await connectDB();
-        const employees = await Employee.find({
-            $or: [
-                { rol: { $ne: 'cliente' } },
-                { rol: { $exists: false } }
-            ],
-            role: { $nin: ['cliente', 'client'] }
-        })
+
+        const employees = await Employee.find({})
             .select('-password')
             .sort({ createdAt: -1 })
             .lean();
 
         const normalizedEmployees = employees.map((emp: MongoEmployee) => {
+            const rol = emp.rol || 'cliente';
+
             const formatDateOnly = (date: Date | string | undefined) => {
                 if (!date) return null;
                 const d = new Date(date);
@@ -46,6 +43,7 @@ export async function GET() {
 
             return {
                 ...emp,
+                rol: rol,  // 👈 unificar a 'rol'
                 employmentDetails: emp.employmentDetails ? {
                     ...emp.employmentDetails,
                     startDate: formatDateOnly(emp.employmentDetails.startDate)
@@ -76,7 +74,7 @@ export async function POST(request: Request) {
             name: data.name,
             email: data.email,
             password: data.password_hash || data.password,
-            role: data.role,
+            rol: data.rol || data.role, 
             isActive: data.isActive,
             employmentDetails: data.employmentDetails || {
                 phone: '',
@@ -87,7 +85,6 @@ export async function POST(request: Request) {
             }
         };
 
-        // ✅ Validar que password existe
         if (!employeeData.password) {
             return NextResponse.json(
                 { error: 'La contraseña es obligatoria' },

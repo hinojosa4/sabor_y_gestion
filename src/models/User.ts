@@ -1,3 +1,4 @@
+// models/User.ts
 import mongoose, { Document, Schema } from "mongoose";
 import bcrypt from "bcryptjs";
 
@@ -11,6 +12,7 @@ export interface IUser extends Document {
   createdAt: Date;
   updatedAt: Date;
   googleId: string;
+  loyaltyPoints?: number;
   comparePassword(candidatePassword: string): Promise<boolean>;
 }
 
@@ -52,6 +54,12 @@ const UserSchema = new Schema<IUser>(
     googleId: {
       type: String,
       sparse: true, // permite múltiples null pero no duplicados en los que tienen valor
+    },
+    loyaltyPoints: {
+      type: Number,
+      default: 0,
+      min: 0,
+      select: false,
     },
   },
   {
