@@ -27,7 +27,6 @@ export async function GET(
     await connectDB();
     const { orderId } = await params;
 
-    // Validar que sea un ObjectId válido
     if (!Types.ObjectId.isValid(orderId)) {
       return NextResponse.json({ items: [], subtotal: 0, iva: 0, total: 0 });
     }
