@@ -1,6 +1,6 @@
 // src/app/dashboard/cajero/page.tsx
 "use client";
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useAuth } from '@/lib/useAuth';
 import { CAJERO } from '@/lib/roles';
 import { Search, DollarSign, Receipt, Clock } from 'lucide-react';
