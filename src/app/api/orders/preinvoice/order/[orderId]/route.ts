@@ -25,19 +25,16 @@ export async function GET(
 ) {
   try {
     await connectDB();
-
     const { orderId } = await params;
 
-    const items = await OrderItem.find({ order_id: orderId })
-      .lean<LeanOrderItem[]>();
+    if (!Types.ObjectId.isValid(orderId)) {
+      return NextResponse.json({ items: [], subtotal: 0, iva: 0, total: 0 });
+    }
+
+    const items = await OrderItem.find({ order_id: orderId }).lean<LeanOrderItem[]>();
 
     if (!items.length) {
-      return NextResponse.json({
-        items: [],
-        subtotal: 0,
-        iva: 0,
-        total: 0,
-      });
+      return NextResponse.json({ items: [], subtotal: 0, iva: 0, total: 0 });
     }
 
     const dishIds = items
@@ -48,9 +45,7 @@ export async function GET(
       _id: { $in: dishIds },
     }).lean<LeanDish[]>();
 
-    const dishMap = new Map(
-      dishes.map((dish) => [dish._id.toString(), dish])
-    );
+    const dishMap = new Map(dishes.map((dish) => [dish._id.toString(), dish]));
 
     let subtotal = 0;
 
@@ -85,10 +80,6 @@ export async function GET(
     });
   } catch (error) {
     console.error('[OrderSummary] Error:', error);
-
-    return NextResponse.json(
-      { error: 'Error interno' },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: 'Error interno' }, { status: 500 });
   }
 }
