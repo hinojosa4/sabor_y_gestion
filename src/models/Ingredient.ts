@@ -1,83 +1,99 @@
 import mongoose, { Document, Schema } from "mongoose";
 
-export type UnitOfMeasure = "kg" | "lt" | "unidad" | "gr" | "ml";
-export type StockStatus = "ok" | "bajo" | "critico";
+export type UnitOfMeasure = "kg" | "lt" | "unit" | "gr" | "ml";
+export type StockStatus = "ok" | "low" | "critical";
 
 export interface IIngredient extends Document {
-  nombre: string;
-  stock_actual: number;
-  stock_minimo: number;
-  stock_maximo: number;
-  unidad: UnitOfMeasure;
-  proveedor?: string;
+  name: string;
+  currentStock: number;
+  minStock: number;
+  maxStock: number;
+  unit: UnitOfMeasure;
+  supplier?: string;
   category_id?: mongoose.Types.ObjectId;
-  activo: boolean;
+  isActive: boolean;
   createdAt: Date;
   updatedAt: Date;
-  // virtual
   stockStatus: StockStatus;
 }
 
+type IngredientDocType = mongoose.HydratedDocument<IIngredient>;
+
 const IngredientSchema = new Schema<IIngredient>(
   {
-    nombre: {
+    name: {
       type: String,
       required: [true, "El nombre es obligatorio"],
       trim: true,
       unique: true,
-      minlength: [2, "Mínimo 2 caracteres"],
-      maxlength: [100, "Máximo 100 caracteres"],
+      minlength: [2, "El nombre debe tener al menos 2 caracteres"],
+      maxlength: [100, "El nombre no puede superar los 100 caracteres"],
     },
-    stock_actual: {
+    currentStock: {
       type: Number,
-      required: true,
+      required: [true, "El stock actual es obligatorio"],
       min: [0, "El stock no puede ser negativo"],
       default: 0,
     },
-    stock_minimo: {
+    minStock: {
       type: Number,
-      required: true,
+      required: [true, "El stock mínimo es obligatorio"],
       min: [0, "El stock mínimo no puede ser negativo"],
     },
-    stock_maximo: {
+    maxStock: {
       type: Number,
-      required: true,
+      required: [true, "El stock máximo es obligatorio"],
+      min: [0, "El stock máximo no puede ser negativo"],
     },
-    unidad: {
+    unit: {
       type: String,
-      enum: ["kg", "lt", "unidad", "gr", "ml"],
-      required: true,
+      enum: {
+        values: ["kg", "lt", "unit", "gr", "ml"],
+        message: '"{VALUE}" no es una unidad de medida válida',
+      },
+      required: [true, "La unidad de medida es obligatoria"],
     },
-    proveedor: {
+    supplier: {
       type: String,
       trim: true,
       default: "",
+      maxlength: [150, "El proveedor no puede superar los 150 caracteres"],
     },
     category_id: {
       type: Schema.Types.ObjectId,
       ref: "IngredientCategory",
       default: null,
+      index: true,
     },
-    activo: {
+    isActive: {
       type: Boolean,
       default: true,
     },
   },
-  { timestamps: true, versionKey: false }
+  {
+    timestamps: true,
+    versionKey: false,
+  }
 );
 
-// Virtual para calcular estado sin guardar en BD
-IngredientSchema.virtual("stockStatus").get(function (): StockStatus {
-  if (this.stock_actual <= 0) return "critico";
-  if (this.stock_actual <= this.stock_minimo) return "bajo";
+// Validación maxStock > minStock separada del schema para evitar problemas de tipado
+IngredientSchema.path("maxStock").validate(function (this: IngredientDocType, value: number) {
+  return value > this.minStock;
+}, "El stock máximo debe ser mayor al stock mínimo");
+
+IngredientSchema.virtual("stockStatus").get(function (this: IngredientDocType): StockStatus {
+  if (this.currentStock <= 0) return "critical";
+  if (this.currentStock <= this.minStock) return "low";
   return "ok";
 });
+
+IngredientSchema.index({ name: "text", supplier: "text" });
 
 IngredientSchema.set("toJSON", { virtuals: true });
 IngredientSchema.set("toObject", { virtuals: true });
 
 const Ingredient =
-  mongoose.models.Ingredient ||
+  (mongoose.models.Ingredient as mongoose.Model<IIngredient>) ||
   mongoose.model<IIngredient>("Ingredient", IngredientSchema);
 
 export default Ingredient;

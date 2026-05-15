@@ -6,14 +6,14 @@ import Image from "next/image";
 
 interface ICategory {
   _id: string;
-  nombre: string;
-  descripcion?: string;
-  activo: boolean;
+  name: string;
+  description?: string;
+  isActive: boolean;
   createdAt: string;
 }
 
 interface IDishIngredient {
-  ingredient_id: { _id: string; nombre: string; unidad: string } | string;
+  ingredient_id: { _id: string; name: string; unit: string } | string;
   quantity: number;
 }
 
@@ -106,7 +106,7 @@ export default function CategoriesPage() {
   const [error, setError] = useState("");
   const [successMsg, setSuccessMsg] = useState("");
 
-  const [catForm, setCatForm] = useState({ nombre: "", descripcion: "", activo: true });
+  const [catForm, setCatForm] = useState({ name: "", description: "", isActive: true });
 
   const [showAssignModal, setShowAssignModal] = useState(false);
   const [assignTargetCategory, setAssignTargetCategory] = useState<ICategory | null>(null);
@@ -153,14 +153,14 @@ export default function CategoriesPage() {
 
   // ── categoría CRUD ─────────────────────────────────────────────────────────
   const openCreateCat = () => {
-    setCatForm({ nombre: "", descripcion: "", activo: true });
-    setCatModalMode("create");
-    setShowCatModal(true);
-    setError("");
-  };
+  setCatForm({ name: "", description: "", isActive: true });
+  setCatModalMode("create");
+  setShowCatModal(true);
+  setError("");
+};
 
   const openEditCat = (cat: ICategory) => {
-    setCatForm({ nombre: cat.nombre, descripcion: cat.descripcion || "", activo: cat.activo });
+    setCatForm({ name: cat.name, description: cat.description || "", isActive: cat.isActive });
     setSelectedCategory(cat);
     setCatModalMode("edit");
     setShowCatModal(true);
@@ -170,7 +170,7 @@ export default function CategoriesPage() {
   const closeCatModal = () => { setShowCatModal(false); setSelectedCategory(null); setError(""); };
 
   const handleCatSubmit = async () => {
-    if (!catForm.nombre.trim()) { setError("El nombre es obligatorio"); return; }
+    if (!catForm.name.trim()) { setError("El nombre es obligatorio"); return; }
     setError("");
     try {
       const url = catModalMode === "create"
@@ -337,8 +337,8 @@ export default function CategoriesPage() {
       }}>
         {[
           { label: "Total Categorías", value: categories.length, color: "#1a1a1a" },
-          { label: "Activas", value: categories.filter(c => c.activo).length, color: "#27ae60" },
-          { label: "Inactivas", value: categories.filter(c => !c.activo).length, color: "#e85d26" },
+          { label: "Activas", value: categories.filter(c => c.isActive).length, color: "#27ae60" },
+          { label: "Inactivas", value: categories.filter(c => !c.isActive).length, color: "#e85d26" },
           { label: "Total Platos", value: dishes.length, color: "#8e44ad" },
           { label: "Sin Categoría", value: uncategorizedDishes.length, color: "#888" },
         ].map((s) => (
@@ -394,23 +394,23 @@ export default function CategoriesPage() {
                     <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
                       <div style={{
                         width: 46, height: 46, borderRadius: 12, flexShrink: 0,
-                        background: cat.activo ? "#fff8f5" : "#f5f5f5",
-                        border: `2px solid ${cat.activo ? "#e85d26" : "#ddd"}`,
+                        background: cat.isActive ? "#fff8f5" : "#f5f5f5",
+                        border: `2px solid ${cat.isActive ? "#e85d26" : "#ddd"}`,
                         display: "flex", alignItems: "center", justifyContent: "center", fontSize: 20,
                       }}>🏷️</div>
                       <div>
                         <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
-                          <h2 style={{ margin: 0, fontSize: 17, fontWeight: 700, color: "#1a1a1a" }}>{cat.nombre}</h2>
+                          <h2 style={{ margin: 0, fontSize: 17, fontWeight: 700, color: "#1a1a1a" }}>{cat.name}</h2>
                           <span style={{
                             fontSize: 10, fontWeight: 700, padding: "2px 9px", borderRadius: 20,
-                            background: cat.activo ? "#e8f8ef" : "#f5f5f5",
-                            color: cat.activo ? "#27ae60" : "#999",
+                            background: cat.isActive ? "#e8f8ef" : "#f5f5f5",
+                            color: cat.isActive ? "#27ae60" : "#999",
                           }}>
-                            {cat.activo ? "ACTIVA" : "INACTIVA"}
+                            {cat.isActive ? "ACTIVA" : "INACTIVA"}
                           </span>
                         </div>
                         <p style={{ margin: "3px 0 0", fontSize: 12, color: "#888" }}>
-                          {cat.descripcion || "Sin descripción"} ·{" "}
+                          {cat.description || "Sin descripción"} ·{" "}
                           <span style={{ color: "#e85d26", fontWeight: 600 }}>{catDishes.length} plato{catDishes.length !== 1 ? "s" : ""}</span>
                           {catDishes.length > 0 && <span style={{ color: "#27ae60" }}> · {available} disponible{available !== 1 ? "s" : ""}</span>}
                         </p>
@@ -501,16 +501,16 @@ export default function CategoriesPage() {
           {error && <ErrorBox msg={error} />}
           <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
             <Field label="Nombre *">
-              <input value={catForm.nombre} onChange={(e) => setCatForm({ ...catForm, nombre: e.target.value })}
+              <input value={catForm.name} onChange={(e) => setCatForm({ ...catForm, name: e.target.value })}
                 placeholder="Ej: Entradas, Platos Fuertes..." style={inputStyle} />
             </Field>
             <Field label="Descripción">
-              <textarea value={catForm.descripcion} onChange={(e) => setCatForm({ ...catForm, descripcion: e.target.value })}
+              <textarea value={catForm.description} onChange={(e) => setCatForm({ ...catForm, description: e.target.value })}
                 placeholder="Descripción opcional..." rows={3} style={{ ...inputStyle, resize: "none" }} />
             </Field>
             <label style={{ display: "flex", alignItems: "center", gap: 10, cursor: "pointer", fontSize: 14, color: "#333" }}>
-              <input type="checkbox" checked={catForm.activo}
-                onChange={(e) => setCatForm({ ...catForm, activo: e.target.checked })}
+              <input type="checkbox" checked={catForm.isActive}
+                onChange={(e) => setCatForm({ ...catForm, isActive: e.target.checked })}
                 style={{ width: 17, height: 17 }} />
               Categoría activa
             </label>
@@ -526,7 +526,7 @@ export default function CategoriesPage() {
 
       {/* ── Modal asignar platos ── */}
       {showAssignModal && assignTargetCategory && (
-        <Modal title={`Asignar platos → ${assignTargetCategory.nombre}`} onClose={() => setShowAssignModal(false)} wide isMobile={isMobile}>
+        <Modal title={`Asignar platos → ${assignTargetCategory.name}`} onClose={() => setShowAssignModal(false)} wide isMobile={isMobile}>
           {error && <ErrorBox msg={error} />}
           <p style={{ margin: "0 0 14px", fontSize: 13, color: "#888" }}>Selecciona platos para moverlos a esta categoría.</p>
           <div style={{ maxHeight: 360, overflowY: "auto", display: "flex", flexDirection: "column", gap: 8 }}>
@@ -622,9 +622,9 @@ export default function CategoriesPage() {
                 <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
                   {selectedDish.ingredients.map((ing, i) => {
                     const nombre = typeof ing.ingredient_id === "object"
-                      ? ing.ingredient_id.nombre : ing.ingredient_id;
+                      ? ing.ingredient_id.name : ing.ingredient_id;
                     const unidad = typeof ing.ingredient_id === "object"
-                      ? ing.ingredient_id.unidad : "";
+                      ? ing.ingredient_id.unit : "";
                     return (
                       <span key={i} style={{
                         background: "#fff8f5", border: "1px solid #e85d26",
@@ -801,9 +801,9 @@ function DishCard({ dish, onClick, categories, onRemove, onAssign }: {
             <p style={{ margin: "3px 0 0", fontSize: 11, color: "#aaa", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
               {dish.ingredients.slice(0, 3).map((ing) => {
                 const nombre = typeof ing.ingredient_id === "object"
-                  ? ing.ingredient_id.nombre : ing.ingredient_id;
+                  ? ing.ingredient_id.name : ing.ingredient_id;
                 const unidad = typeof ing.ingredient_id === "object"
-                  ? ing.ingredient_id.unidad : "";
+                  ? ing.ingredient_id.unit : "";
                 return `${nombre} ${ing.quantity}${unidad}`;
               }).join(", ")}
               {dish.ingredients.length > 3 ? "..." : ""}
@@ -828,7 +828,7 @@ function DishCard({ dish, onClick, categories, onRemove, onAssign }: {
             overflow: "hidden", textOverflow: "ellipsis",
           }}>
             <option value="">Asignar a categoría...</option>
-            {categories.map((c) => <option key={c._id} value={c._id}>{c.nombre}</option>)}
+            {categories.map((c) => <option key={c._id} value={c._id}>{c.name}</option>)}
           </select>
           <button onClick={() => { if (assignValue) { onAssign(assignValue); setAssignValue(""); } }}
             disabled={!assignValue} style={{

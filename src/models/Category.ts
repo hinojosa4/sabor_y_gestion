@@ -1,37 +1,37 @@
 import mongoose, { Document, Schema } from "mongoose";
 
 export interface ICategory extends Document {
-  nombre: string;
-  descripcion?: string;
-  activo: boolean;
+  name: string;
+  description?: string;
+  isActive: boolean;
   createdAt: Date;
   updatedAt: Date;
 }
 
 const CategorySchema = new Schema<ICategory>(
   {
-    nombre: {
+    name: {
       type: String,
       required: [true, "El nombre es obligatorio"],
       trim: true,
+      unique: true,
       minlength: [2, "El nombre debe tener al menos 2 caracteres"],
       maxlength: [100, "El nombre no puede superar los 100 caracteres"],
-      unique: true,
     },
-    descripcion: {
+    description: {
       type: String,
       trim: true,
       maxlength: [255, "La descripción no puede superar los 255 caracteres"],
       default: "",
     },
-    activo: {
+    isActive: {
       type: Boolean,
       default: true,
     },
   },
   {
     timestamps: true,
-    versionKey: false, //  esto elimina __v
+    versionKey: false,
   }
 );
 

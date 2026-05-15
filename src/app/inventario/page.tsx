@@ -1,49 +1,51 @@
 "use client";
-
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/useAuth";
 
 // ─── Tipos ────────────────────────────────────────────────────────────────────
 interface IIngredientCategory {
   _id: string;
-  nombre: string;
+  name: string;
+  description?: string;
+  isActive?: boolean;
 }
 
+// FIX: campos alineados con lo que devuelve la API (minStock, maxStock, supplier)
 interface IIngredient {
   _id: string;
-  nombre: string;
-  stock_actual: number;
-  stock_minimo: number;
-  stock_maximo: number;
-  unidad: string;
-  proveedor?: string;
+  name: string;
+  currentStock: number;
+  minStock: number;
+  maxStock: number;
+  unit: string;
+  supplier?: string;
   category_id: IIngredientCategory | null;
-  activo: boolean;
-  stockStatus: "ok" | "bajo" | "critico";
+  isActive: boolean;
+  stockStatus: "ok" | "low" | "critical";
 }
 
+// FIX: campos del formulario alineados con IIngredient
 type IngredientFormData = {
-  nombre: string;
-  stock_actual: string;
-  stock_minimo: string;
-  stock_maximo: string;
-  unidad: string;
-  proveedor: string;
+  name: string;
+  currentStock: string;
+  minStock: string;
+  maxStock: string;
+  unit: string;
+  supplier: string;
   category_id: string;
-  activo: boolean;
+  isActive: boolean;
 };
 
 type CategoryFormData = {
-  nombre: string;
-  descripcion: string;
-  activo: boolean;
+  name: string;
+  description: string;
+  isActive: boolean;
 };
 
 // Roles permitidos definidos FUERA del componente para evitar loop
 const ALLOWED_ROLES = ["admin", "cocinero"] as const;
-
-const UNITS = ["kg", "gr", "lt", "ml", "unidad"] as const;
+const UNITS = ["kg", "gr", "lt", "ml", "unit"] as const;
 
 // ─── Helpers de estilo ────────────────────────────────────────────────────────
 const inputStyle: React.CSSProperties = {
@@ -60,15 +62,15 @@ const inputStyle: React.CSSProperties = {
 };
 
 const STATUS_CONFIG = {
-  ok:      { label: "Normal",   bg: "#f0fdf4", color: "#16a34a", border: "#bbf7d0" },
-  bajo:    { label: "Bajo",     bg: "#fffbeb", color: "#d97706", border: "#fde68a" },
-  critico: { label: "Crítico",  bg: "#fff0ee", color: "#e85d26", border: "#fecaca" },
+  ok:       { label: "Normal",  bg: "#f0fdf4", color: "#16a34a", border: "#bbf7d0" },
+  low:      { label: "Bajo",    bg: "#fffbeb", color: "#d97706", border: "#fde68a" },
+  critical: { label: "Crítico", bg: "#fff0ee", color: "#e85d26", border: "#fecaca" },
 };
 
 const BAR_COLOR = {
-  ok:      "#16a34a",
-  bajo:    "#d97706",
-  critico: "#e85d26",
+  ok:       "#16a34a",
+  low:      "#d97706",
+  critical: "#e85d26",
 };
 
 // ─── Hook responsive ──────────────────────────────────────────────────────────
@@ -81,6 +83,16 @@ function useIsMobile() {
     return () => window.removeEventListener("resize", check);
   }, []);
   return isMobile;
+}
+
+// ─── Hook: bloquear scroll del body cuando hay modal abierto ──────────────────
+function useLockBodyScroll(active: boolean) {
+  useEffect(() => {
+    if (!active) return;
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => { document.body.style.overflow = prev; };
+  }, [active]);
 }
 
 // ─── Componentes UI reutilizables ─────────────────────────────────────────────
@@ -113,24 +125,50 @@ function ErrorBox({ msg }: { msg: string }) {
 function Modal({ title, children, onClose, isMobile = false }: {
   title?: string; children: React.ReactNode; onClose: () => void; isMobile?: boolean;
 }) {
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, [onClose]);
+
+  useLockBodyScroll(true);
+
   return (
-    <div onClick={onClose} style={{
-      position: "fixed", inset: 0, background: "rgba(0,0,0,0.45)",
-      display: "flex", alignItems: isMobile ? "flex-end" : "center",
-      justifyContent: "center", zIndex: 1000, padding: isMobile ? 0 : 20,
-    }}>
-      <div onClick={(e) => e.stopPropagation()} style={{
-        position: "relative", background: "#fff",
-        borderRadius: isMobile ? "18px 18px 0 0" : 18,
-        padding: isMobile ? "28px 20px 32px" : "32px 36px",
-        width: isMobile ? "100%" : 560, maxWidth: "100%",
-        maxHeight: isMobile ? "92vh" : "90vh", overflowY: "auto",
-        boxShadow: "0 20px 60px rgba(0,0,0,0.18)",
-      }}>
-        <button onClick={onClose} style={{
-          position: "absolute", top: 12, right: 16, background: "none",
-          border: "none", fontSize: 18, cursor: "pointer", color: "#888",
-        }}>✕</button>
+    <div
+      onClick={onClose}
+      role="dialog"
+      aria-modal="true"
+      style={{
+        position: "fixed", inset: 0, background: "rgba(0,0,0,0.45)",
+        display: "flex", alignItems: isMobile ? "flex-end" : "center",
+        justifyContent: "center", zIndex: 1000, padding: isMobile ? 0 : 20,
+      }}
+    >
+      <div
+        onClick={(e) => e.stopPropagation()}
+        style={{
+          position: "relative", background: "#fff",
+          borderRadius: isMobile ? "18px 18px 0 0" : 18,
+          padding: isMobile ? "28px 20px 32px" : "32px 36px",
+          width: isMobile ? "100%" : 560, maxWidth: "100%",
+          maxHeight: isMobile ? "96vh" : "90vh", overflowY: "auto",
+          boxShadow: "0 20px 60px rgba(0,0,0,0.18)",
+        }}
+      >
+        {isMobile && (
+          <div style={{
+            width: 40, height: 4, background: "#ddd", borderRadius: 2,
+            margin: "-12px auto 20px",
+          }} />
+        )}
+        <button
+          onClick={onClose}
+          aria-label="Cerrar"
+          style={{
+            position: "absolute", top: isMobile ? 20 : 12, right: 16, background: "none",
+            border: "none", fontSize: 18, cursor: "pointer", color: "#888",
+          }}
+        >✕</button>
         {title && (
           <h2 style={{ margin: "0 0 22px", fontSize: 19, fontWeight: 700, color: "#1a1a1a", paddingRight: 24 }}>
             {title}
@@ -154,30 +192,51 @@ function IngredientForm({ initial, categories, onSubmit, onCancel, error, submit
   isCocinero?: boolean;
 }) {
   const [form, setForm] = useState<IngredientFormData>(initial);
+
+  // FIX: sincronizar si cambia el initial (al abrir editar otro ingrediente)
+  useEffect(() => {
+    setForm(initial);
+  }, [initial]);
+
   const set = (k: keyof IngredientFormData, v: string | boolean) =>
     setForm((f) => ({ ...f, [k]: v }));
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
       {error && <ErrorBox msg={error} />}
-
       <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap: 12 }}>
         <div style={{ gridColumn: "1 / -1" }}>
           <Field label="Nombre *">
-            <input value={form.nombre} onChange={(e) => set("nombre", e.target.value)}
-              placeholder="Ej: Filete de Res" style={inputStyle} disabled={isCocinero} />
+            <input
+              value={form.name}
+              onChange={(e) => set("name", e.target.value)}
+              placeholder="Ej: Filete de Res"
+              style={inputStyle}
+              disabled={isCocinero}
+            />
           </Field>
         </div>
 
         <Field label="Stock Actual *">
-          <input type="number" min={0} step="0.001" value={form.stock_actual}
-            onChange={(e) => set("stock_actual", e.target.value)}
-            placeholder="0" style={inputStyle} />
+          <input
+            type="number"
+            min={0}
+            step="0.001"
+            value={form.currentStock}
+            onChange={(e) => set("currentStock", e.target.value)}
+            placeholder="0"
+            style={inputStyle}
+            inputMode="decimal"
+          />
         </Field>
 
         <Field label="Unidad *">
-          <select value={form.unidad} onChange={(e) => set("unidad", e.target.value)}
-            style={inputStyle} disabled={isCocinero}>
+          <select
+            value={form.unit}
+            onChange={(e) => set("unit", e.target.value)}
+            style={inputStyle}
+            disabled={isCocinero}
+          >
             <option value="">Seleccionar...</option>
             {UNITS.map((u) => <option key={u} value={u}>{u}</option>)}
           </select>
@@ -185,25 +244,43 @@ function IngredientForm({ initial, categories, onSubmit, onCancel, error, submit
 
         {!isCocinero && (
           <Field label="Stock Mínimo *">
-            <input type="number" min={0} step="0.001" value={form.stock_minimo}
-              onChange={(e) => set("stock_minimo", e.target.value)}
-              placeholder="0" style={inputStyle} />
+            <input
+              type="number"
+              min={0}
+              step="0.001"
+              value={form.minStock}
+              onChange={(e) => set("minStock", e.target.value)}
+              placeholder="0"
+              style={inputStyle}
+              inputMode="decimal"
+            />
           </Field>
         )}
 
         {!isCocinero && (
           <Field label="Stock Máximo *">
-            <input type="number" min={0} step="0.001" value={form.stock_maximo}
-              onChange={(e) => set("stock_maximo", e.target.value)}
-              placeholder="0" style={inputStyle} />
+            <input
+              type="number"
+              min={0}
+              step="0.001"
+              value={form.maxStock}
+              onChange={(e) => set("maxStock", e.target.value)}
+              placeholder="0"
+              style={inputStyle}
+              inputMode="decimal"
+            />
           </Field>
         )}
 
         {!isCocinero && (
           <div style={{ gridColumn: "1 / -1" }}>
             <Field label="Proveedor">
-              <input value={form.proveedor} onChange={(e) => set("proveedor", e.target.value)}
-                placeholder="Nombre del proveedor" style={inputStyle} />
+              <input
+                value={form.supplier}
+                onChange={(e) => set("supplier", e.target.value)}
+                placeholder="Nombre del proveedor"
+                style={inputStyle}
+              />
             </Field>
           </div>
         )}
@@ -211,10 +288,13 @@ function IngredientForm({ initial, categories, onSubmit, onCancel, error, submit
         {!isCocinero && (
           <div style={{ gridColumn: "1 / -1" }}>
             <Field label="Categoría (opcional)">
-              <select value={form.category_id} onChange={(e) => set("category_id", e.target.value)}
-                style={inputStyle}>
+              <select
+                value={form.category_id}
+                onChange={(e) => set("category_id", e.target.value)}
+                style={inputStyle}
+              >
                 <option value="">Sin categoría</option>
-                {categories.map((c) => <option key={c._id} value={c._id}>{c.nombre}</option>)}
+                {categories.map((c) => <option key={c._id} value={c._id}>{c.name}</option>)}
               </select>
             </Field>
           </div>
@@ -223,9 +303,12 @@ function IngredientForm({ initial, categories, onSubmit, onCancel, error, submit
         {!isCocinero && (
           <div style={{ gridColumn: "1 / -1" }}>
             <label style={{ display: "flex", alignItems: "center", gap: 10, cursor: "pointer", fontSize: 14, color: "#333" }}>
-              <input type="checkbox" checked={form.activo}
-                onChange={(e) => set("activo", e.target.checked)}
-                style={{ width: 17, height: 17 }} />
+              <input
+                type="checkbox"
+                checked={form.isActive}
+                onChange={(e) => set("isActive", e.target.checked)}
+                style={{ width: 17, height: 17 }}
+              />
               Ingrediente activo
             </label>
           </div>
@@ -233,18 +316,26 @@ function IngredientForm({ initial, categories, onSubmit, onCancel, error, submit
       </div>
 
       <div style={{ display: "flex", gap: 10, marginTop: 8, flexDirection: isMobile ? "column-reverse" : "row" }}>
-        <button onClick={onCancel} style={{
-          flex: isMobile ? undefined : 1, padding: "11px 22px", borderRadius: 9,
-          border: "1.5px solid #e0e0e0", background: "transparent", fontSize: 13,
-          fontWeight: 600, cursor: "pointer", color: "#888", fontFamily: "inherit",
-          width: isMobile ? "100%" : undefined,
-        }}>Cancelar</button>
-        <button onClick={() => onSubmit(form)} style={{
-          flex: isMobile ? undefined : 2, padding: "11px 22px", borderRadius: 9,
-          border: "none", background: "#e85d26", fontSize: 13, fontWeight: 600,
-          cursor: "pointer", color: "#fff", fontFamily: "inherit",
-          width: isMobile ? "100%" : undefined,
-        }}>{submitLabel}</button>
+        <button
+          onClick={onCancel}
+          type="button"
+          style={{
+            flex: isMobile ? undefined : 1, padding: "11px 22px", borderRadius: 9,
+            border: "1.5px solid #e0e0e0", background: "transparent", fontSize: 13,
+            fontWeight: 600, cursor: "pointer", color: "#888", fontFamily: "inherit",
+            width: isMobile ? "100%" : undefined, minHeight: 44,
+          }}
+        >Cancelar</button>
+        <button
+          onClick={() => onSubmit(form)}
+          type="button"
+          style={{
+            flex: isMobile ? undefined : 2, padding: "11px 22px", borderRadius: 9,
+            border: "none", background: "#e85d26", fontSize: 13, fontWeight: 600,
+            cursor: "pointer", color: "#fff", fontFamily: "inherit",
+            width: isMobile ? "100%" : undefined, minHeight: 44,
+          }}
+        >{submitLabel}</button>
       </div>
     </div>
   );
@@ -262,57 +353,88 @@ function CategoryForm({ initial, onSubmit, onCancel, error, submitLabel }: {
   const set = (k: keyof CategoryFormData, v: string | boolean) =>
     setForm((f) => ({ ...f, [k]: v }));
 
+  useEffect(() => {
+    setForm(initial);
+  }, [initial]);
+
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
       {error && <ErrorBox msg={error} />}
       <Field label="Nombre *">
-        <input value={form.nombre} onChange={(e) => set("nombre", e.target.value)}
-          placeholder="Ej: Carnes, Lácteos..." style={inputStyle} />
+        <input
+          value={form.name}
+          onChange={(e) => set("name", e.target.value)}
+          placeholder="Ej: Carnes, Lácteos..."
+          style={inputStyle}
+        />
       </Field>
       <Field label="Descripción">
-        <input value={form.descripcion} onChange={(e) => set("descripcion", e.target.value)}
-          placeholder="Descripción opcional" style={inputStyle} />
+        <input
+          value={form.description}
+          onChange={(e) => set("description", e.target.value)}
+          placeholder="Descripción opcional"
+          style={inputStyle}
+        />
       </Field>
       <label style={{ display: "flex", alignItems: "center", gap: 10, cursor: "pointer", fontSize: 14, color: "#333" }}>
-        <input type="checkbox" checked={form.activo}
-          onChange={(e) => set("activo", e.target.checked)}
-          style={{ width: 17, height: 17 }} />
+        <input
+          type="checkbox"
+          checked={form.isActive}
+          onChange={(e) => set("isActive", e.target.checked)}
+          style={{ width: 17, height: 17 }}
+        />
         Categoría activa
       </label>
       <div style={{ display: "flex", gap: 10, marginTop: 8 }}>
-        <button onClick={onCancel} style={{
-          flex: 1, padding: "11px 22px", borderRadius: 9,
-          border: "1.5px solid #e0e0e0", background: "transparent", fontSize: 13,
-          fontWeight: 600, cursor: "pointer", color: "#888", fontFamily: "inherit",
-        }}>Cancelar</button>
-        <button onClick={() => onSubmit(form)} style={{
-          flex: 2, padding: "11px 22px", borderRadius: 9,
-          border: "none", background: "#1a1a1a", fontSize: 13, fontWeight: 600,
-          cursor: "pointer", color: "#fff", fontFamily: "inherit",
-        }}>{submitLabel}</button>
+        <button
+          onClick={onCancel}
+          type="button"
+          style={{
+            flex: 1, padding: "11px 22px", borderRadius: 9,
+            border: "1.5px solid #e0e0e0", background: "transparent", fontSize: 13,
+            fontWeight: 600, cursor: "pointer", color: "#888", fontFamily: "inherit",
+            minHeight: 44,
+          }}
+        >Cancelar</button>
+        <button
+          onClick={() => onSubmit(form)}
+          type="button"
+          style={{
+            flex: 2, padding: "11px 22px", borderRadius: 9,
+            border: "none", background: "#1a1a1a", fontSize: 13, fontWeight: 600,
+            cursor: "pointer", color: "#fff", fontFamily: "inherit",
+            minHeight: 44,
+          }}
+        >{submitLabel}</button>
       </div>
     </div>
   );
 }
 
 // ─── Fila de tabla ────────────────────────────────────────────────────────────
-function IngredientRow({ ing, onEdit, isCocinero }: {
-  ing: IIngredient; onEdit: () => void; isCocinero: boolean;
+function IngredientRow({ ing, onEdit, onDelete, isCocinero, isAdmin }: {
+  ing: IIngredient;
+  onEdit: () => void;
+  onDelete: () => void;
+  isCocinero: boolean;
+  isAdmin: boolean;
 }) {
-  const pct = ing.stock_maximo > 0
-    ? Math.min(100, Math.round((ing.stock_actual / ing.stock_maximo) * 100))
+  // FIX: usar ing.maxStock en lugar de ing.stock_maximo
+  const pct = ing.maxStock > 0
+    ? Math.min(100, Math.round((ing.currentStock / ing.maxStock) * 100))
     : 0;
   const status = STATUS_CONFIG[ing.stockStatus];
-  const catName = ing.category_id?.nombre ?? "—";
+  const catName = ing.category_id?.name ?? "—";
 
   return (
-    <tr style={{ borderBottom: "1px solid #f0f0f0" }}
+    <tr
+      style={{ borderBottom: "1px solid #f0f0f0" }}
       onMouseEnter={(e) => (e.currentTarget.style.background = "#fafafa")}
       onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
     >
       <td style={{ padding: "14px 16px", fontWeight: 700, color: "#1a1a1a", fontSize: 14 }}>
-        {ing.nombre}
-        {!ing.activo && (
+        {ing.name}
+        {!ing.isActive && (
           <span style={{ marginLeft: 8, fontSize: 10, color: "#aaa", fontWeight: 400 }}>inactivo</span>
         )}
       </td>
@@ -324,7 +446,7 @@ function IngredientRow({ ing, onEdit, isCocinero }: {
       </td>
       <td style={{ padding: "14px 16px", minWidth: 160 }}>
         <p style={{ margin: "0 0 6px", fontSize: 15, fontWeight: 700, color: "#1a1a1a" }}>
-          {ing.stock_actual} {ing.unidad}
+          {ing.currentStock} {ing.unit}
         </p>
         <div style={{ height: 6, background: "#f0f0f0", borderRadius: 3, overflow: "hidden", width: 120 }}>
           <div style={{
@@ -335,9 +457,10 @@ function IngredientRow({ ing, onEdit, isCocinero }: {
           }} />
         </div>
       </td>
+      {/* FIX: usar ing.minStock / ing.maxStock */}
       <td style={{ padding: "14px 16px", fontSize: 12, color: "#888", lineHeight: 1.8 }}>
-        <span>Min: {ing.stock_minimo} {ing.unidad}</span><br />
-        <span>Max: {ing.stock_maximo} {ing.unidad}</span>
+        <span>Min: {ing.minStock} {ing.unit}</span><br />
+        <span>Max: {ing.maxStock} {ing.unit}</span>
       </td>
       <td style={{ padding: "14px 16px" }}>
         <span style={{
@@ -346,15 +469,33 @@ function IngredientRow({ ing, onEdit, isCocinero }: {
         }}>{status.label}</span>
       </td>
       <td style={{ padding: "14px 16px" }}>
-        <button onClick={onEdit} style={{
-          display: "inline-flex", alignItems: "center", gap: 6,
-          padding: "7px 16px", borderRadius: 8,
-          border: "1.5px solid #e0e0e0", background: "#fff",
-          fontSize: 13, fontWeight: 600, cursor: "pointer",
-          color: "#333", fontFamily: "inherit",
-        }}>
-          ✏️ {isCocinero ? "Ajustar" : "Editar"}
-        </button>
+        <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+          <button
+            onClick={onEdit}
+            style={{
+              display: "inline-flex", alignItems: "center", gap: 6,
+              padding: "7px 16px", borderRadius: 8,
+              border: "1.5px solid #e0e0e0", background: "#fff",
+              fontSize: 13, fontWeight: 600, cursor: "pointer",
+              color: "#333", fontFamily: "inherit", minHeight: 36,
+            }}
+          >
+            ✏️ {isCocinero ? "Ajustar" : "Editar"}
+          </button>
+          {isAdmin && (
+            <button
+              onClick={onDelete}
+              aria-label="Eliminar ingrediente"
+              style={{
+                width: 36, height: 36, borderRadius: 8, flexShrink: 0,
+                border: "1.5px solid #fecaca", background: "#fff0ee",
+                fontSize: 15, cursor: "pointer",
+                display: "flex", alignItems: "center", justifyContent: "center",
+                color: "#e85d26",
+              }}
+            >🗑</button>
+          )}
+        </div>
       </td>
     </tr>
   );
@@ -362,10 +503,7 @@ function IngredientRow({ ing, onEdit, isCocinero }: {
 
 // ─── Modal de gestión de categorías ──────────────────────────────────────────
 function CategoriesModal({
-  categories,
-  onClose,
-  isMobile,
-  onRefresh,
+  categories, onClose, isMobile, onRefresh,
 }: {
   categories: IIngredientCategory[];
   onClose: () => void;
@@ -379,7 +517,7 @@ function CategoriesModal({
   const [formError, setFormError] = useState("");
   const [successMsg, setSuccessMsg] = useState("");
 
-  const emptyForm: CategoryFormData = { nombre: "", descripcion: "", activo: true };
+  const emptyForm: CategoryFormData = { name: "", description: "", isActive: true };
 
   const showSuccess = (msg: string) => {
     setSuccessMsg(msg);
@@ -387,13 +525,13 @@ function CategoriesModal({
   };
 
   const handleCreate = async (form: CategoryFormData) => {
-    if (!form.nombre.trim()) { setFormError("El nombre es obligatorio"); return; }
+    if (!form.name.trim()) { setFormError("El nombre es obligatorio"); return; }
     setFormError("");
     try {
       const res = await fetch("/api/ingredient-categories", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ nombre: form.nombre.trim(), descripcion: form.descripcion.trim(), activo: form.activo }),
+        body: JSON.stringify({ name: form.name.trim(), description: form.description.trim(), isActive: form.isActive }),
       });
       const data = await res.json();
       if (!data.ok) { setFormError(data.message); return; }
@@ -405,13 +543,13 @@ function CategoriesModal({
 
   const handleEdit = async (form: CategoryFormData) => {
     if (!editCat) return;
-    if (!form.nombre.trim()) { setFormError("El nombre es obligatorio"); return; }
+    if (!form.name.trim()) { setFormError("El nombre es obligatorio"); return; }
     setFormError("");
     try {
       const res = await fetch(`/api/ingredient-categories/${editCat._id}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ nombre: form.nombre.trim(), descripcion: form.descripcion.trim(), activo: form.activo }),
+        body: JSON.stringify({ name: form.name.trim(), description: form.description.trim(), isActive: form.isActive }),
       });
       const data = await res.json();
       if (!data.ok) { setFormError(data.message); return; }
@@ -433,9 +571,12 @@ function CategoriesModal({
     } catch { setError("Error al eliminar"); }
   };
 
+  const editFormInitial: CategoryFormData = editCat
+    ? { name: editCat.name, description: editCat.description ?? "", isActive: editCat.isActive ?? true }
+    : emptyForm;
+
   return (
     <Modal title="Gestión de Categorías" onClose={onClose} isMobile={isMobile}>
-      {/* Toast interno */}
       {successMsg && (
         <div style={{
           background: "#f0fdf4", border: "1px solid #bbf7d0", borderRadius: 8,
@@ -453,15 +594,17 @@ function CategoriesModal({
         </div>
       )}
 
-      {/* Vista: lista */}
       {view === "list" && (
         <>
-          <button onClick={() => { setFormError(""); setView("create"); }} style={{
-            width: "100%", padding: "11px", borderRadius: 9,
-            border: "1.5px dashed #e0e0e0", background: "#fafafa",
-            fontSize: 13, fontWeight: 600, cursor: "pointer",
-            color: "#555", fontFamily: "inherit", marginBottom: 16,
-          }}>+ Nueva Categoría</button>
+          <button
+            onClick={() => { setFormError(""); setView("create"); }}
+            style={{
+              width: "100%", padding: "11px", borderRadius: 9,
+              border: "1.5px dashed #e0e0e0", background: "#fafafa",
+              fontSize: 13, fontWeight: 600, cursor: "pointer",
+              color: "#555", fontFamily: "inherit", marginBottom: 16, minHeight: 44,
+            }}
+          >+ Nueva Categoría</button>
 
           {categories.length === 0 ? (
             <p style={{ textAlign: "center", color: "#aaa", fontSize: 14, padding: "20px 0" }}>
@@ -476,7 +619,7 @@ function CategoriesModal({
                   background: "#fafafa",
                 }}>
                   <span style={{ fontWeight: 600, fontSize: 14, color: "#1a1a1a" }}>
-                    🏷️ {cat.nombre}
+                    🏷 {cat.name}
                   </span>
                   <div style={{ display: "flex", gap: 8 }}>
                     <button
@@ -484,22 +627,24 @@ function CategoriesModal({
                       style={{
                         padding: "6px 14px", borderRadius: 7, border: "1.5px solid #e0e0e0",
                         background: "#fff", fontSize: 12, fontWeight: 600, cursor: "pointer",
-                        color: "#333", fontFamily: "inherit",
-                      }}>✏️ Editar</button>
+                        color: "#333", fontFamily: "inherit", minHeight: 36,
+                      }}
+                    >✏️ Editar</button>
                     <button
                       onClick={() => setDeleteId(cat._id)}
+                      aria-label={`Eliminar ${cat.name}`}
                       style={{
                         padding: "6px 14px", borderRadius: 7, border: "1.5px solid #fecaca",
                         background: "#fff0ee", fontSize: 12, fontWeight: 600, cursor: "pointer",
-                        color: "#e85d26", fontFamily: "inherit",
-                      }}>🗑️</button>
+                        color: "#e85d26", fontFamily: "inherit", minHeight: 36,
+                      }}
+                    >🗑</button>
                   </div>
                 </div>
               ))}
             </div>
           )}
 
-          {/* Confirm delete inline */}
           {deleteId && (
             <div style={{
               marginTop: 16, padding: "16px", borderRadius: 10,
@@ -512,23 +657,28 @@ function CategoriesModal({
                 Los ingredientes asociados quedarán sin categoría.
               </p>
               <div style={{ display: "flex", gap: 10, justifyContent: "center" }}>
-                <button onClick={() => setDeleteId(null)} style={{
-                  padding: "9px 20px", borderRadius: 8, border: "1.5px solid #e0e0e0",
-                  background: "transparent", fontSize: 13, fontWeight: 600,
-                  cursor: "pointer", color: "#888", fontFamily: "inherit",
-                }}>Cancelar</button>
-                <button onClick={() => handleDelete(deleteId)} style={{
-                  padding: "9px 20px", borderRadius: 8, border: "none",
-                  background: "#e85d26", fontSize: 13, fontWeight: 600,
-                  cursor: "pointer", color: "#fff", fontFamily: "inherit",
-                }}>Sí, eliminar</button>
+                <button
+                  onClick={() => setDeleteId(null)}
+                  style={{
+                    padding: "9px 20px", borderRadius: 8, border: "1.5px solid #e0e0e0",
+                    background: "transparent", fontSize: 13, fontWeight: 600,
+                    cursor: "pointer", color: "#888", fontFamily: "inherit", minHeight: 44,
+                  }}
+                >Cancelar</button>
+                <button
+                  onClick={() => handleDelete(deleteId)}
+                  style={{
+                    padding: "9px 20px", borderRadius: 8, border: "none",
+                    background: "#e85d26", fontSize: 13, fontWeight: 600,
+                    cursor: "pointer", color: "#fff", fontFamily: "inherit", minHeight: 44,
+                  }}
+                >Sí, eliminar</button>
               </div>
             </div>
           )}
         </>
       )}
 
-      {/* Vista: crear */}
       {view === "create" && (
         <>
           <p style={{ margin: "-10px 0 18px", fontSize: 13, color: "#888" }}>← Nueva categoría</p>
@@ -542,12 +692,11 @@ function CategoriesModal({
         </>
       )}
 
-      {/* Vista: editar */}
       {view === "edit" && editCat && (
         <>
-          <p style={{ margin: "-10px 0 18px", fontSize: 13, color: "#888" }}>← Editando: {editCat.nombre}</p>
+          <p style={{ margin: "-10px 0 18px", fontSize: 13, color: "#888" }}>← Editando: {editCat.name}</p>
           <CategoryForm
-            initial={{ nombre: editCat.nombre, descripcion: "", activo: true }}
+            initial={editFormInitial}
             onSubmit={handleEdit}
             onCancel={() => { setView("list"); setEditCat(null); setFormError(""); }}
             error={formError}
@@ -563,8 +712,6 @@ function CategoriesModal({
 export default function InventoryPage() {
   const router = useRouter();
   const isMobile = useIsMobile();
-
-  // ALLOWED_ROLES está definido fuera del componente → referencia estable → sin loop
   const { user, loading: userLoading } = useAuth(ALLOWED_ROLES as unknown as import("@/lib/useAuth").AuthUser["rol"][]);
   const isCocinero = user?.rol === "cocinero";
   const isAdmin = user?.rol === "admin";
@@ -574,7 +721,7 @@ export default function InventoryPage() {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [filterCat, setFilterCat] = useState("all");
-  const [filterStatus, setFilterStatus] = useState<"all" | "ok" | "bajo" | "critico">("all");
+  const [filterStatus, setFilterStatus] = useState<"all" | "ok" | "low" | "critical">("all");
   const [successMsg, setSuccessMsg] = useState("");
   const [error, setError] = useState("");
   const [formError, setFormError] = useState("");
@@ -584,7 +731,7 @@ export default function InventoryPage() {
   const [deleteId, setDeleteId] = useState<string | null>(null);
 
   // ── Fetch ──────────────────────────────────────────────────────────────────
-  const fetchData = async () => {
+  const fetchData = useCallback(async () => {
     setLoading(true);
     try {
       const [ingRes, catRes] = await Promise.all([
@@ -600,13 +747,11 @@ export default function InventoryPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
-  // FIX DEL LOOP: usar user?._id (string primitivo) en lugar de user (objeto)
-  // Así React compara por valor, no por referencia
   useEffect(() => {
     if (!userLoading && user) fetchData();
-  }, [userLoading, user?._id]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [userLoading, user, fetchData]);
 
   const showSuccess = (msg: string) => {
     setSuccessMsg(msg);
@@ -617,8 +762,9 @@ export default function InventoryPage() {
   const filtered = useMemo(() => {
     return ingredients.filter((ing) => {
       const matchSearch =
-        ing.nombre.toLowerCase().includes(search.toLowerCase()) ||
-        (ing.proveedor ?? "").toLowerCase().includes(search.toLowerCase());
+        (ing.name ?? "").toLowerCase().includes(search.toLowerCase()) ||
+        // FIX: usar ing.supplier en lugar de ing.proveedor
+        (ing.supplier ?? "").toLowerCase().includes(search.toLowerCase());
       const matchCat =
         filterCat === "all" ? true
         : filterCat === "none" ? !ing.category_id
@@ -629,22 +775,23 @@ export default function InventoryPage() {
   }, [ingredients, search, filterCat, filterStatus]);
 
   // ── Stats ──────────────────────────────────────────────────────────────────
-  const totalOk      = ingredients.filter((i) => i.stockStatus === "ok").length;
-  const totalBajo    = ingredients.filter((i) => i.stockStatus === "bajo").length;
-  const totalCritico = ingredients.filter((i) => i.stockStatus === "critico").length;
+  const totalOk       = ingredients.filter((i) => i.stockStatus === "ok").length;
+  const totalLow      = ingredients.filter((i) => i.stockStatus === "low").length;
+  const totalCritical = ingredients.filter((i) => i.stockStatus === "critical").length;
 
   // ── CRUD ingredientes ──────────────────────────────────────────────────────
+  // FIX: emptyForm con los campos correctos
   const emptyForm: IngredientFormData = {
-    nombre: "", stock_actual: "", stock_minimo: "", stock_maximo: "",
-    unidad: "", proveedor: "", category_id: "", activo: true,
+    name: "", currentStock: "", minStock: "", maxStock: "",
+    unit: "", supplier: "", category_id: "", isActive: true,
   };
 
   const handleCreate = async (form: IngredientFormData) => {
-    if (!form.nombre.trim()) { setFormError("El nombre es obligatorio"); return; }
-    if (!form.unidad) { setFormError("La unidad es obligatoria"); return; }
-    if (form.stock_actual === "" || Number(form.stock_actual) < 0) { setFormError("El stock actual es obligatorio"); return; }
-    if (form.stock_minimo === "" || Number(form.stock_minimo) < 0) { setFormError("El stock mínimo es obligatorio"); return; }
-    if (form.stock_maximo === "" || Number(form.stock_maximo) < Number(form.stock_minimo)) {
+    if (!form.name.trim()) { setFormError("El nombre es obligatorio"); return; }
+    if (!form.unit) { setFormError("La unidad es obligatoria"); return; }
+    if (form.currentStock === "" || Number(form.currentStock) < 0) { setFormError("El stock actual es obligatorio"); return; }
+    if (form.minStock === "" || Number(form.minStock) < 0) { setFormError("El stock mínimo es obligatorio"); return; }
+    if (form.maxStock === "" || Number(form.maxStock) <= Number(form.minStock)) {
       setFormError("El stock máximo debe ser mayor al mínimo"); return;
     }
     setFormError("");
@@ -653,14 +800,14 @@ export default function InventoryPage() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          nombre: form.nombre.trim(),
-          stock_actual: Number(form.stock_actual),
-          stock_minimo: Number(form.stock_minimo),
-          stock_maximo: Number(form.stock_maximo),
-          unidad: form.unidad,
-          proveedor: form.proveedor.trim() || "",
+          name: form.name.trim(),
+          currentStock: Number(form.currentStock),
+          minStock: Number(form.minStock),
+          maxStock: Number(form.maxStock),
+          unit: form.unit,
+          supplier: form.supplier.trim() || "",
           category_id: form.category_id || null,
-          activo: form.activo,
+          isActive: form.isActive,
         }),
       });
       const data = await res.json();
@@ -673,34 +820,44 @@ export default function InventoryPage() {
 
   const handleEdit = async (form: IngredientFormData) => {
     if (!editIngredient) return;
-    if (!form.nombre.trim()) { setFormError("El nombre es obligatorio"); return; }
-    if (!form.unidad) { setFormError("La unidad es obligatoria"); return; }
-    if (form.stock_actual === "" || Number(form.stock_actual) < 0) { setFormError("El stock actual es obligatorio"); return; }
+    if (!form.name.trim()) { setFormError("El nombre es obligatorio"); return; }
+    if (!form.unit) { setFormError("La unidad es obligatoria"); return; }
+    if (form.currentStock === "" || Number(form.currentStock) < 0) { setFormError("El stock actual es obligatorio"); return; }
+
+    // FIX: validar minStock/maxStock para admin
+    if (!isCocinero) {
+      if (form.minStock === "" || Number(form.minStock) < 0) { setFormError("El stock mínimo es obligatorio"); return; }
+      if (form.maxStock === "" || Number(form.maxStock) <= Number(form.minStock)) {
+        setFormError("El stock máximo debe ser mayor al mínimo"); return;
+      }
+    }
+
     setFormError("");
     try {
       const res = await fetch(`/api/ingredients/${editIngredient._id}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
+        // FIX: usar los campos correctos en ambos casos (cocinero y admin)
         body: JSON.stringify(isCocinero
           ? {
-              nombre: editIngredient.nombre,
-              stock_actual: Number(form.stock_actual),
-              stock_minimo: editIngredient.stock_minimo,
-              stock_maximo: editIngredient.stock_maximo,
-              unidad: editIngredient.unidad,
-              proveedor: editIngredient.proveedor || "",
-              category_id: editIngredient.category_id?._id || null,
-              activo: editIngredient.activo,
+              name: editIngredient.name,
+              currentStock: Number(form.currentStock),
+              minStock: editIngredient.minStock,
+              maxStock: editIngredient.maxStock,
+              unit: editIngredient.unit,
+              supplier: editIngredient.supplier || "",
+              category_id: editIngredient.category_id?._id ?? null,
+              isActive: editIngredient.isActive,
             }
           : {
-              nombre: form.nombre.trim(),
-              stock_actual: Number(form.stock_actual),
-              stock_minimo: Number(form.stock_minimo),
-              stock_maximo: Number(form.stock_maximo),
-              unidad: form.unidad,
-              proveedor: form.proveedor.trim() || "",
+              name: form.name.trim(),
+              currentStock: Number(form.currentStock),
+              minStock: Number(form.minStock),
+              maxStock: Number(form.maxStock),
+              unit: form.unit,
+              supplier: form.supplier.trim() || "",
               category_id: form.category_id || null,
-              activo: form.activo,
+              isActive: form.isActive,
             }),
       });
       const data = await res.json();
@@ -730,14 +887,14 @@ export default function InventoryPage() {
       </div>
     );
   }
+
   if (!user) return null;
 
   const px = isMobile ? "16px" : "40px";
-
   const catTabs = [
     { id: "all",  label: "Todos" },
     { id: "none", label: "Sin categoría" },
-    ...categories.map((c) => ({ id: c._id, label: c.nombre })),
+    ...categories.map((c) => ({ id: c._id, label: c.name })),
   ];
 
   return (
@@ -750,19 +907,30 @@ export default function InventoryPage() {
         display: "flex", alignItems: "center", justifyContent: "space-between",
         gap: 10, position: "sticky", top: 0, zIndex: 100,
       }}>
-        <div style={{ display: "flex", alignItems: "center", gap: isMobile ? 10 : 14, minWidth: 0 }}>
-          <button onClick={() => router.push(isAdmin ? "/dashboard" : "/dashboard/cocinero")} style={{
-            background: "#f4f4f4", border: "1.5px solid #e0e0e0", borderRadius: 9,
-            width: 38, height: 38, flexShrink: 0,
-            display: "flex", alignItems: "center", justifyContent: "center",
-            cursor: "pointer", fontSize: 16,
-          }}>←</button>
+        <div style={{
+          display: "flex", alignItems: "center", gap: isMobile ? 10 : 14,
+          minWidth: 0, flex: 1,
+          maxWidth: isMobile ? "calc(100% - 96px)" : undefined,
+        }}>
+          <button
+            onClick={() => router.push(isAdmin ? "/dashboard" : "/dashboard/cocinero")}
+            aria-label="Volver al dashboard"
+            style={{
+              background: "#f4f4f4", border: "1.5px solid #e0e0e0", borderRadius: 9,
+              width: 40, height: 40, flexShrink: 0,
+              display: "flex", alignItems: "center", justifyContent: "center",
+              cursor: "pointer", fontSize: 16,
+            }}
+          >←</button>
           <div style={{
             width: 40, height: 40, borderRadius: 12, background: "#e85d26", flexShrink: 0,
             display: "flex", alignItems: "center", justifyContent: "center", fontSize: isMobile ? 18 : 22,
           }}>📦</div>
           {isMobile ? (
-            <h1 style={{ margin: 0, fontSize: 15, fontWeight: 700, color: "#1a1a1a" }}>Inventario</h1>
+            <h1 style={{
+              margin: 0, fontSize: 15, fontWeight: 700, color: "#1a1a1a",
+              whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis",
+            }}>Inventario</h1>
           ) : (
             <div>
               <h1 style={{ margin: 0, fontSize: 20, fontWeight: 700, color: "#1a1a1a" }}>Control de Inventario</h1>
@@ -770,34 +938,35 @@ export default function InventoryPage() {
             </div>
           )}
         </div>
-
-        {/* Acciones del header — solo admin */}
         {isAdmin && (
           <div style={{ display: "flex", gap: 8, flexShrink: 0 }}>
-            {/* Botón Categorías */}
-            <button onClick={() => setShowCategoriesModal(true)} style={{
-              background: "#fff", color: "#1a1a1a",
-              border: "1.5px solid #1a1a1a",
-              padding: isMobile ? "0" : "11px 18px",
-              width: isMobile ? 38 : undefined,
-              height: isMobile ? 38 : undefined,
-              borderRadius: 9, fontSize: isMobile ? 16 : 13, fontWeight: 600,
-              cursor: "pointer", fontFamily: "inherit",
-              display: "flex", alignItems: "center", justifyContent: "center",
-            }}>
-              {isMobile ? "🏷️" : "🏷️ Categorías"}
+            <button
+              onClick={() => setShowCategoriesModal(true)}
+              style={{
+                background: "#fff", color: "#1a1a1a",
+                border: "1.5px solid #1a1a1a",
+                padding: isMobile ? "0" : "11px 18px",
+                width: isMobile ? 44 : undefined,
+                height: isMobile ? 44 : undefined,
+                borderRadius: 9, fontSize: isMobile ? 16 : 13, fontWeight: 600,
+                cursor: "pointer", fontFamily: "inherit",
+                display: "flex", alignItems: "center", justifyContent: "center",
+              }}
+            >
+              {isMobile ? "🏷" : "🏷 Categorías"}
             </button>
-
-            {/* Botón Nuevo Ingrediente */}
-            <button onClick={() => { setFormError(""); setShowCreateModal(true); }} style={{
-              background: "#1a1a1a", color: "#fff", border: "none",
-              padding: isMobile ? "0" : "11px 22px",
-              width: isMobile ? 38 : undefined,
-              height: isMobile ? 38 : undefined,
-              borderRadius: 9, fontSize: isMobile ? 18 : 13, fontWeight: 600,
-              cursor: "pointer", fontFamily: "inherit",
-              display: "flex", alignItems: "center", justifyContent: "center",
-            }}>
+            <button
+              onClick={() => { setFormError(""); setShowCreateModal(true); }}
+              style={{
+                background: "#1a1a1a", color: "#fff", border: "none",
+                padding: isMobile ? "0" : "11px 22px",
+                width: isMobile ? 44 : undefined,
+                height: isMobile ? 44 : undefined,
+                borderRadius: 9, fontSize: isMobile ? 20 : 13, fontWeight: 600,
+                cursor: "pointer", fontFamily: "inherit",
+                display: "flex", alignItems: "center", justifyContent: "center",
+              }}
+            >
               {isMobile ? "+" : "+ Nuevo Ingrediente"}
             </button>
           </div>
@@ -806,13 +975,17 @@ export default function InventoryPage() {
 
       {/* ── Toast ── */}
       {successMsg && (
-        <div style={{
-          position: "fixed", top: 24,
-          right: isMobile ? 12 : 24, left: isMobile ? 12 : "auto",
-          zIndex: 9999, background: "#1a1a1a", color: "#fff",
-          padding: "13px 22px", borderRadius: 10, fontSize: 14, fontWeight: 600,
-          boxShadow: "0 4px 20px rgba(0,0,0,0.2)",
-        }}>✓ {successMsg}</div>
+        <div
+          role="status"
+          aria-live="polite"
+          style={{
+            position: "fixed", top: 24,
+            right: isMobile ? 12 : 24, left: isMobile ? 12 : "auto",
+            zIndex: 9999, background: "#1a1a1a", color: "#fff",
+            padding: "13px 22px", borderRadius: 10, fontSize: 14, fontWeight: 600,
+            boxShadow: "0 4px 20px rgba(0,0,0,0.2)",
+          }}
+        >✓ {successMsg}</div>
       )}
 
       {/* ── Error global ── */}
@@ -823,44 +996,72 @@ export default function InventoryPage() {
           display: "flex", justifyContent: "space-between", alignItems: "center",
         }}>
           <span>⚠️ {error}</span>
-          <button onClick={() => setError("")} style={{ background: "none", border: "none", cursor: "pointer", color: "#c0392b", fontSize: 16 }}>✕</button>
+          <button
+            onClick={() => setError("")}
+            aria-label="Cerrar error"
+            style={{ background: "none", border: "none", cursor: "pointer", color: "#c0392b", fontSize: 16 }}
+          >✕</button>
         </div>
       )}
 
       {/* ── Stats cards ── */}
       <div style={{
         padding: `24px ${px} 0`,
-        display: "grid",
-        gridTemplateColumns: isMobile ? "repeat(2, 1fr)" : "repeat(4, 1fr)",
+        display: "flex",
+        flexDirection: isMobile ? "column" : "row",
         gap: isMobile ? 10 : 16,
       }}>
-        {[
-          { label: "Total ingredientes", value: ingredients.length, color: "#1a1a1a", icon: "📦", bg: "#f5f5f5" },
-          { label: "Normal",   value: totalOk,      color: "#16a34a", icon: "🟢", bg: "#f0fdf4" },
-          { label: "Bajo",     value: totalBajo,    color: "#d97706", icon: "🟡", bg: "#fffbeb" },
-          { label: "Crítico",  value: totalCritico, color: "#e85d26", icon: "🔴", bg: "#fff0ee" },
-        ].map((s) => (
-          <div key={s.label} style={{
-            background: "#fff", border: "1.5px solid #e8e8e8", borderRadius: isMobile ? 12 : 16,
-            padding: isMobile ? "14px 16px" : "20px 24px",
-            display: "flex", alignItems: "center", gap: isMobile ? 10 : 16,
-            boxShadow: "0 2px 8px rgba(0,0,0,0.03)",
-          }}>
-            <div style={{
-              width: isMobile ? 36 : 44, height: isMobile ? 36 : 44, borderRadius: 10,
-              background: s.bg, display: "flex", alignItems: "center",
-              justifyContent: "center", fontSize: isMobile ? 16 : 20, flexShrink: 0,
-            }}>{s.icon}</div>
-            <div>
-              <p style={{ margin: 0, fontSize: isMobile ? 10 : 11, color: "#888", marginBottom: 2 }}>{s.label}</p>
-              <p style={{ margin: 0, fontSize: isMobile ? 22 : 28, fontWeight: 700, color: s.color, lineHeight: 1 }}>{s.value}</p>
-            </div>
+        <div style={{
+          background: "#fff", border: "1.5px solid #e8e8e8", borderRadius: isMobile ? 12 : 16,
+          padding: isMobile ? "14px 16px" : "20px 24px",
+          display: "flex", alignItems: "center", gap: isMobile ? 10 : 16,
+          boxShadow: "0 2px 8px rgba(0,0,0,0.03)",
+          flex: isMobile ? undefined : 1,
+        }}>
+          <div style={{
+            width: isMobile ? 36 : 44, height: isMobile ? 36 : 44, borderRadius: 10,
+            background: "#f5f5f5", display: "flex", alignItems: "center",
+            justifyContent: "center", fontSize: isMobile ? 16 : 20, flexShrink: 0,
+          }}>📦</div>
+          <div>
+            <p style={{ margin: 0, fontSize: isMobile ? 10 : 11, color: "#888", marginBottom: 2 }}>Total ingredientes</p>
+            <p style={{ margin: 0, fontSize: isMobile ? 22 : 28, fontWeight: 700, color: "#1a1a1a", lineHeight: 1 }}>{ingredients.length}</p>
           </div>
-        ))}
+        </div>
+
+        <div style={{
+          display: "grid",
+          gridTemplateColumns: "repeat(3, 1fr)",
+          gap: isMobile ? 10 : 16,
+          flex: isMobile ? undefined : 3,
+        }}>
+          {[
+            { label: "Normal",  value: totalOk,       color: "#16a34a", icon: "🟢", bg: "#f0fdf4" },
+            { label: "Bajo",    value: totalLow,      color: "#d97706", icon: "🟡", bg: "#fffbeb" },
+            { label: "Crítico", value: totalCritical, color: "#e85d26", icon: "🔴", bg: "#fff0ee" },
+          ].map((s) => (
+            <div key={s.label} style={{
+              background: "#fff", border: "1.5px solid #e8e8e8", borderRadius: isMobile ? 12 : 16,
+              padding: isMobile ? "12px" : "20px 24px",
+              display: "flex", alignItems: "center", gap: isMobile ? 8 : 16,
+              boxShadow: "0 2px 8px rgba(0,0,0,0.03)",
+            }}>
+              <div style={{
+                width: isMobile ? 32 : 44, height: isMobile ? 32 : 44, borderRadius: 10,
+                background: s.bg, display: "flex", alignItems: "center",
+                justifyContent: "center", fontSize: isMobile ? 14 : 20, flexShrink: 0,
+              }}>{s.icon}</div>
+              <div style={{ minWidth: 0 }}>
+                <p style={{ margin: 0, fontSize: isMobile ? 10 : 11, color: "#888", marginBottom: 2, whiteSpace: "nowrap" }}>{s.label}</p>
+                <p style={{ margin: 0, fontSize: isMobile ? 20 : 28, fontWeight: 700, color: s.color, lineHeight: 1 }}>{s.value}</p>
+              </div>
+            </div>
+          ))}
+        </div>
       </div>
 
       {/* ── Alertas críticas ── */}
-      {totalCritico > 0 && (
+      {totalCritical > 0 && (
         <div style={{
           margin: `16px ${px} 0`,
           background: "#fff0ee", border: "1.5px solid #e85d26",
@@ -870,7 +1071,7 @@ export default function InventoryPage() {
           <span style={{ fontSize: 20 }}>🚨</span>
           <div>
             <p style={{ margin: 0, fontSize: 13, fontWeight: 700, color: "#e85d26" }}>
-              {totalCritico} ingrediente{totalCritico > 1 ? "s" : ""} sin stock crítico
+              {totalCritical} ingrediente{totalCritical > 1 ? "s" : ""} con stock crítico
             </p>
             <p style={{ margin: "2px 0 0", fontSize: 12, color: "#888" }}>
               Requiere reposición inmediata
@@ -885,8 +1086,13 @@ export default function InventoryPage() {
           <span style={{
             position: "absolute", left: 14, top: "50%",
             transform: "translateY(-50%)", color: "#aaa", fontSize: 16,
+            pointerEvents: "none",
           }}>🔍</span>
           <input
+            type="search"
+            autoComplete="off"
+            autoCorrect="off"
+            spellCheck={false}
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Buscar por nombre o proveedor..."
@@ -898,7 +1104,11 @@ export default function InventoryPage() {
       {/* ── Filtros de categoría y estado ── */}
       <div style={{
         paddingTop: 12, paddingRight: px, paddingBottom: 4, paddingLeft: px,
-        display: "flex", gap: 8, overflowX: "auto",
+        display: "flex", gap: 8,
+        overflowX: "auto",
+        WebkitOverflowScrolling: "touch",
+        msOverflowStyle: "none",
+        scrollbarWidth: "none",
       }}>
         {catTabs.map((tab) => (
           <button key={tab.id} onClick={() => setFilterCat(tab.id)} style={{
@@ -908,13 +1118,12 @@ export default function InventoryPage() {
             color: filterCat === tab.id ? "#fff" : "#555",
             fontSize: 13, fontWeight: 600, cursor: "pointer",
             fontFamily: "inherit", flexShrink: 0, whiteSpace: "nowrap",
+            minHeight: 36,
           }}>{tab.label}</button>
         ))}
-
         <div style={{ width: 1, background: "#e0e0e0", flexShrink: 0, margin: "4px 4px" }} />
-
-        {(["all", "ok", "bajo", "critico"] as const).map((s) => {
-          const labels = { all: "Todos los estados", ok: "🟢 Normal", bajo: "🟡 Bajo", critico: "🔴 Crítico" };
+        {(["all", "ok", "low", "critical"] as const).map((s) => {
+          const labels = { all: "Todos los estados", ok: "🟢 Normal", low: "🟡 Bajo", critical: "🔴 Crítico" };
           return (
             <button key={s} onClick={() => setFilterStatus(s)} style={{
               padding: "7px 18px", borderRadius: 30, border: "1.5px solid",
@@ -923,6 +1132,7 @@ export default function InventoryPage() {
               color: filterStatus === s ? "#e85d26" : "#555",
               fontSize: 13, fontWeight: 600, cursor: "pointer",
               fontFamily: "inherit", flexShrink: 0, whiteSpace: "nowrap",
+              minHeight: 36,
             }}>{labels[s]}</button>
           );
         })}
@@ -952,28 +1162,42 @@ export default function InventoryPage() {
                 {ingredients.length === 0 ? "No hay ingredientes aún" : "Sin resultados"}
               </p>
               {ingredients.length === 0 && isAdmin && (
-                <button onClick={() => setShowCreateModal(true)} style={{
-                  marginTop: 14, background: "#e85d26", color: "#fff", border: "none",
-                  padding: "11px 22px", borderRadius: 9, fontSize: 13, fontWeight: 600,
-                  cursor: "pointer", fontFamily: "inherit",
-                }}>Agregar primer ingrediente</button>
+                <button
+                  onClick={() => setShowCreateModal(true)}
+                  style={{
+                    marginTop: 14, background: "#e85d26", color: "#fff", border: "none",
+                    padding: "11px 22px", borderRadius: 9, fontSize: 13, fontWeight: 600,
+                    cursor: "pointer", fontFamily: "inherit", minHeight: 44,
+                  }}
+                >Agregar primer ingrediente</button>
               )}
             </div>
           ) : isMobile ? (
+            // ── Cards móvil ──────────────────────────────────────────────────
             <div style={{ display: "flex", flexDirection: "column", gap: 0 }}>
               {filtered.map((ing) => {
-                const pct = ing.stock_maximo > 0
-                  ? Math.min(100, Math.round((ing.stock_actual / ing.stock_maximo) * 100))
+                // FIX: usar ing.maxStock
+                const pct = ing.maxStock > 0
+                  ? Math.min(100, Math.round((ing.currentStock / ing.maxStock) * 100))
                   : 0;
                 const status = STATUS_CONFIG[ing.stockStatus];
                 return (
                   <div key={ing._id} style={{ padding: "16px", borderBottom: "1px solid #f0f0f0" }}>
                     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 10 }}>
-                      <div>
-                        <p style={{ margin: 0, fontSize: 15, fontWeight: 700, color: "#1a1a1a" }}>{ing.nombre}</p>
+                      <div style={{ minWidth: 0, flex: 1 }}>
+                        <p style={{
+                          margin: 0, fontSize: 15, fontWeight: 700, color: "#1a1a1a",
+                          whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis",
+                        }}>
+                          {ing.name}
+                          {!ing.isActive && (
+                            <span style={{ marginLeft: 6, fontSize: 10, color: "#aaa", fontWeight: 400 }}>inactivo</span>
+                          )}
+                        </p>
+                        {/* FIX: usar ing.supplier */}
                         <p style={{ margin: "2px 0 0", fontSize: 11, color: "#888" }}>
-                          {ing.category_id?.nombre ?? "Sin categoría"}
-                          {ing.proveedor ? ` · ${ing.proveedor}` : ""}
+                          {ing.category_id?.name ?? "Sin categoría"}
+                          {ing.supplier ? ` · ${ing.supplier}` : ""}
                         </p>
                       </div>
                       <span style={{
@@ -982,32 +1206,55 @@ export default function InventoryPage() {
                         flexShrink: 0, marginLeft: 8,
                       }}>{status.label}</span>
                     </div>
-                    <div style={{ marginBottom: 10 }}>
+                    <div style={{ marginBottom: 12 }}>
                       <p style={{ margin: "0 0 4px", fontSize: 16, fontWeight: 700, color: "#1a1a1a" }}>
-                        {ing.stock_actual} {ing.unidad}
+                        {ing.currentStock} {ing.unit}
                       </p>
                       <div style={{ height: 6, background: "#f0f0f0", borderRadius: 3, overflow: "hidden" }}>
                         <div style={{
                           height: "100%", borderRadius: 3,
                           background: BAR_COLOR[ing.stockStatus],
                           width: `${pct}%`,
+                          transition: "width 0.4s ease",
                         }} />
                       </div>
+                      {/* FIX: usar ing.minStock / ing.maxStock */}
                       <p style={{ margin: "4px 0 0", fontSize: 11, color: "#aaa" }}>
-                        Min: {ing.stock_minimo} · Max: {ing.stock_maximo} {ing.unidad}
+                        Min: {ing.minStock} · Max: {ing.maxStock} {ing.unit}
                       </p>
                     </div>
-                    <button onClick={() => { setFormError(""); setEditIngredient(ing); }} style={{
-                      width: "100%", padding: "9px", borderRadius: 8,
-                      border: "1.5px solid #e0e0e0", background: "#fff",
-                      fontSize: 13, fontWeight: 600, cursor: "pointer",
-                      color: "#333", fontFamily: "inherit",
-                    }}>✏️ {isCocinero ? "Ajustar stock" : "Editar"}</button>
+                    <div style={{ display: "flex", gap: 8 }}>
+                      <button
+                        onClick={() => { setFormError(""); setEditIngredient(ing); }}
+                        style={{
+                          flex: 1, padding: "10px", borderRadius: 8,
+                          border: "1.5px solid #e0e0e0", background: "#fff",
+                          fontSize: 13, fontWeight: 600, cursor: "pointer",
+                          color: "#333", fontFamily: "inherit",
+                          display: "flex", alignItems: "center", justifyContent: "center",
+                          gap: 6, minHeight: 44,
+                        }}
+                      >✏️ {isCocinero ? "Ajustar stock" : "Editar"}</button>
+                      {isAdmin && (
+                        <button
+                          onClick={() => setDeleteId(ing._id)}
+                          aria-label="Eliminar ingrediente"
+                          style={{
+                            width: 44, height: 44, borderRadius: 8, flexShrink: 0,
+                            border: "1.5px solid #fecaca", background: "#fff0ee",
+                            fontSize: 16, cursor: "pointer",
+                            display: "flex", alignItems: "center", justifyContent: "center",
+                            color: "#e85d26",
+                          }}
+                        >🗑</button>
+                      )}
+                    </div>
                   </div>
                 );
               })}
             </div>
           ) : (
+            // ── Tabla desktop ────────────────────────────────────────────────
             <div style={{ overflowX: "auto" }}>
               <table style={{ width: "100%", borderCollapse: "collapse" }}>
                 <thead>
@@ -1027,7 +1274,9 @@ export default function InventoryPage() {
                       key={ing._id}
                       ing={ing}
                       isCocinero={isCocinero}
+                      isAdmin={isAdmin}
                       onEdit={() => { setFormError(""); setEditIngredient(ing); }}
+                      onDelete={() => setDeleteId(ing._id)}
                     />
                   ))}
                 </tbody>
@@ -1037,7 +1286,7 @@ export default function InventoryPage() {
         </div>
       </div>
 
-      {/* ── Modal categorías ── */}
+      {/* ── Modales ── */}
       {showCategoriesModal && isAdmin && (
         <CategoriesModal
           categories={categories}
@@ -1047,7 +1296,6 @@ export default function InventoryPage() {
         />
       )}
 
-      {/* ── Modal crear ingrediente (solo admin) ── */}
       {showCreateModal && isAdmin && (
         <Modal title="Nuevo Ingrediente" onClose={() => setShowCreateModal(false)} isMobile={isMobile}>
           <IngredientForm
@@ -1063,23 +1311,23 @@ export default function InventoryPage() {
         </Modal>
       )}
 
-      {/* ── Modal editar ingrediente ── */}
       {editIngredient && (
         <Modal
-          title={isCocinero ? `Ajustar stock: ${editIngredient.nombre}` : "Editar Ingrediente"}
+          title={isCocinero ? `Ajustar stock: ${editIngredient.name}` : "Editar Ingrediente"}
           onClose={() => setEditIngredient(null)}
           isMobile={isMobile}
         >
           <IngredientForm
+            // FIX: initial con los campos correctos (minStock, maxStock, supplier)
             initial={{
-              nombre: editIngredient.nombre,
-              stock_actual: String(editIngredient.stock_actual),
-              stock_minimo: String(editIngredient.stock_minimo),
-              stock_maximo: String(editIngredient.stock_maximo),
-              unidad: editIngredient.unidad,
-              proveedor: editIngredient.proveedor || "",
+              name: editIngredient.name,
+              currentStock: String(editIngredient.currentStock),
+              minStock: String(editIngredient.minStock),
+              maxStock: String(editIngredient.maxStock),
+              unit: editIngredient.unit,
+              supplier: editIngredient.supplier || "",
               category_id: editIngredient.category_id?._id || "",
-              activo: editIngredient.activo,
+              isActive: editIngredient.isActive,
             }}
             categories={categories}
             onSubmit={handleEdit}
@@ -1092,24 +1340,34 @@ export default function InventoryPage() {
         </Modal>
       )}
 
-      {/* ── Modal confirmar delete ingrediente (solo admin) ── */}
       {deleteId && isAdmin && (
         <Modal onClose={() => setDeleteId(null)} isMobile={isMobile}>
           <div style={{ textAlign: "center" }}>
-            <div style={{ fontSize: 44, marginBottom: 12 }}>🗑️</div>
+            <div style={{ fontSize: 44, marginBottom: 12 }}>🗑</div>
             <h2 style={{ margin: "0 0 8px", fontSize: 19, fontWeight: 700, color: "#1a1a1a" }}>¿Eliminar ingrediente?</h2>
             <p style={{ color: "#888", fontSize: 13, margin: 0 }}>Esta acción no se puede deshacer.</p>
-            <div style={{ display: "flex", gap: 10, marginTop: 22, justifyContent: "center" }}>
-              <button onClick={() => setDeleteId(null)} style={{
-                padding: "11px 22px", borderRadius: 9, border: "1.5px solid #e0e0e0",
-                background: "transparent", fontSize: 13, fontWeight: 600,
-                cursor: "pointer", color: "#888", fontFamily: "inherit",
-              }}>Cancelar</button>
-              <button onClick={() => handleDelete(deleteId)} style={{
-                padding: "11px 22px", borderRadius: 9, border: "1.5px solid #e85d26",
-                background: "#fff0ee", fontSize: 13, fontWeight: 600,
-                cursor: "pointer", color: "#e85d26", fontFamily: "inherit",
-              }}>Sí, eliminar</button>
+            <div style={{
+              display: "flex", gap: 10, marginTop: 22, justifyContent: "center",
+              flexDirection: isMobile ? "column-reverse" : "row",
+            }}>
+              <button
+                onClick={() => setDeleteId(null)}
+                style={{
+                  padding: "11px 22px", borderRadius: 9, border: "1.5px solid #e0e0e0",
+                  background: "transparent", fontSize: 13, fontWeight: 600,
+                  cursor: "pointer", color: "#888", fontFamily: "inherit",
+                  width: isMobile ? "100%" : undefined, minHeight: 44,
+                }}
+              >Cancelar</button>
+              <button
+                onClick={() => handleDelete(deleteId)}
+                style={{
+                  padding: "11px 22px", borderRadius: 9, border: "1.5px solid #e85d26",
+                  background: "#fff0ee", fontSize: 13, fontWeight: 600,
+                  cursor: "pointer", color: "#e85d26", fontFamily: "inherit",
+                  width: isMobile ? "100%" : undefined, minHeight: 44,
+                }}
+              >Sí, eliminar</button>
             </div>
           </div>
         </Modal>

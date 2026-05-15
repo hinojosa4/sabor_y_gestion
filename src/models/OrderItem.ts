@@ -2,7 +2,7 @@ import mongoose, { Document, Schema } from 'mongoose';
 
 export interface IOrderItem extends Document {
   order_id: mongoose.Types.ObjectId;
-  menu_item_id: mongoose.Types.ObjectId;
+  dish_id: mongoose.Types.ObjectId; // ← cambio
   quantity: number;
   unit_price: number;
   subtotal: number;
@@ -17,15 +17,25 @@ export interface IOrderItem extends Document {
 
 const OrderItemSchema = new Schema<IOrderItem>({
   order_id: { type: Schema.Types.ObjectId, ref: 'Order', required: true },
-  menu_item_id: { type: Schema.Types.ObjectId, ref: 'MenuItem', required: true },
+
+  // cambio clave
+  dish_id: { type: Schema.Types.ObjectId, ref: 'Dish', required: true },
+
   quantity: { type: Number, default: 1 },
   unit_price: { type: Number, required: true },
   subtotal: { type: Number, required: true },
-  status: { type: String, enum: ['pending', 'in_kitchen', 'ready', 'served', 'cancelled'], default: 'pending' },
+
+  status: { 
+    type: String, 
+    enum: ['pending', 'in_kitchen', 'ready', 'served', 'cancelled'], 
+    default: 'pending' 
+  },
+
   notes: { type: String },
   chef_id: { type: String },
   prepared_at: { type: Date },
   served_at: { type: Date },
+
 }, { 
   timestamps: { createdAt: 'created_at', updatedAt: 'updated_at' },
   collection: 'order_item' 

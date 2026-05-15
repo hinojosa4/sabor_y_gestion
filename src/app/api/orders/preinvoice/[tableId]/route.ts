@@ -1,10 +1,8 @@
-// app/api/orders/preinvoice/[tableId]/route.ts
 import { NextRequest, NextResponse } from 'next/server';
 import { connectDB } from '@/lib/db';
-import mongoose from 'mongoose';
 import Order from '@/models/Order';
 import OrderItem from '@/models/OrderItem';
-import MenuItem from '@/models/MenuItem';
+import Dish from '@/models/Dish';
 
 export async function GET(
   req: NextRequest,
@@ -14,10 +12,9 @@ export async function GET(
     await connectDB();
     const { tableId } = await params;
 
-    const tableObjectId = new mongoose.Types.ObjectId(tableId);
-
+    // table_id es string en el modelo Order
     const order = await Order.findOne({
-      table_id: tableObjectId,
+      table_id: tableId,
       status: { $nin: ['paid', 'cancelled'] },
     }).lean();
 
@@ -31,18 +28,19 @@ export async function GET(
       return NextResponse.json({ items: [], subtotal: 0, iva: 0, total: 0 });
     }
 
-    const menuItemIds = items.map(item => item.menu_item_id);
-    const menuItems = await MenuItem.find({ _id: { $in: menuItemIds } }).lean();
-    const menuMap = new Map(menuItems.map(m => [m._id.toString(), m]));
+    // dish_id en vez de menu_item_id
+    const dishIds = items.map(item => item.dish_id);
+    const dishes = await Dish.find({ _id: { $in: dishIds } }).lean();
+    const dishMap = new Map(dishes.map(d => [d._id.toString(), d]));
 
     let subtotal = 0;
     const formattedItems = items.map(item => {
-      const menu = menuMap.get(item.menu_item_id.toString());
-      const price = menu ? menu.price : item.unit_price;
+      const dish = dishMap.get(item.dish_id?.toString());
+      const price = dish ? dish.price : item.unit_price;
       const subt = price * item.quantity;
       subtotal += subt;
       return {
-        dish: { name: menu?.name || 'Plato', price },
+        dish: { name: dish?.name || 'Plato', price },
         quantity: item.quantity,
         subtotal: subt,
       };
@@ -56,6 +54,7 @@ export async function GET(
       subtotal,
       iva,
       total,
+      orderId: order._id,
     });
   } catch (error) {
     console.error('[Preinvoice] Error:', error);

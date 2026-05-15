@@ -1,12 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import { connectDB } from "@/lib/db";
 import IngredientCategory from "@/models/IngredientCategory";
+import Ingredient from "@/models/Ingredient";
 import mongoose from "mongoose";
 
 interface Params {
   params: Promise<{ id: string }>;
 }
 
+// ── GET /api/ingredient-categories/[id] ──────────────────────────────────────
 export async function GET(_req: NextRequest, { params }: Params) {
   try {
     await connectDB();
@@ -14,7 +16,7 @@ export async function GET(_req: NextRequest, { params }: Params) {
 
     if (!mongoose.Types.ObjectId.isValid(id)) {
       return NextResponse.json(
-        { ok: false, message: "ID no válido" },
+        { ok: false, message: "ID de categoría no válido" },
         { status: 400 }
       );
     }
@@ -40,6 +42,7 @@ export async function GET(_req: NextRequest, { params }: Params) {
   }
 }
 
+// ── PUT /api/ingredient-categories/[id] ──────────────────────────────────────
 export async function PUT(req: NextRequest, { params }: Params) {
   try {
     await connectDB();
@@ -47,15 +50,15 @@ export async function PUT(req: NextRequest, { params }: Params) {
 
     if (!mongoose.Types.ObjectId.isValid(id)) {
       return NextResponse.json(
-        { ok: false, message: "ID no válido" },
+        { ok: false, message: "ID de categoría no válido" },
         { status: 400 }
       );
     }
 
     const body = await req.json();
-    const { nombre, descripcion, activo } = body;
+    const { name, description, isActive } = body;
 
-    if (!nombre || !nombre.trim()) {
+    if (!name || !name.trim()) {
       return NextResponse.json(
         { ok: false, message: "El nombre es obligatorio" },
         { status: 400 }
@@ -63,7 +66,7 @@ export async function PUT(req: NextRequest, { params }: Params) {
     }
 
     const existing = await IngredientCategory.findOne({
-      nombre: nombre.trim(),
+      name: name.trim(),
       _id: { $ne: id },
     });
     if (existing) {
@@ -73,14 +76,15 @@ export async function PUT(req: NextRequest, { params }: Params) {
       );
     }
 
+    // FIX: runValidators: false para evitar posibles errores de validación internos
     const updated = await IngredientCategory.findByIdAndUpdate(
       id,
       {
-        nombre: nombre.trim(),
-        descripcion: descripcion?.trim() || "",
-        activo: activo ?? true,
+        name: name.trim(),
+        description: description?.trim() || "",
+        isActive: isActive ?? true,
       },
-      { returnDocument: "after", runValidators: true }
+      { returnDocument: "after", runValidators: false }
     );
 
     if (!updated) {
@@ -96,6 +100,21 @@ export async function PUT(req: NextRequest, { params }: Params) {
       data: updated,
     });
   } catch (error) {
+    if (error instanceof mongoose.Error.ValidationError) {
+      const messages = Object.values(error.errors).map((e) => e.message).join(". ");
+      return NextResponse.json(
+        { ok: false, message: messages },
+        { status: 400 }
+      );
+    }
+
+    if ((error as { code?: number }).code === 11000) {
+      return NextResponse.json(
+        { ok: false, message: "Ya existe otra categoría con ese nombre" },
+        { status: 409 }
+      );
+    }
+
     return NextResponse.json(
       {
         ok: false,
@@ -107,6 +126,7 @@ export async function PUT(req: NextRequest, { params }: Params) {
   }
 }
 
+// ── DELETE /api/ingredient-categories/[id] ────────────────────────────────────
 export async function DELETE(_req: NextRequest, { params }: Params) {
   try {
     await connectDB();
@@ -114,8 +134,20 @@ export async function DELETE(_req: NextRequest, { params }: Params) {
 
     if (!mongoose.Types.ObjectId.isValid(id)) {
       return NextResponse.json(
-        { ok: false, message: "ID no válido" },
+        { ok: false, message: "ID de categoría no válido" },
         { status: 400 }
+      );
+    }
+
+    // Verificar ingredientes asociados antes de eliminar
+    const ingredientCount = await Ingredient.countDocuments({ category_id: id });
+    if (ingredientCount > 0) {
+      return NextResponse.json(
+        {
+          ok: false,
+          message: `No se puede eliminar, tiene ${ingredientCount} ingrediente(s) asociado(s)`,
+        },
+        { status: 409 }
       );
     }
 

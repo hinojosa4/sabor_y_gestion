@@ -3,7 +3,7 @@ import { connectDB } from '@/lib/db';
 import Payment from '@/models/Payment';
 import Order from '@/models/Order';
 import Table from '@/models/Table';
-
+import { pusherServer } from "@/lib/pusher"; 
 //const RESTAURANT_ID = "69e170e941daf8c2b2f76677"; // para obtener el nombre del restaurante
 
 export async function POST(req: Request) {
@@ -33,6 +33,10 @@ export async function POST(req: Request) {
     if (order.service_type === 'dine_in' && tableId) {
       await Table.findByIdAndUpdate(tableId, { status: 'Libre' });
     }
+      await pusherServer.trigger("restaurant", "table:updated", {
+        tableId,
+        newStatus: "Libre",
+      });
 
     return NextResponse.json(payment, { status: 201 });
   } catch (error) {
