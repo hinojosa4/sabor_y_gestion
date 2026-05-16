@@ -1,13 +1,14 @@
 // src/components/clientScreen/ClientHeader.tsx
 import React from "react";
-import { User, Truck, LogOut } from "lucide-react";
+import { User, Truck, CalendarDays, LogOut } from "lucide-react";
 
 interface ClientHeaderProps {
     onDelivery?: () => void;
+    onReservar?: () => void;
     onLogout?: () => void;
 }
 
-export function ClientHeader({ onDelivery, onLogout }: ClientHeaderProps) {
+export function ClientHeader({ onDelivery, onReservar, onLogout }: ClientHeaderProps) {
     return (
         <header style={styles.header}>
             <div style={styles.left}>
@@ -24,6 +25,10 @@ export function ClientHeader({ onDelivery, onLogout }: ClientHeaderProps) {
                 <button style={styles.outlineBtn} onClick={onDelivery}>
                     <Truck size={16} />
                     <span>Pedir delivery</span>
+                </button>
+                <button style={styles.outlineBtn} onClick={onReservar}>
+                    <CalendarDays size={16} />
+                    <span>Reservar mesa</span>
                 </button>
                 <button style={styles.outlineBtn} onClick={onLogout}>
                     <LogOut size={16} />

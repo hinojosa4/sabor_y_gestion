@@ -90,7 +90,9 @@ export async function PATCH(req: NextRequest) {
     const validTransitions: Record<string, string[]> = {
       pending:    ["in_kitchen", "cancelled"],
       in_kitchen: ["ready", "cancelled"],
-      ready:      ["delivered"],
+      ready:      ["delivered", "picked_up"],   // ← repartidor recoge
+      picked_up:  ["in_transit", "cancelled"],  // ← repartidor sale
+      in_transit: ["delivered", "cancelled"],   // ← repartidor entrega
     };
 
     const order = await Order.findById(orderId);
@@ -226,6 +228,23 @@ export async function PATCH(req: NextRequest) {
       orderId,
       newStatus,
     });
+
+    // Notificar al cliente dueño de la orden (canal privado)
+    if (order.user_id) {
+      await pusherServer.trigger(`client-${order.user_id}`, "order:status", {
+        orderId,
+        newStatus,
+        service_type: order.service_type,
+      });
+    }
+
+    // Si es delivery y pasó a "ready" → notificar al canal del repartidor
+    if (order.service_type === "delivery" && newStatus === "ready") {
+      await pusherServer.trigger("delivery", "order:ready_for_pickup", {
+        orderId,
+        newStatus,
+      });
+    }
 
     return NextResponse.json({
       ok: true,
