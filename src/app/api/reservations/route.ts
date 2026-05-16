@@ -1,0 +1,128 @@
+import { NextRequest, NextResponse } from "next/server";
+import { connectDB } from "@/lib/db";
+import Reservation from "@/models/Reservation";
+import { verifyToken } from "@/lib/jwt";
+import { pusherServer } from "@/lib/pusher";
+
+// ── POST /api/reservations ─────────────────────────────────────────────────────
+export async function POST(req: NextRequest) {
+  try {
+    await connectDB();
+
+    const authHeader = req.headers.get("authorization");
+    if (!authHeader?.startsWith("Bearer ")) {
+      return NextResponse.json({ ok: false, message: "No autorizado" }, { status: 401 });
+    }
+
+    let userId: string;
+    try {
+      const payload = verifyToken(authHeader.split(" ")[1]);
+      userId = payload.userId;
+    } catch {
+      return NextResponse.json({ ok: false, message: "Token inválido" }, { status: 401 });
+    }
+
+    const body = await req.json();
+    const {
+      contact_name,
+      contact_lastname,
+      contact_phone,
+      party_size,
+      date,
+      occasion,
+      special_requests,
+    } = body;
+
+    // ── Validaciones ───────────────────────────────────────────────────────────
+    if (!contact_name?.trim()) {
+      return NextResponse.json({ ok: false, message: "El nombre es obligatorio" }, { status: 400 });
+    }
+    if (!contact_lastname?.trim()) {
+      return NextResponse.json({ ok: false, message: "El apellido es obligatorio" }, { status: 400 });
+    }
+    if (!contact_phone?.trim()) {
+      return NextResponse.json({ ok: false, message: "El celular es obligatorio" }, { status: 400 });
+    }
+    if (!party_size || party_size < 1 || party_size > 20) {
+      return NextResponse.json(
+        { ok: false, message: "El número de personas debe estar entre 1 y 20" },
+        { status: 400 }
+      );
+    }
+    if (!date) {
+      return NextResponse.json({ ok: false, message: "La fecha y hora son obligatorias" }, { status: 400 });
+    }
+
+    const reservationDate = new Date(date);
+    if (isNaN(reservationDate.getTime())) {
+      return NextResponse.json({ ok: false, message: "La fecha no es válida" }, { status: 400 });
+    }
+    if (reservationDate < new Date()) {
+      return NextResponse.json(
+        { ok: false, message: "La fecha debe ser en el futuro" },
+        { status: 400 }
+      );
+    }
+
+    // ── Crear reserva ──────────────────────────────────────────────────────────
+    const reservation = await Reservation.create({
+      user_id: userId,
+      contact_name: contact_name.trim(),
+      contact_lastname: contact_lastname.trim(),
+      contact_phone: contact_phone.trim(),
+      party_size: Number(party_size),
+      date: reservationDate,
+      occasion: occasion ?? "",
+      special_requests: special_requests?.trim() ?? "",
+      status: "pending",
+    });
+
+    // Notificar al restaurante en tiempo real
+    await pusherServer.trigger("restaurant", "reservation:new", {
+      reservation: reservation.toObject(),
+    });
+
+    return NextResponse.json(
+      { ok: true, message: "Reserva creada correctamente", data: reservation },
+      { status: 201 }
+    );
+  } catch (error) {
+    console.error("[POST /api/reservations]", error);
+    return NextResponse.json(
+      { ok: false, message: "Error al crear reserva", error: String(error) },
+      { status: 500 }
+    );
+  }
+}
+
+// ── GET /api/reservations ──────────────────────────────────────────────────────
+export async function GET(req: NextRequest) {
+  try {
+    await connectDB();
+
+    const authHeader = req.headers.get("authorization");
+    if (!authHeader?.startsWith("Bearer ")) {
+      return NextResponse.json({ ok: false, message: "No autorizado" }, { status: 401 });
+    }
+
+    let userId: string;
+    try {
+      const payload = verifyToken(authHeader.split(" ")[1]);
+      userId = payload.userId;
+    } catch {
+      return NextResponse.json({ ok: false, message: "Token inválido" }, { status: 401 });
+    }
+
+    const reservations = await Reservation.find({ user_id: userId })
+      .sort({ date: -1 })
+      .populate("table_id", "number capacity location")
+      .lean();
+
+    return NextResponse.json({ ok: true, data: reservations });
+  } catch (error) {
+    return NextResponse.json(
+      { ok: false, message: "Error al obtener reservas", error: String(error) },
+      { status: 500 }
+    );
+  }
+}

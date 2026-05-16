@@ -7,7 +7,7 @@ export interface AuthUser {
   _id: string;
   name: string;
   email: string;
-  rol: "admin" | "cajero" | "cocinero" | "mesero" | "cliente";
+  rol: "admin" | "cajero" | "cocinero" | "mesero" | "cliente" | "delivery";
   activo: boolean;
 }
 

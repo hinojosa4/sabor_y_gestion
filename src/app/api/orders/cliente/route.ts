@@ -1,0 +1,135 @@
+import { NextRequest, NextResponse } from "next/server";
+import { connectDB } from "@/lib/db";
+import Order from "@/models/Order";
+import OrderItem from "@/models/OrderItem";
+import { verifyToken } from "@/lib/jwt";
+import { pusherServer } from "@/lib/pusher";
+
+export async function POST(req: NextRequest) {
+  try {
+    await connectDB();
+
+    const authHeader = req.headers.get("authorization");
+    if (!authHeader?.startsWith("Bearer ")) {
+      return NextResponse.json({ ok: false, message: "No autorizado" }, { status: 401 });
+    }
+
+    let userId: string;
+    try {
+      const payload = verifyToken(authHeader.split(" ")[1]);
+      userId = payload.userId;
+    } catch {
+      return NextResponse.json({ ok: false, message: "Token inválido" }, { status: 401 });
+    }
+
+    const body = await req.json();
+    const {
+      service_type,
+      items,
+      delivery_address,
+      delivery_coords,
+      delivery_phone,
+      table_id,
+      notes,
+      payment_method,   // ← nuevo campo
+    } = body;
+
+    // ── Validaciones ──────────────────────────────────────────────────────────
+    const VALID_TYPES = ["delivery", "pick_up", "dine_in"];
+    if (!service_type || !VALID_TYPES.includes(service_type)) {
+      return NextResponse.json(
+        { ok: false, message: "service_type debe ser delivery, pick_up o dine_in" },
+        { status: 400 }
+      );
+    }
+
+    if (!items || !Array.isArray(items) || items.length === 0) {
+      return NextResponse.json(
+        { ok: false, message: "Se requiere al menos un ítem" },
+        { status: 400 }
+      );
+    }
+
+    if (service_type === "delivery" && !delivery_address) {
+      return NextResponse.json(
+        { ok: false, message: "La dirección es requerida para delivery" },
+        { status: 400 }
+      );
+    }
+
+    for (const item of items) {
+      if (!item.dish_id || !item.quantity || !item.unit_price) {
+        return NextResponse.json(
+          { ok: false, message: "Cada ítem requiere dish_id, quantity y unit_price" },
+          { status: 400 }
+        );
+      }
+    }
+
+    const total_amount = items.reduce(
+      (sum: number, i: { quantity: number; unit_price: number }) =>
+        sum + i.quantity * i.unit_price,
+      0
+    );
+
+    // ── Crear orden ───────────────────────────────────────────────────────────
+    const order = await Order.create({
+      restaurantId: process.env.RESTAURANT_ID ?? "default",
+      user_id: userId,
+      mesero_id: "self",
+      service_type,
+      status: "pending",
+      total_amount,
+      payment_method: payment_method ?? "Efectivo",   // ← guardado
+      table_id: table_id ?? undefined,
+      delivery_address: delivery_address ?? undefined,
+      delivery_coords: delivery_coords ?? undefined,
+      delivery_phone: delivery_phone ?? undefined,
+      notes: notes ?? undefined,
+    });
+
+    // ── Crear items ───────────────────────────────────────────────────────────
+    const orderItems = await OrderItem.insertMany(
+      items.map((i: {
+        dish_id: string;
+        quantity: number;
+        unit_price: number;
+        notes?: string;
+      }) => ({
+        order_id: order._id,
+        dish_id: i.dish_id,
+        quantity: i.quantity,
+        unit_price: i.unit_price,
+        subtotal: i.quantity * i.unit_price,
+        notes: i.notes ?? undefined,
+        status: "pending",
+      }))
+    );
+
+    // ── Pusher ────────────────────────────────────────────────────────────────
+    await pusherServer.trigger("restaurant", "order:new", {
+      order: { ...order.toObject(), items: orderItems },
+    });
+
+    if (service_type === "delivery") {
+      await pusherServer.trigger("delivery", "order:new_delivery", {
+        order: { ...order.toObject(), items: orderItems },
+      });
+    }
+
+    return NextResponse.json(
+      { ok: true, message: "Orden creada", data: { order, items: orderItems } },
+      { status: 201 }
+    );
+  } catch (error) {
+    console.error("[POST /api/orders/cliente]", error);
+    return NextResponse.json(
+      {
+        ok: false,
+        message: "Error al crear la orden",
+        error: error instanceof Error ? error.message : String(error),
+      },
+      { status: 500 }
+    );
+  }
+}
