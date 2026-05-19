@@ -9,7 +9,7 @@ export async function GET() {
   try {
     await connectDB();
     const orders = await Order.find({
-      status: { $in: ["pending", "in_kitchen", "ready"] },
+      status: { $in: ["pending", "in_kitchen", "ready", "delivered"] },
     })
       .sort({ createdAt: -1 })
       .lean();

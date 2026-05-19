@@ -77,6 +77,10 @@ const ORDER_STATUS_CONFIG: Record<string, { label: string; color: string; bg: st
   cancelled:  { label: "Cancelado",  color: "#dc2626", bg: "#fee2e2" },
 };
 
+// ─── Helper: formato Bolivianos ──────────────────────────────────
+const formatBOB = (amount: number) =>
+  new Intl.NumberFormat("es-BO", { style: "currency", currency: "BOB" }).format(amount);
+
 // ─── Hook: tiempo transcurrido ────────────────────────────────────
 function useElapsed(createdAt: string) {
   const [elapsed, setElapsed] = useState("");
@@ -100,11 +104,13 @@ function TableCard({
   onClick,
   onRequestBill,
   onViewComanda,
+  canRequestBill,
 }: {
   table: Table;
   onClick: () => void;
   onRequestBill: (tableId: string) => void;
   onViewComanda: (tableId: string) => void;
+  canRequestBill: boolean;
 }) {
   const cfg = TABLE_STATUS_CONFIG[table.status] ?? TABLE_STATUS_CONFIG["Libre"];
   const isClickable = !["Reservada", "Inactiva", "Ocupada", "Cuenta solicitada"].includes(table.status);
@@ -180,16 +186,26 @@ function TableCard({
           >
             📋 Ver Comanda
           </button>
-          <button
-            onClick={e => { e.stopPropagation(); onRequestBill(table._id); }}
-            style={{
+          {canRequestBill ? (
+            <button
+              onClick={e => { e.stopPropagation(); onRequestBill(table._id); }}
+              style={{
+                width: "100%", padding: "7px", borderRadius: 10,
+                border: "1.5px solid #ea580c", background: "#fff7ed", color: "#ea580c",
+                fontSize: 12, fontWeight: 700, cursor: "pointer",
+              }}
+            >
+              🧾 Pedir Cuenta
+            </button>
+          ) : (
+            <div style={{
               width: "100%", padding: "7px", borderRadius: 10,
-              border: "1.5px solid #ea580c", background: "#fff7ed", color: "#ea580c",
-              fontSize: 12, fontWeight: 700, cursor: "pointer",
-            }}
-          >
-            🧾 Pedir Cuenta
-          </button>
+              border: "1.5px solid #e5e7eb", background: "#f9fafb", color: "#9ca3af",
+              fontSize: 12, fontWeight: 600, textAlign: "center",
+            }}>
+              Esperando entrega
+            </div>
+          )}
         </div>
       )}
     </div>
@@ -229,7 +245,12 @@ function ActiveOrderCard({
             <span style={{ fontSize: 18 }}>📋</span>
           </div>
           <div>
-            <p style={{ margin: 0, fontSize: 14, fontWeight: 700, color: "#111" }}>Mesa {tableNum}</p>
+            <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+              <p style={{ margin: 0, fontSize: 14, fontWeight: 700, color: "#111" }}>Mesa {tableNum}</p>
+              <span style={{ fontSize: 11, fontWeight: 700, color: "#fff", background: "#1a1a1a", padding: "2px 7px", borderRadius: 6, fontFamily: "monospace" }}>
+                #{order._id.slice(-4).toUpperCase()}
+              </span>
+            </div>
             <p style={{ margin: 0, fontSize: 11, color: "#9ca3af" }}>{elapsed}</p>
           </div>
         </div>
@@ -238,7 +259,7 @@ function ActiveOrderCard({
             {statusCfg.label}
           </span>
           <span style={{ fontSize: 15, fontWeight: 800, color: "#111" }}>
-            ${order.total_amount?.toFixed(2) ?? "0.00"}
+            {formatBOB(order.total_amount ?? 0)}
           </span>
         </div>
       </div>
@@ -248,7 +269,7 @@ function ActiveOrderCard({
         {order.items?.map(item => (
           <div key={item._id} style={{ display: "flex", justifyContent: "space-between", fontSize: 13, color: "#374151", marginBottom: 4 }}>
             <span>{item.quantity}x {item.dish_id?.name ?? "Plato"}</span>
-            <span style={{ color: "#6b7280" }}>${(item.unit_price * item.quantity).toFixed(2)}</span>
+            <span style={{ color: "#6b7280" }}>{formatBOB(item.unit_price * item.quantity)}</span>
           </div>
         ))}
       </div>
@@ -450,7 +471,7 @@ function OrderModal({
                     <div style={{ flex: 1, minWidth: 0 }}>
                       <p style={{ margin: 0, fontSize: 14, fontWeight: 700, color: "#111" }}>{dish.name}</p>
                       {dish.description && <p style={{ margin: "2px 0 0", fontSize: 11, color: "#9ca3af", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{dish.description}</p>}
-                      <p style={{ margin: "4px 0 0", fontSize: 14, fontWeight: 700, color: "#ea580c" }}>${dish.price.toFixed(2)}</p>
+                      <p style={{ margin: "4px 0 0", fontSize: 14, fontWeight: 700, color: "#ea580c" }}>{formatBOB(dish.price)}</p>
                     </div>
                     {qty === 0 ? (
                       <button onClick={() => addToCart(dish)} style={{ width: 32, height: 32, borderRadius: "50%", border: "none", background: "#ea580c", color: "#fff", fontSize: 20, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>+</button>
@@ -485,7 +506,7 @@ function OrderModal({
                       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
                         <div style={{ flex: 1, minWidth: 0 }}>
                           <p style={{ margin: 0, fontSize: 13, fontWeight: 600, color: "#111" }}>{item.quantity}x {item.dish.name}</p>
-                          <p style={{ margin: "2px 0 0", fontSize: 12, color: "#ea580c", fontWeight: 600 }}>${(item.dish.price * item.quantity).toFixed(2)}</p>
+                          <p style={{ margin: "2px 0 0", fontSize: 12, color: "#ea580c", fontWeight: 600 }}>{formatBOB(item.dish.price * item.quantity)}</p>
                         </div>
                         <button onClick={() => setCart(prev => prev.filter(i => i.dish._id !== item.dish._id))} style={{ border: "none", background: "none", cursor: "pointer", color: "#9ca3af", fontSize: 14, padding: "0 0 0 8px" }}>✕</button>
                       </div>
@@ -506,7 +527,7 @@ function OrderModal({
               {cart.length > 0 && (
                 <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 12 }}>
                   <span style={{ fontSize: 13, color: "#6b7280" }}>Total</span>
-                  <span style={{ fontSize: 16, fontWeight: 800, color: "#111" }}>${total.toFixed(2)}</span>
+                  <span style={{ fontSize: 16, fontWeight: 800, color: "#111" }}>{formatBOB(total)}</span>
                 </div>
               )}
               <button
@@ -659,7 +680,9 @@ export default function MeseroPage() {
     setComandaTableNumber(table?.number ?? null);
   };
 
-  // Stats
+  // Helper: verificar si la mesa tiene orden entregada
+  const isTableDelivered = (tableId: string) =>
+    activeOrders.some(o => o.table_id === tableId && o.status === "delivered");
   const occupiedCount = tables.filter(t => ["Ocupada", "Cuenta solicitada"].includes(t.status)).length;
   const reservedCount = tables.filter(t => t.status === "Reservada").length;
   const availableCount = tables.filter(t => ["Libre", "Activa"].includes(t.status)).length;
@@ -722,6 +745,7 @@ export default function MeseroPage() {
                     onClick={() => setSelectedTable(table)}
                     onRequestBill={handleRequestBill}
                     onViewComanda={handleViewComanda}
+                    canRequestBill={isTableDelivered(table._id)}
                   />
                 ))}
               </div>
@@ -729,13 +753,13 @@ export default function MeseroPage() {
           </div>
 
           {/* Órdenes activas */}
-          {activeOrders.filter(o => !["paid", "cancelled"].includes(o.status)).length > 0 && (
+          {activeOrders.filter(o => !["paid", "cancelled", "delivered"].includes(o.status)).length > 0 && (
             <div style={{ background: "#fff", borderRadius: 20, border: "1.5px solid #f3f4f6", padding: "24px" }}>
               <h2 style={{ margin: "0 0 4px", fontSize: 16, fontWeight: 800, color: "#111" }}>Órdenes Activas</h2>
               <p style={{ margin: "0 0 20px", fontSize: 13, color: "#9ca3af" }}>Seguimiento de órdenes en proceso</p>
               <div key={refreshKey} style={{ display: "flex", flexDirection: "column", gap: 12 }}>
                 {activeOrders
-                  .filter(o => !["paid", "cancelled"].includes(o.status))
+                  .filter(o => !["paid", "cancelled", "delivered"].includes(o.status))
                   .map(order => (
                     <ActiveOrderCard
                       key={`${order._id}-${order.status}`}
