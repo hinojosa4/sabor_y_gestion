@@ -77,11 +77,9 @@ const ORDER_STATUS_CONFIG: Record<string, { label: string; color: string; bg: st
   cancelled:  { label: "Cancelado",  color: "#dc2626", bg: "#fee2e2" },
 };
 
-// ─── Helper: formato Bolivianos ──────────────────────────────────
 const formatBOB = (amount: number) =>
   new Intl.NumberFormat("es-BO", { style: "currency", currency: "BOB" }).format(amount);
 
-// ─── Hook: tiempo transcurrido ────────────────────────────────────
 function useElapsed(createdAt: string) {
   const [elapsed, setElapsed] = useState("");
   useEffect(() => {
@@ -98,13 +96,9 @@ function useElapsed(createdAt: string) {
   return elapsed;
 }
 
-// ─── Componente: Tarjeta de mesa ──────────────────────────────────
+// ─── TableCard ────────────────────────────────────────────────────
 function TableCard({
-  table,
-  onClick,
-  onRequestBill,
-  onViewComanda,
-  canRequestBill,
+  table, onClick, onRequestBill, onViewComanda, canRequestBill,
 }: {
   table: Table;
   onClick: () => void;
@@ -119,30 +113,14 @@ function TableCard({
     <div
       onClick={isClickable ? onClick : undefined}
       style={{
-        background: cfg.bg,
-        border: `1.5px solid ${cfg.border}`,
-        borderRadius: 16,
-        padding: "24px 16px 20px",
-        display: "flex",
-        flexDirection: "column",
-        alignItems: "center",
-        gap: 8,
-        cursor: isClickable ? "pointer" : "default",
-        transition: "transform 0.15s, box-shadow 0.15s",
-        position: "relative",
-        minHeight: 160,
-        justifyContent: "center",
+        background: cfg.bg, border: `1.5px solid ${cfg.border}`, borderRadius: 16,
+        padding: "24px 16px 20px", display: "flex", flexDirection: "column",
+        alignItems: "center", gap: 8, cursor: isClickable ? "pointer" : "default",
+        transition: "transform 0.15s, box-shadow 0.15s", position: "relative",
+        minHeight: 160, justifyContent: "center",
       }}
-      onMouseEnter={e => {
-        if (isClickable) {
-          (e.currentTarget as HTMLDivElement).style.transform = "translateY(-2px)";
-          (e.currentTarget as HTMLDivElement).style.boxShadow = "0 8px 24px rgba(0,0,0,0.1)";
-        }
-      }}
-      onMouseLeave={e => {
-        (e.currentTarget as HTMLDivElement).style.transform = "none";
-        (e.currentTarget as HTMLDivElement).style.boxShadow = "none";
-      }}
+      onMouseEnter={e => { if (isClickable) { (e.currentTarget as HTMLDivElement).style.transform = "translateY(-2px)"; (e.currentTarget as HTMLDivElement).style.boxShadow = "0 8px 24px rgba(0,0,0,0.1)"; } }}
+      onMouseLeave={e => { (e.currentTarget as HTMLDivElement).style.transform = "none"; (e.currentTarget as HTMLDivElement).style.boxShadow = "none"; }}
     >
       <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#374151" strokeWidth="1.5">
         <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
@@ -150,50 +128,31 @@ function TableCard({
         <path d="M23 21v-2a4 4 0 0 0-3-3.87"/>
         <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
       </svg>
-
-      <p style={{ margin: 0, fontSize: 18, fontWeight: 800, color: "#111" }}>
-        Mesa {table.number}
-      </p>
+      <p style={{ margin: 0, fontSize: 18, fontWeight: 800, color: "#111" }}>Mesa {table.number}</p>
       <p style={{ margin: 0, fontSize: 13, color: "#6b7280" }}>{table.seats} personas</p>
       {table.location && (
         <p style={{ margin: 0, fontSize: 11, color: "#9ca3af", display: "flex", alignItems: "center", gap: 4 }}>
           <span>📍</span> {table.location}
         </p>
       )}
-
-      <span style={{
-        marginTop: 4,
-        padding: "4px 14px",
-        borderRadius: 20,
-        fontSize: 12,
-        fontWeight: 700,
-        background: cfg.badgeBg,
-        color: cfg.badgeColor,
-      }}>
+      <span style={{ marginTop: 4, padding: "4px 14px", borderRadius: 20, fontSize: 12, fontWeight: 700, background: cfg.badgeBg, color: cfg.badgeColor }}>
         {cfg.label}
       </span>
 
-      {/* Botones para mesa ocupada */}
       {table.status === "Ocupada" && (
         <div style={{ width: "100%", display: "flex", flexDirection: "column", gap: 6, marginTop: 4 }}>
           <button
             onClick={e => { e.stopPropagation(); onViewComanda(table._id); }}
-            style={{
-              width: "100%", padding: "7px", borderRadius: 10,
-              border: "1.5px solid #2563eb", background: "#eff6ff", color: "#2563eb",
-              fontSize: 12, fontWeight: 700, cursor: "pointer",
-            }}
+            style={{ width: "100%", padding: "7px", borderRadius: 10, border: "1.5px solid #2563eb", background: "#eff6ff", color: "#2563eb", fontSize: 12, fontWeight: 700, cursor: "pointer" }}
           >
             📋 Ver Comanda
           </button>
+
+          {/* Pedir cuenta solo si la orden fue marcada como servida (delivered) */}
           {canRequestBill ? (
             <button
               onClick={e => { e.stopPropagation(); onRequestBill(table._id); }}
-              style={{
-                width: "100%", padding: "7px", borderRadius: 10,
-                border: "1.5px solid #ea580c", background: "#fff7ed", color: "#ea580c",
-                fontSize: 12, fontWeight: 700, cursor: "pointer",
-              }}
+              style={{ width: "100%", padding: "7px", borderRadius: 10, border: "1.5px solid #ea580c", background: "#fff7ed", color: "#ea580c", fontSize: 12, fontWeight: 700, cursor: "pointer" }}
             >
               🧾 Pedir Cuenta
             </button>
@@ -203,7 +162,7 @@ function TableCard({
               border: "1.5px solid #e5e7eb", background: "#f9fafb", color: "#9ca3af",
               fontSize: 12, fontWeight: 600, textAlign: "center",
             }}>
-              Esperando entrega
+              Marcar como servido primero
             </div>
           )}
         </div>
@@ -212,12 +171,9 @@ function TableCard({
   );
 }
 
-// ─── Componente: Orden activa ─────────────────────────────────────
+// ─── ActiveOrderCard ──────────────────────────────────────────────
 function ActiveOrderCard({
-  order,
-  onMarkServed,
-  onRequestBill,
-  loading,
+  order, onMarkServed, onRequestBill, loading,
 }: {
   order: ActiveOrder;
   onMarkServed: (orderId: string) => void;
@@ -232,13 +188,10 @@ function ActiveOrderCard({
   return (
     <div style={{
       border: `1.5px solid ${isReady ? "#86efac" : "#e5e7eb"}`,
-      borderRadius: 14,
-      overflow: "hidden",
-      background: "#fff",
+      borderRadius: 14, overflow: "hidden", background: "#fff",
       boxShadow: isReady ? "0 0 0 3px rgba(34,197,94,0.1)" : "none",
       transition: "box-shadow 0.2s",
     }}>
-      {/* Header */}
       <div style={{ padding: "14px 16px", display: "flex", alignItems: "center", justifyContent: "space-between", borderBottom: "1px solid #f3f4f6" }}>
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
           <div style={{ width: 36, height: 36, borderRadius: 10, background: "#fff7ed", display: "flex", alignItems: "center", justifyContent: "center" }}>
@@ -264,7 +217,6 @@ function ActiveOrderCard({
         </div>
       </div>
 
-      {/* Items */}
       <div style={{ padding: "12px 16px" }}>
         {order.items?.map(item => (
           <div key={item._id} style={{ display: "flex", justifyContent: "space-between", fontSize: 13, color: "#374151", marginBottom: 4 }}>
@@ -274,7 +226,7 @@ function ActiveOrderCard({
         ))}
       </div>
 
-      {/* Marcar como servido */}
+      {/* Marcar como servido — solo si está ready */}
       {order.status === "ready" && (
         <div style={{ padding: "0 16px 8px" }}>
           <button
@@ -293,7 +245,7 @@ function ActiveOrderCard({
         </div>
       )}
 
-      {/* Pedir cuenta */}
+      {/* Pedir cuenta — solo si ya fue servida (delivered) */}
       {order.status === "delivered" && (
         <div style={{ padding: "0 16px 14px" }}>
           <button
@@ -311,20 +263,21 @@ function ActiveOrderCard({
           </button>
         </div>
       )}
+
+      {/* Aviso si aún no está listo para servir */}
+      {(order.status === "pending" || order.status === "in_kitchen") && (
+        <div style={{ padding: "0 16px 12px" }}>
+          <div style={{ padding: "8px 12px", borderRadius: 8, background: "#fef3c7", border: "1px solid #fcd34d", fontSize: 12, color: "#92400e", textAlign: "center" }}>
+            ⏳ {order.status === "pending" ? "Esperando que cocina tome la orden" : "En preparación en cocina"}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
 
-// ─── Componente: Modal nueva orden ────────────────────────────────
-function OrderModal({
-  table,
-  onClose,
-  onOrderCreated,
-}: {
-  table: Table;
-  onClose: () => void;
-  onOrderCreated: () => void;
-}) {
+// ─── OrderModal ───────────────────────────────────────────────────
+function OrderModal({ table, onClose, onOrderCreated }: { table: Table; onClose: () => void; onOrderCreated: () => void; }) {
   const [dishes, setDishes] = useState<Dish[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [selectedCat, setSelectedCat] = useState<string>("all");
@@ -334,112 +287,52 @@ function OrderModal({
   const [error, setError] = useState("");
   const overlayRef = useRef<HTMLDivElement>(null);
 
-  const handleOverlayClick = (e: React.MouseEvent) => {
-    if (e.target === overlayRef.current) onClose();
-  };
+  const handleOverlayClick = (e: React.MouseEvent) => { if (e.target === overlayRef.current) onClose(); };
 
   useEffect(() => {
     const fetchMenuData = async () => {
       try {
-        const [dishRes, catRes] = await Promise.all([
-          fetch("/api/dishes"),
-          fetch("/api/categories"),
-        ]);
+        const [dishRes, catRes] = await Promise.all([fetch("/api/dishes"), fetch("/api/categories")]);
         const dishData = await dishRes.json();
         const catData = await catRes.json();
         if (dishData.ok) setDishes(dishData.data.filter((d: Dish) => d.isAvailable));
         if (catData.ok) setCategories(catData.data);
-      } catch {
-        setError("Error al cargar el menú");
-      } finally {
-        setLoading(false);
-      }
+      } catch { setError("Error al cargar el menú"); }
+      finally { setLoading(false); }
     };
     fetchMenuData();
   }, []);
 
-  const filteredDishes = selectedCat === "all"
-    ? dishes
-    : dishes.filter(d => d.category_id?._id === selectedCat);
-
-  const addToCart = (dish: Dish) => {
-    setCart(prev => {
-      const existing = prev.find(i => i.dish._id === dish._id);
-      if (existing) return prev.map(i => i.dish._id === dish._id ? { ...i, quantity: i.quantity + 1 } : i);
-      return [...prev, { dish, quantity: 1, notes: "" }];
-    });
-  };
-
-  const removeFromCart = (dishId: string) => {
-    setCart(prev => {
-      const existing = prev.find(i => i.dish._id === dishId);
-      if (!existing) return prev;
-      if (existing.quantity <= 1) return prev.filter(i => i.dish._id !== dishId);
-      return prev.map(i => i.dish._id === dishId ? { ...i, quantity: i.quantity - 1 } : i);
-    });
-  };
-
+  const filteredDishes = selectedCat === "all" ? dishes : dishes.filter(d => d.category_id?._id === selectedCat);
+  const addToCart = (dish: Dish) => setCart(prev => { const ex = prev.find(i => i.dish._id === dish._id); if (ex) return prev.map(i => i.dish._id === dish._id ? { ...i, quantity: i.quantity + 1 } : i); return [...prev, { dish, quantity: 1, notes: "" }]; });
+  const removeFromCart = (dishId: string) => setCart(prev => { const ex = prev.find(i => i.dish._id === dishId); if (!ex) return prev; if (ex.quantity <= 1) return prev.filter(i => i.dish._id !== dishId); return prev.map(i => i.dish._id === dishId ? { ...i, quantity: i.quantity - 1 } : i); });
   const getQty = (dishId: string) => cart.find(i => i.dish._id === dishId)?.quantity ?? 0;
   const total = cart.reduce((sum, i) => sum + i.dish.price * i.quantity, 0);
 
   const handleSubmit = async () => {
     if (cart.length === 0) { setError("Agrega al menos un platillo"); return; }
-    setSubmitting(true);
-    setError("");
+    setSubmitting(true); setError("");
     try {
       const token = localStorage.getItem("token");
       const res = await fetch("/api/orders", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          ...(token ? { Authorization: `Bearer ${token}` } : {}),
-        },
-        body: JSON.stringify({
-          table_id: table._id,
-          service_type: "dine_in",
-          items: cart.map(i => ({
-            dish_id: i.dish._id,
-            quantity: i.quantity,
-            unit_price: i.dish.price,
-            notes: i.notes || undefined,
-          })),
-        }),
+        headers: { "Content-Type": "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+        body: JSON.stringify({ table_id: table._id, service_type: "dine_in", items: cart.map(i => ({ dish_id: i.dish._id, quantity: i.quantity, unit_price: i.dish.price, notes: i.notes || undefined })) }),
       });
       const data = await res.json();
       if (!data.ok) { setError(data.message || "Error al crear la orden"); return; }
-      onOrderCreated();
-      onClose();
-    } catch {
-      setError("Error de conexión. Intenta de nuevo.");
-    } finally {
-      setSubmitting(false);
-    }
+      onOrderCreated(); onClose();
+    } catch { setError("Error de conexión. Intenta de nuevo."); }
+    finally { setSubmitting(false); }
   };
 
   return (
-    <div
-      ref={overlayRef}
-      onClick={handleOverlayClick}
-      style={{
-        position: "fixed", inset: 0, zIndex: 1000,
-        background: "rgba(0,0,0,0.45)",
-        display: "flex", alignItems: "center", justifyContent: "center",
-        padding: 16,
-      }}
-    >
-      <div style={{
-        background: "#fff", borderRadius: 20, width: "100%", maxWidth: 760,
-        maxHeight: "90vh", display: "flex", flexDirection: "column",
-        overflow: "hidden", boxShadow: "0 24px 64px rgba(0,0,0,0.2)",
-      }}>
+    <div ref={overlayRef} onClick={handleOverlayClick} style={{ position: "fixed", inset: 0, zIndex: 1000, background: "rgba(0,0,0,0.45)", display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}>
+      <div style={{ background: "#fff", borderRadius: 20, width: "100%", maxWidth: 760, maxHeight: "90vh", display: "flex", flexDirection: "column", overflow: "hidden", boxShadow: "0 24px 64px rgba(0,0,0,0.2)" }}>
         <div style={{ padding: "20px 24px 16px", borderBottom: "1px solid #f3f4f6", display: "flex", alignItems: "flex-start", justifyContent: "space-between" }}>
           <div>
-            <h2 style={{ margin: 0, fontSize: 18, fontWeight: 800, color: "#111" }}>
-              Nueva Orden — Mesa {table.number}
-            </h2>
-            <p style={{ margin: "4px 0 0", fontSize: 13, color: "#6b7280" }}>
-              Selecciona los platillos y envía la orden a cocina
-            </p>
+            <h2 style={{ margin: 0, fontSize: 18, fontWeight: 800, color: "#111" }}>Nueva Orden — Mesa {table.number}</h2>
+            <p style={{ margin: "4px 0 0", fontSize: 13, color: "#6b7280" }}>Selecciona los platillos y envía la orden a cocina</p>
           </div>
           <button onClick={onClose} style={{ width: 32, height: 32, borderRadius: "50%", border: "1.5px solid #e5e7eb", background: "#fff", cursor: "pointer", fontSize: 16, display: "flex", alignItems: "center", justifyContent: "center", color: "#6b7280", flexShrink: 0 }}>×</button>
         </div>
@@ -447,9 +340,7 @@ function OrderModal({
         <div style={{ display: "flex", flex: 1, overflow: "hidden" }}>
           {/* Menú */}
           <div style={{ flex: 1, display: "flex", flexDirection: "column", borderRight: "1px solid #f3f4f6", overflow: "hidden" }}>
-            <div style={{ padding: "16px 20px 8px" }}>
-              <p style={{ margin: 0, fontSize: 14, fontWeight: 700, color: "#111" }}>Menú Disponible</p>
-            </div>
+            <div style={{ padding: "16px 20px 8px" }}><p style={{ margin: 0, fontSize: 14, fontWeight: 700, color: "#111" }}>Menú Disponible</p></div>
             <div style={{ padding: "0 20px 12px", display: "flex", gap: 8, overflowX: "auto", flexShrink: 0 }}>
               <button onClick={() => setSelectedCat("all")} style={{ padding: "6px 16px", borderRadius: 20, border: "1.5px solid", borderColor: selectedCat === "all" ? "#111" : "#e5e7eb", background: selectedCat === "all" ? "#111" : "#fff", color: selectedCat === "all" ? "#fff" : "#6b7280", fontSize: 12, fontWeight: 600, cursor: "pointer", whiteSpace: "nowrap" }}>Todos</button>
               {categories.map(cat => (
@@ -457,10 +348,8 @@ function OrderModal({
               ))}
             </div>
             <div style={{ flex: 1, overflowY: "auto", padding: "0 20px 16px", display: "flex", flexDirection: "column", gap: 10 }}>
-              {loading ? (
-                <p style={{ color: "#9ca3af", fontSize: 13, textAlign: "center", padding: 32 }}>Cargando menú...</p>
-              ) : filteredDishes.length === 0 ? (
-                <p style={{ color: "#9ca3af", fontSize: 13, textAlign: "center", padding: 32 }}>Sin platillos en esta categoría</p>
+              {loading ? (<p style={{ color: "#9ca3af", fontSize: 13, textAlign: "center", padding: 32 }}>Cargando menú...</p>
+              ) : filteredDishes.length === 0 ? (<p style={{ color: "#9ca3af", fontSize: 13, textAlign: "center", padding: 32 }}>Sin platillos en esta categoría</p>
               ) : filteredDishes.map(dish => {
                 const qty = getQty(dish._id);
                 return (
@@ -490,9 +379,7 @@ function OrderModal({
 
           {/* Orden actual */}
           <div style={{ width: 280, display: "flex", flexDirection: "column", flexShrink: 0 }}>
-            <div style={{ padding: "16px 20px 8px" }}>
-              <p style={{ margin: 0, fontSize: 14, fontWeight: 700, color: "#111" }}>Orden Actual</p>
-            </div>
+            <div style={{ padding: "16px 20px 8px" }}><p style={{ margin: 0, fontSize: 14, fontWeight: 700, color: "#111" }}>Orden Actual</p></div>
             <div style={{ flex: 1, overflowY: "auto", padding: "0 20px" }}>
               {cart.length === 0 ? (
                 <div style={{ textAlign: "center", padding: "48px 16px", border: "2px dashed #e5e7eb", borderRadius: 12, color: "#d1d5db" }}>
@@ -510,10 +397,7 @@ function OrderModal({
                         </div>
                         <button onClick={() => setCart(prev => prev.filter(i => i.dish._id !== item.dish._id))} style={{ border: "none", background: "none", cursor: "pointer", color: "#9ca3af", fontSize: 14, padding: "0 0 0 8px" }}>✕</button>
                       </div>
-                      <input
-                        type="text"
-                        placeholder="Notas (opcional)..."
-                        value={item.notes}
+                      <input type="text" placeholder="Notas (opcional)..." value={item.notes}
                         onChange={e => setCart(prev => prev.map(i => i.dish._id === item.dish._id ? { ...i, notes: e.target.value } : i))}
                         style={{ marginTop: 6, width: "100%", padding: "5px 8px", fontSize: 11, border: "1px solid #e5e7eb", borderRadius: 6, outline: "none", color: "#374151", boxSizing: "border-box" }}
                       />
@@ -530,10 +414,8 @@ function OrderModal({
                   <span style={{ fontSize: 16, fontWeight: 800, color: "#111" }}>{formatBOB(total)}</span>
                 </div>
               )}
-              <button
-                onClick={handleSubmit}
-                disabled={submitting || cart.length === 0}
-                style={{ width: "100%", padding: "13px", borderRadius: 12, border: "none", background: cart.length === 0 ? "#e5e7eb" : submitting ? "#94a3b8" : "#ea580c", color: cart.length === 0 ? "#9ca3af" : "#fff", fontSize: 14, fontWeight: 700, cursor: cart.length === 0 || submitting ? "not-allowed" : "pointer", transition: "background 0.15s" }}
+              <button onClick={handleSubmit} disabled={submitting || cart.length === 0}
+                style={{ width: "100%", padding: "13px", borderRadius: 12, border: "none", background: cart.length === 0 ? "#e5e7eb" : submitting ? "#94a3b8" : "#ea580c", color: cart.length === 0 ? "#9ca3af" : "#fff", fontSize: 14, fontWeight: 700, cursor: cart.length === 0 || submitting ? "not-allowed" : "pointer" }}
               >
                 {submitting ? "Enviando..." : "Enviar a Cocina"}
               </button>
@@ -557,8 +439,6 @@ export default function MeseroPage() {
   const [selectedTable, setSelectedTable] = useState<Table | null>(null);
   const [toast, setToast] = useState("");
   const [refreshKey, setRefreshKey] = useState(0);
-
-  // Comanda modal
   const [comandaOrderId, setComandaOrderId] = useState<string | null>(null);
   const [comandaTableNumber, setComandaTableNumber] = useState<number | null>(null);
 
@@ -569,31 +449,21 @@ export default function MeseroPage() {
 
   const fetchData = useCallback(async () => {
     try {
-      const [tablesRes, ordersRes] = await Promise.all([
-        fetch("/api/tables"),
-        fetch("/api/orders/active"),
-      ]);
+      const [tablesRes, ordersRes] = await Promise.all([fetch("/api/tables"), fetch("/api/orders/active")]);
       const tablesRaw = await tablesRes.json();
       const ordersData = await ordersRes.json();
-      const tablesArray = Array.isArray(tablesRaw) ? tablesRaw : [];
-      setTables(tablesArray);
+      setTables(Array.isArray(tablesRaw) ? tablesRaw : []);
       if (ordersData.ok) {
         setActiveOrders(ordersData.data);
         setRefreshKey(k => k + 1);
       }
-    } catch {
-      // silencioso
-    } finally {
-      setLoadingData(false);
-    }
+    } catch { /* silencioso */ }
+    finally { setLoadingData(false); }
   }, []);
 
   const fetchDataRef = useRef(fetchData);
-  useEffect(() => {
-    fetchDataRef.current = fetchData;
-  }, [fetchData]);
+  useEffect(() => { fetchDataRef.current = fetchData; }, [fetchData]);
 
-  // Pusher
   useEffect(() => {
     if (userLoading || !user) return;
     fetchData();
@@ -602,9 +472,7 @@ export default function MeseroPage() {
     const setup = async () => {
       const { default: Pusher } = await import("pusher-js");
       if (!mounted) return;
-      pusherInstance = new Pusher(process.env.NEXT_PUBLIC_PUSHER_KEY!, {
-        cluster: process.env.NEXT_PUBLIC_PUSHER_CLUSTER!,
-      });
+      pusherInstance = new Pusher(process.env.NEXT_PUBLIC_PUSHER_KEY!, { cluster: process.env.NEXT_PUBLIC_PUSHER_CLUSTER! });
       const channel = pusherInstance.subscribe("restaurant");
       channel.bind("order:new", () => { if (mounted) fetchDataRef.current(); });
       channel.bind("order:updated", (data: { newStatus: string }) => {
@@ -616,15 +484,15 @@ export default function MeseroPage() {
       channel.bind("table:bill_requested", () => { if (mounted) fetchDataRef.current(); });
     };
     setup();
-    return () => {
-      mounted = false;
-      pusherInstance?.unsubscribe("restaurant");
-      pusherInstance?.disconnect();
-    };
+    return () => { mounted = false; pusherInstance?.unsubscribe("restaurant"); pusherInstance?.disconnect(); };
   }, [userLoading, user, fetchData, showToast]);
 
+  // Marcar como servido — actualización optimista inmediata
   const handleMarkServed = async (orderId: string) => {
     setActionLoading(true);
+    setActiveOrders(prev =>
+      prev.map(o => o._id === orderId ? { ...o, status: "delivered" as OrderStatus } : o)
+    );
     try {
       const res = await fetch("/api/Kitchen", {
         method: "PATCH",
@@ -632,11 +500,16 @@ export default function MeseroPage() {
         body: JSON.stringify({ orderId, newStatus: "delivered" }),
       });
       const data = await res.json();
-      if (!data.ok) { showToast("❌ " + data.message); return; }
+      if (!data.ok) {
+        showToast("❌ " + data.message);
+        await fetchData(); // revertir
+        return;
+      }
       showToast("✓ Orden marcada como entregada");
-      await fetchData();
+      await fetchData(); // ← reemplaza el fetch manual de tablas
     } catch {
       showToast("❌ Error al actualizar");
+      await fetchData();
     } finally {
       setActionLoading(false);
     }
@@ -669,33 +542,35 @@ export default function MeseroPage() {
     }
   };
 
-  // Abrir comanda desde tarjeta de mesa
   const handleViewComanda = (tableId: string) => {
-    const order = activeOrders.find(
-      o => o.table_id === tableId && !["paid", "cancelled"].includes(o.status)
-    );
+    const order = activeOrders.find(o => o.table_id === tableId && !["paid", "cancelled"].includes(o.status));
     if (!order) { showToast("❌ No hay orden activa para esta mesa"); return; }
     const table = tables.find(t => t._id === tableId);
     setComandaOrderId(order._id);
     setComandaTableNumber(table?.number ?? null);
   };
 
-  // Helper: verificar si la mesa tiene orden entregada
-  const isTableDelivered = (tableId: string) =>
-    activeOrders.some(o => o.table_id === tableId && o.status === "delivered");
-  const occupiedCount = tables.filter(t => ["Ocupada", "Cuenta solicitada"].includes(t.status)).length;
-  const reservedCount = tables.filter(t => t.status === "Reservada").length;
+  // Una mesa puede pedir cuenta solo si tiene alguna orden en estado "delivered"
+  const isTableDelivered = (tableId: string) => {
+    const tableOrders = activeOrders.filter(o => o.table_id === tableId);
+    const hasActiveOrder = tableOrders.some(o => 
+      ["pending", "in_kitchen", "ready"].includes(o.status)
+    );
+    const hasDelivered = tableOrders.some(o => o.status === "delivered");
+    return hasDelivered && !hasActiveOrder;
+  };
+
+  const occupiedCount  = tables.filter(t => ["Ocupada", "Cuenta solicitada"].includes(t.status)).length;
+  const reservedCount  = tables.filter(t => t.status === "Reservada").length;
   const availableCount = tables.filter(t => ["Libre", "Activa"].includes(t.status)).length;
   const activeOrdersCount = activeOrders.filter(o => ["pending", "in_kitchen"].includes(o.status)).length;
   const readyCount = activeOrders.filter(o => o.status === "ready").length;
 
-  if (userLoading) {
-    return (
-      <div style={{ minHeight: "100vh", background: "#f9fafb", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "system-ui, sans-serif" }}>
-        <p style={{ color: "#6b7280", fontSize: 14 }}>Verificando sesión...</p>
-      </div>
-    );
-  }
+  if (userLoading) return (
+    <div style={{ minHeight: "100vh", background: "#f9fafb", display: "flex", alignItems: "center", justifyContent: "center" }}>
+      <p style={{ color: "#6b7280", fontSize: 14 }}>Verificando sesión...</p>
+    </div>
+  );
   if (!user) return null;
 
   return (
@@ -727,7 +602,6 @@ export default function MeseroPage() {
         </div>
       )}
 
-      {/* Contenido */}
       <div style={{ maxWidth: 1280, margin: "0 auto", padding: "24px 24px 48px", display: "flex", gap: 24, alignItems: "flex-start" }}>
         <div style={{ flex: 1, minWidth: 0 }}>
           {/* Mesas */}
@@ -759,7 +633,7 @@ export default function MeseroPage() {
               <p style={{ margin: "0 0 20px", fontSize: 13, color: "#9ca3af" }}>Seguimiento de órdenes en proceso</p>
               <div key={refreshKey} style={{ display: "flex", flexDirection: "column", gap: 12 }}>
                 {activeOrders
-                  .filter(o => !["paid", "cancelled", "delivered"].includes(o.status))
+                  .filter(o => !["paid", "cancelled","delivered"].includes(o.status))
                   .map(order => (
                     <ActiveOrderCard
                       key={`${order._id}-${order.status}`}
@@ -810,25 +684,12 @@ export default function MeseroPage() {
         </div>
       </div>
 
-      {/* Modal nueva orden */}
       {selectedTable && (
-        <OrderModal
-          table={selectedTable}
-          onClose={() => setSelectedTable(null)}
-          onOrderCreated={() => {
-            showToast("✓ Orden enviada a cocina");
-            fetchData();
-          }}
-        />
+        <OrderModal table={selectedTable} onClose={() => setSelectedTable(null)} onOrderCreated={() => { showToast("✓ Orden enviada a cocina"); fetchData(); }} />
       )}
 
-      {/* Modal comanda mesero */}
       {comandaOrderId && (
-        <ComandaMeseroModal
-          orderId={comandaOrderId}
-          tableNumber={comandaTableNumber}
-          onClose={() => { setComandaOrderId(null); setComandaTableNumber(null); }}
-        />
+        <ComandaMeseroModal orderId={comandaOrderId} tableNumber={comandaTableNumber} onClose={() => { setComandaOrderId(null); setComandaTableNumber(null); }} />
       )}
     </div>
   );

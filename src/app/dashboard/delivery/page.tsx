@@ -144,6 +144,9 @@ function ActiveOrderCard({
   const nextStatus    = NEXT_STATUS[order.status];
   const showCancel    = order.status === "picked_up" || order.status === "in_transit";
   const isGreen       = order.status === "in_transit";
+  const isPickupAction = nextStatus === "picked_up";
+  const canPickup      = order.status === "ready";
+  const btnDisabled    = loading || (isPickupAction && !canPickup);
 
   return (
     <div className={styles.orderCard}>
@@ -249,9 +252,11 @@ function ActiveOrderCard({
           <div className={`${styles.actionsGrid} ${showCancel ? styles.actionsTwo : styles.actionsOne}`}>
             <button
               type="button"
-              disabled={loading}
+              disabled={btnDisabled}
               onClick={() => onAdvance(order._id, nextStatus)}
               className={`${styles.advanceBtn} ${isGreen ? styles.advanceGreen : styles.advanceDefault}`}
+              title={isPickupAction && !canPickup ? "Espera a que cocina marque la orden como lista" : undefined}
+              style={{ opacity: btnDisabled ? 0.5 : 1 }}
             >
               <CheckCircle2 size={16} />
               {loading ? "Actualizando…" : advanceLabel}
@@ -262,6 +267,13 @@ function ActiveOrderCard({
               </button>
             )}
           </div>
+        )}
+
+        {/* Aviso cuando aún no está lista */}
+        {isPickupAction && !canPickup && (
+          <p className={styles.notReadyNote}>
+            ⏳ Esperando que cocina marque la orden como lista…
+          </p>
         )}
       </div>
     </div>
@@ -306,7 +318,7 @@ export default function DeliveryPage() {
 
   useEffect(() => { if (!authLoading && user) loadOrders(); }, [authLoading, user, loadOrders]);
 
-  // ── Pusher: nuevas órdenes de delivery en tiempo real ─────────────────────────
+  // ── Pusher ────────────────────────────────────────────────────────────────────
   useEffect(() => {
     if (!user) return;
 
@@ -315,9 +327,10 @@ export default function DeliveryPage() {
     getPusherClient().then((client) => {
       if (cancelled) return;
 
-      const channel = client.subscribe("delivery");
+      // Canal delivery: nuevas órdenes y cambios de estado propios del repartidor
+      const deliveryChannel = client.subscribe("delivery");
 
-      channel.bind("order:new_delivery", (data: { order: RawOrder }) => {
+      deliveryChannel.bind("order:new_delivery", (data: { order: RawOrder }) => {
         setActiveOrders((prev) => {
           if (prev.some((o) => o._id === data.order._id)) return prev;
           return [data.order, ...prev];
@@ -326,14 +339,19 @@ export default function DeliveryPage() {
         setTimeout(() => setNewOrderAlert(false), 4000);
       });
 
-      channel.bind("order:status_updated", (data: { orderId: string; status: BackendStatus }) => {
+      deliveryChannel.bind("order:status_updated", (data: { orderId: string; status: BackendStatus }) => {
         const isFinished = data.status === "delivered" || data.status === "paid" || data.status === "cancelled";
 
         if (isFinished) {
           setActiveOrders((prev) => {
             const moved = prev.find((o) => o._id === data.orderId);
             if (moved && data.status !== "cancelled") {
-              setCompletedOrders((c) => [{ ...moved, status: data.status }, ...c]);
+              // FIX Bug 2: evitar duplicados al mover a completados
+              setCompletedOrders((c) => {
+                const map = new Map(c.map((o) => [String(o._id), o]));
+                map.set(String(data.orderId), { ...moved, status: data.status });
+                return Array.from(map.values());
+              });
             }
             return prev.filter((o) => o._id !== data.orderId);
           });
@@ -343,12 +361,24 @@ export default function DeliveryPage() {
           );
         }
       });
+
+      // FIX Bug 1: canal restaurant para recibir cuando cocina marca "ready"
+      const restaurantChannel = client.subscribe("restaurant");
+
+      restaurantChannel.bind("order:updated", (data: { orderId: string; newStatus: BackendStatus }) => {
+        setActiveOrders((prev) =>
+          prev.map((o) =>
+            o._id === data.orderId ? { ...o, status: data.newStatus } : o
+          )
+        );
+      });
     });
 
     return () => {
       cancelled = true;
       getPusherClient().then((client) => {
         client.unsubscribe("delivery");
+        client.unsubscribe("restaurant"); // FIX Bug 1: limpiar suscripción
       });
     };
   }, [user]);
@@ -370,7 +400,13 @@ export default function DeliveryPage() {
       const isFinished = nextStatus === "delivered" || nextStatus === "paid";
       if (isFinished) {
         const moved = activeOrders.find((o) => o._id === orderId);
-        if (moved) setCompletedOrders((prev) => [{ ...moved, status: nextStatus }, ...prev]);
+        if (moved) {
+          setCompletedOrders((prev) => {
+            const map = new Map(prev.map((o) => [String(o._id), o]));
+            map.set(String(orderId), { ...moved, status: nextStatus });
+            return Array.from(map.values());
+          });
+        }
         setActiveOrders((prev) => prev.filter((o) => o._id !== orderId));
       } else {
         setActiveOrders((prev) =>
@@ -500,8 +536,9 @@ export default function DeliveryPage() {
                   <p className={styles.completedEmpty}>Aún no hay entregas completadas hoy.</p>
                 ) : (
                   <div className={styles.completedList}>
-                    {completedOrders.filter((o) => o.status !== "cancelled").map((order, i) => (
-                      <div key={`${order._id}-${i}`} className={styles.completedItem}>
+                    {/* FIX Bug 2: key por _id solo, sin índice */}
+                    {completedOrders.filter((o) => o.status !== "cancelled").map((order) => (
+                      <div key={order._id} className={styles.completedItem}>
                         <div className={styles.completedLeft}>
                           <CheckCircle2 size={20} className={styles.completedIcon} />
                           <div>
