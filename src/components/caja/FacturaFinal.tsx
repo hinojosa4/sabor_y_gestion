@@ -1,6 +1,7 @@
 // src/components/caja/FacturaFinal.tsx
 import { useRef } from 'react';
 import { X, Printer, Mail } from 'lucide-react';
+import { formatOrderLabel } from '@/lib/orderDisplay';
 //import { QRCodeCanvas } from 'qrcode.react';
 
 interface OrderItem {
@@ -115,7 +116,7 @@ export function FacturaFinal({
                     </div>
 
                     <div style={{ borderTop: `1px solid var(--border)`, borderBottom: `1px solid var(--border)`, padding: "0.5rem 0", marginBottom: "1rem" }}>
-                        <p style={{ margin: 0, fontSize: "0.75rem" }}><strong>N° Orden:</strong> {orderId}</p>
+                        <p style={{ margin: 0, fontSize: "0.75rem" }}><strong>{formatOrderLabel(orderId)}</strong></p>
                         <p style={{ margin: 0, fontSize: "0.75rem" }}><strong>Mesa:</strong> {tableNumber ?? 'No disponible'}</p>
                         <p style={{ margin: 0, fontSize: "0.75rem" }}><strong>Fecha:</strong> {formatDate(paymentDate)}</p>
                         <p style={{ margin: 0, fontSize: "0.75rem" }}>

@@ -346,25 +346,83 @@ export default function DashboardPage() {
         gridTemplateColumns: isMobile ? "repeat(2, 1fr)" : "repeat(auto-fill, minmax(200px, 1fr))",
         gap: isMobile ? 10 : 16,
       }}>
-        {statCards.map((s) => (
+        {statCards.map((s) => {
+          const isRevenueCard = s.label === "Ingresos";
+
+          return (
           <div key={s.label} style={{
             background: "#fff",
             border: "1.5px solid #e8e8e8",
             borderRadius: isMobile ? 12 : 16,
             padding: isMobile ? "14px 16px" : "20px 24px",
             display: "flex",
+            flexDirection: isRevenueCard ? "column" : "row",
             alignItems: "center",
+            justifyContent: isRevenueCard ? "center" : undefined,
             gap: isMobile ? 10 : 16,
             boxShadow: "0 2px 8px rgba(0,0,0,0.03)",
+            minWidth: 0,
+            gridColumn: isMobile && isRevenueCard ? "1 / -1" : undefined,
           }}>
-            <div style={{ width: isMobile ? 38 : 48, height: isMobile ? 38 : 48, borderRadius: isMobile ? 10 : 12, background: s.iconBg, display: "flex", alignItems: "center", justifyContent: "center", fontSize: isMobile ? 18 : 22, flexShrink: 0 }}>{s.icon}</div>
-            <div style={{ minWidth: 0 }}>
+            {isRevenueCard ? (
+              <>
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 8, width: "100%" }}>
+                  <span style={{ width: 30, height: 30, borderRadius: 8, background: s.iconBg, display: "inline-flex", alignItems: "center", justifyContent: "center", fontSize: 14, flexShrink: 0 }}>{s.icon}</span>
+                  <p style={{ margin: 0, fontSize: isMobile ? 10 : 11, color: "#888" }}>{s.label}</p>
+                </div>
+                <p style={{
+                  margin: 0,
+                  width: "100%",
+                  fontSize: isMobile ? 26 : 28,
+                  fontWeight: 700,
+                  color: "#1a1a1a",
+                  lineHeight: 1.05,
+                  textAlign: "center",
+                  whiteSpace: "nowrap",
+                  fontVariantNumeric: "tabular-nums",
+                }}>{s.value}</p>
+                {!revenueLoading && (
+                  <div style={{ width: "100%", display: "grid", gap: 2, textAlign: "center" }}>
+                    <p style={{ margin: 0, fontSize: isMobile ? 10 : 11, color: s.subColor, fontWeight: 600, lineHeight: 1.2 }}>
+                      Efectivo {formatCurrency(revenue.cashTotal)}
+                    </p>
+                    <p style={{ margin: 0, fontSize: isMobile ? 10 : 11, color: s.subColor, fontWeight: 600, lineHeight: 1.2 }}>
+                      QR {formatCurrency(revenue.qrTotal)}
+                    </p>
+                  </div>
+                )}
+              </>
+            ) : (
+            <>
+              <div style={{ width: isMobile ? 38 : 48, height: isMobile ? 38 : 48, borderRadius: isMobile ? 10 : 12, background: s.iconBg, display: "flex", alignItems: "center", justifyContent: "center", fontSize: isMobile ? 18 : 22, flexShrink: 0 }}>{s.icon}</div>
+              <div style={{ minWidth: 0, flex: 1 }}>
               <p style={{ margin: 0, fontSize: isMobile ? 10 : 11, color: "#888", marginBottom: 2 }}>{s.label}</p>
-              <p style={{ margin: 0, fontSize: isMobile ? 22 : 28, fontWeight: 700, color: "#1a1a1a", lineHeight: 1 }}>{s.value}</p>
-              {s.sub && <p style={{ margin: "3px 0 0", fontSize: isMobile ? 10 : 11, color: s.subColor, fontWeight: 600 }}>{s.sub}</p>}
-            </div>
+              <p style={{
+                margin: 0,
+                fontSize: isMobile ? 22 : 28,
+                fontWeight: 700,
+                color: "#1a1a1a",
+                lineHeight: 1,
+                maxWidth: "100%",
+                overflowWrap: "anywhere",
+                wordBreak: "break-word",
+              }}>{s.value}</p>
+              {s.sub && <p style={{
+                margin: "3px 0 0",
+                fontSize: isMobile ? 10 : 11,
+                color: s.subColor,
+                fontWeight: 600,
+                lineHeight: 1.25,
+                maxWidth: "100%",
+                whiteSpace: "normal",
+                overflowWrap: "anywhere",
+              }}>{s.sub}</p>}
+              </div>
+            </>
+            )}
           </div>
-        ))}
+          );
+        })}
       </div>
 
       {/* ── Contenido inferior ── */}
