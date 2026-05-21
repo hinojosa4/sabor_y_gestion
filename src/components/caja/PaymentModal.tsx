@@ -2,6 +2,7 @@
 import { useState, useEffect } from 'react';
 import { X } from 'lucide-react';
 import { FacturaFinal } from './FacturaFinal';
+import { formatOrderLabel } from '@/lib/orderDisplay';
 
 interface PaymentModalProps {
     isOpen: boolean;
@@ -77,6 +78,11 @@ function OrderSummary({ orderId }: { orderId: string }) {
 
     return (
         <div style={{ marginBottom: "1rem", padding: "0.5rem", backgroundColor: "var(--muted)", borderRadius: "var(--radius-md)" }}>
+            {orderId && (
+                <p style={{ margin: "0 0 0.5rem", fontSize: "0.875rem", fontWeight: "bold" }}>
+                    {formatOrderLabel(orderId)}
+                </p>
+            )}
             <h3 style={{ margin: "0 0 0.5rem", fontSize: "0.875rem", fontWeight: "bold" }}>Productos</h3>
             {items.map((item, idx) => (
                 <div key={idx} style={{ display: "flex", justifyContent: "space-between", fontSize: "0.75rem", marginBottom: "0.25rem" }}>

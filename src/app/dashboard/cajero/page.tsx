@@ -8,6 +8,7 @@ import Link from 'next/link';
 import { useTableData } from '@/hooks/useTableData';
 import { PreinvoiceModal } from '@/components/caja/PreinvoiceModal';
 import { PaymentModal } from '@/components/caja/PaymentModal';
+import { formatShortOrderId } from '@/lib/orderDisplay';
 
 interface ActiveOrder {
     _id: string;
@@ -397,8 +398,6 @@ export default function CajeroDashboard() {
         gridTemplateColumns: isMobile ? "1fr" : "repeat(auto-fill, minmax(300px, 1fr))",
     };
 
-    const getShortOrderId = (orderId: string) => `#${orderId.slice(-6).toUpperCase()}`;
-
     const renderOrderIdentifier = (
         orderId: string | undefined,
         variant: 'billing' | 'occupied' | 'free',
@@ -430,7 +429,7 @@ export default function CajeroDashboard() {
                 title={`/api/orders/${orderId}`}
                 aria-label={`Orden ${orderId}`}
             >
-                {getShortOrderId(orderId)}
+                {formatShortOrderId(orderId)}
             </span>
         );
     };

@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { FacturaFinal } from '@/components/caja/FacturaFinal';
+import { formatOrderLabel } from '@/lib/orderDisplay';
 
 // Estilos
 const containerStyle: React.CSSProperties = {
@@ -234,6 +235,9 @@ export default function PagoQRPage() {
 
                     {/* Resumen de la orden */}
                     <div style={orderSummaryStyle}>
+                        <p style={{ margin: "0 0 0.5rem", fontSize: "0.875rem", fontWeight: "bold" }}>
+                            {formatOrderLabel(orderId)}
+                        </p>
                         <h3 style={{ margin: "0 0 0.5rem", fontSize: "1rem" }}>Resumen de tu pedido</h3>
                         {items.map((item, idx) => (
                             <div key={idx} style={{ display: "flex", justifyContent: "space-between", marginBottom: "0.25rem", fontSize: "0.875rem" }}>
