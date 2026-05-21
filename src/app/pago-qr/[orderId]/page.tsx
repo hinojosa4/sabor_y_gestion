@@ -254,10 +254,6 @@ export default function PagoQRPage() {
                                 <span>Subtotal</span>
                                 <span>{formatCurrency(subtotal)}</span>
                             </div>
-                            <div style={{ display: "flex", justifyContent: "space-between" }}>
-                                <span>IVA (13%)</span>
-                                <span>{formatCurrency(iva)}</span>
-                            </div>
                             <div style={{ display: "flex", justifyContent: "space-between", fontWeight: "bold", marginTop: "0.25rem" }}>
                                 <span>Total</span>
                                 <span>{formatCurrency(total)}</span>

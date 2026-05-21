@@ -2,19 +2,36 @@ import { NextResponse } from 'next/server';
 import { connectDB } from '@/lib/db';
 import Payment from '@/models/Payment';
 import Order from '@/models/Order';
+import OrderItem from '@/models/OrderItem';
 import Table from '@/models/Table';
-import { pusherServer } from "@/lib/pusher"; 
+import { pusherServer } from "@/lib/pusher";
 //const RESTAURANT_ID = "69e170e941daf8c2b2f76677"; // para obtener el nombre del restaurante
 
 export async function POST(req: Request) {
   try {
     await connectDB();
-    const { orderId, amount, method, tableId } = await req.json();
+    const { orderId, method, tableId, customerEmail } = await req.json();
 
     const order = await Order.findById(orderId);
     if (!order) {
       return NextResponse.json({ error: 'Orden no encontrada' }, { status: 404 });
     }
+
+    const items = await OrderItem.find({ order_id: orderId }).lean<{
+      quantity?: number;
+      unit_price?: number;
+    }[]>();
+
+    if (!items.length) {
+      return NextResponse.json({ error: 'La orden no tiene productos' }, { status: 400 });
+    }
+
+    const subtotal = items.reduce((sum, item) => {
+      const quantity = item.quantity ?? 1;
+      const unitPrice = item.unit_price ?? 0;
+      return sum + unitPrice * quantity;
+    }, 0);
+    const amount = subtotal;
 
     // Crear pago
     const payment = await Payment.create({
@@ -22,6 +39,7 @@ export async function POST(req: Request) {
       amount,
       method,
       status: 'completed',
+      customer_email: customerEmail || null,
       timestamp: new Date(),
     });
 
