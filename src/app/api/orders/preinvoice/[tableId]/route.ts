@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { connectDB } from '@/lib/db';
 import Order from '@/models/Order';
 import OrderItem from '@/models/OrderItem';
+import '@/models/Dish';
 
 type PreinvoiceItem = {
   dish_id?: {

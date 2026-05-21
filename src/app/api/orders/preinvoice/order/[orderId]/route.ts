@@ -1,7 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { Types } from 'mongoose';
 import { connectDB } from '@/lib/db';
+import Order from '@/models/Order';
 import OrderItem from '@/models/OrderItem';
+import Table from '@/models/Table';
+import '@/models/Dish';
 
 type LeanOrderItem = {
   _id: Types.ObjectId;
@@ -26,6 +29,14 @@ export async function GET(
     if (!Types.ObjectId.isValid(orderId)) {
       return NextResponse.json({ items: [], subtotal: 0, iva: 0, total: 0 });
     }
+
+    const order = await Order.findById(orderId).lean<{
+      table_id?: string;
+    } | null>();
+
+    const table = order?.table_id
+      ? await Table.findById(order.table_id).select('number').lean<{ number?: number } | null>()
+      : null;
 
     const items = await OrderItem.find({ order_id: orderId })
       .populate({ path: 'dish_id', model: 'Dish', select: 'name price' })
@@ -64,6 +75,7 @@ export async function GET(
       subtotal,
       iva,
       total,
+      tableNumber: table?.number ?? null,
     });
   } catch (error) {
     console.error('[OrderSummary] Error:', error);
