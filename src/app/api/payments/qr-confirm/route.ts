@@ -7,6 +7,7 @@ import OrderItem from '@/models/OrderItem';
 import Table from '@/models/Table';
 import Payment from '@/models/Payment';
 import { sendPaymentEmail } from '@/lib/email';
+import '@/models/Dish';
 
 type LeanOrderItem = {
   _id: Types.ObjectId;

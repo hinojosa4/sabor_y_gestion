@@ -96,12 +96,6 @@ interface OrderItem {
     subtotal: number;
 }
 
-interface OrderItem {
-    dish: { name: string; price: number };
-    quantity: number;
-    subtotal: number;
-}
-
 export default function PagoQRPage() {
     const params = useParams();
     const router = useRouter();
@@ -116,6 +110,7 @@ export default function PagoQRPage() {
     const [email, setEmail] = useState('');
     const [emailError, setEmailError] = useState('');
     const [error, setError] = useState('');
+    const [tableNumber, setTableNumber] = useState<number | null>(null);
 
     // Estados para la factura final
     const [showFactura, setShowFactura] = useState(false);
@@ -140,6 +135,7 @@ export default function PagoQRPage() {
                     setSubtotal(data.subtotal || 0);
                     setIva(data.iva || 0);
                     setTotal(data.total || 0);
+                    setTableNumber(data.tableNumber ?? null);
                 } else {
                     setError('Orden no encontrada');
                 }
@@ -296,7 +292,7 @@ export default function PagoQRPage() {
                         router.push('/');
                     }}
                     orderId={paymentData.orderId}
-                    tableNumber={0}  // No aplica para QR
+                    tableNumber={tableNumber}
                     items={paymentData.items}
                     subtotal={paymentData.subtotal}
                     iva={paymentData.iva}
