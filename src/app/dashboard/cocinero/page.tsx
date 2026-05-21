@@ -377,18 +377,23 @@ function OrderCard({
                     <button
                       onClick={() => onItemToggle(item._id, item.status)}
                       disabled={loading}
-                      title={isReady ? "Marcar como pendiente" : "Marcar como listo"}
                       style={{
-                        width: 32, height: 32, borderRadius: "50%",
+                        padding: "5px 12px",
+                        borderRadius: 20,
                         border: `2px solid ${isReady ? "#22c55e" : "#d1d5db"}`,
-                        background: isReady ? "#22c55e" : "#fff",
+                        background: isReady ? "#f0fdf4" : "#f9fafb",
                         cursor: loading ? "not-allowed" : "pointer",
-                        display: "flex", alignItems: "center", justifyContent: "center",
-                        fontSize: 14, color: isReady ? "#fff" : "#9ca3af",
+                        display: "flex", alignItems: "center", gap: 5,
+                        fontSize: 12, fontWeight: 700,
+                        color: isReady ? "#16a34a" : "#6b7280",
                         flexShrink: 0, transition: "all 0.15s",
+                        whiteSpace: "nowrap",
                       }}
                     >
-                      {isReady ? "✓" : "○"}
+                      {isReady
+                        ? <><span style={{ fontSize: 14 }}>✓</span> Listo</>
+                        : <><span style={{ fontSize: 14 }}>○</span> Marcar listo</>
+                      }
                     </button>
                   )}
                 </div>

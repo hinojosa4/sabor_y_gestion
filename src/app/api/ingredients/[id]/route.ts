@@ -4,6 +4,7 @@ import Ingredient from "@/models/Ingredient";
 import IngredientCategory from "@/models/IngredientCategory";
 import "@/models/IngredientCategory";
 import mongoose from "mongoose";
+import { pusherServer } from "@/lib/pusher";
 
 const VALID_UNITS = ["kg", "lt", "unit", "gr", "ml"] as const;
 
@@ -59,8 +60,9 @@ export async function PUT(req: NextRequest, { params }: Params) {
       unit, supplier, category_id, isActive,
     } = body;
 
+    await pusherServer.trigger("restaurant", "ingredient:updated", {});
     if (!name?.trim()) {
-      return NextResponse.json({ ok: false, message: "El nombre es obligatorio" }, { status: 400 });
+      return NextResponse.json({ ok: true, data: ingredient });
     }
 
     if (currentStock === undefined || currentStock === null || typeof currentStock !== "number" || isNaN(currentStock)) {
@@ -184,6 +186,7 @@ export async function DELETE(_req: NextRequest, { params }: Params) {
       return NextResponse.json({ ok: false, message: "Ingrediente no encontrado" }, { status: 404 });
     }
 
+    await pusherServer.trigger("restaurant", "ingredient:deleted", {});
     return NextResponse.json({ ok: true, message: "Ingrediente eliminado correctamente" });
   } catch (error) {
     return NextResponse.json(

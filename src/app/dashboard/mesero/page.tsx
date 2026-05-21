@@ -105,10 +105,28 @@ const ORDER_STATUS_CONFIG: Record<string, { label: string; color: string; bg: st
 const formatBOB = (amount: number) =>
   new Intl.NumberFormat("es-BO", { style: "currency", currency: "BOB" }).format(amount);
 
-function hasCriticalIngredient(dish: Dish): boolean {
-  return dish.ingredients?.some(
-    (ing) => ing.ingredient_id?.stockStatus === "critical"
-  ) ?? false;
+function getStockIssue(dish: Dish, cartQty: number): { blocked: boolean; reason: string } | null {
+  if (!dish.ingredients?.length) return null;
+  
+  for (const ing of dish.ingredients) {
+    const ingData = ing.ingredient_id;
+    if (!ingData) continue;
+    
+    // Stock crítico siempre bloquea
+    if (ingData.stockStatus === "critical") {
+      return { blocked: true, reason: `🔴 Sin stock de ${ingData.name}` };
+    }
+    
+    // Verificar si hay stock suficiente para la cantidad pedida
+    const needed = ing.quantity * Math.max(cartQty, 1);
+    if (ingData.currentStock < needed) {
+      return {
+        blocked: true,
+        reason: `⚠️ Stock insuficiente: ${ingData.name} (disponible: ${ingData.currentStock} ${ingData.unit}, necesario: ${needed} ${ingData.unit})`,
+      };
+    }
+  }
+  return null;
 }
 
 function useElapsed(createdAt: string) {
@@ -520,57 +538,58 @@ function OrderModal({ table, onClose, onOrderCreated }: { table: Table; onClose:
               {loading ? (<p style={{ color: "#9ca3af", fontSize: 13, textAlign: "center", padding: 32 }}>Cargando menú...</p>
               ) : filteredDishes.length === 0 ? (<p style={{ color: "#9ca3af", fontSize: 13, textAlign: "center", padding: 32 }}>Sin platillos en esta categoría</p>
               ) : filteredDishes.map(dish => {
-                  const qty = getQty(dish._id);
-                  const isCritical = hasCriticalIngredient(dish);   // ← nuevo
-                  return (
-                    <div key={dish._id} style={{
-                      display: "flex", alignItems: "center", gap: 12, padding: "12px",
-                      borderRadius: 12,
-                      border: isCritical ? "1.5px solid #fecaca" : "1.5px solid #f3f4f6",  // ← rojo si crítico
-                      background: isCritical ? "#fff5f5" : qty > 0 ? "#f0fdf4" : "#fff",
-                      transition: "background 0.15s",
-                      opacity: isCritical ? 0.75 : 1,               // ← atenuado
-                    }}>
-                      {/* imagen sin cambios */}
-                      <div style={{ width: 64, height: 64, borderRadius: 10, flexShrink: 0, background: dish.image_url ? "transparent" : "#f3f4f6", overflow: "hidden", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                        {dish.image_url ? <img src={dish.image_url} alt={dish.name} style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : <span style={{ fontSize: 24 }}>🍽</span>}
-                      </div>
+                    const qty = getQty(dish._id);
+                    const stockIssue = getStockIssue(dish, qty);   // ← qty se recalcula al rederizar
+                    const isBlocked = stockIssue !== null;
+                    return (
+                      <div key={dish._id} style={{
+                        display: "flex", alignItems: "center", gap: 12, padding: "12px",
+                        borderRadius: 12,
+                        border: isBlocked ? "1.5px solid #fecaca" : "1.5px solid #f3f4f6",
+                        background: isBlocked ? "#fff5f5" : qty > 0 ? "#f0fdf4" : "#fff",
+                        transition: "background 0.15s",
+                        opacity: isBlocked ? 0.75 : 1,
+                      }}>
+                        {/* imagen igual que antes */}
+                        <div style={{ width: 64, height: 64, borderRadius: 10, flexShrink: 0, background: dish.image_url ? "transparent" : "#f3f4f6", overflow: "hidden", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                          {dish.image_url ? <img src={dish.image_url} alt={dish.name} style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : <span style={{ fontSize: 24 }}>🍽</span>}
+                        </div>
 
-                      <div style={{ flex: 1, minWidth: 0 }}>
-                        <p style={{ margin: 0, fontSize: 14, fontWeight: 700, color: "#111" }}>{dish.name}</p>
-                        {dish.description && <p style={{ margin: "2px 0 0", fontSize: 11, color: "#9ca3af", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{dish.description}</p>}
-                        <p style={{ margin: "4px 0 0", fontSize: 14, fontWeight: 700, color: "#ea580c" }}>{formatBOB(dish.price)}</p>
-                        
-                        {/* ← NUEVO: badge de stock crítico */}
-                        {isCritical && (
-                          <p style={{ margin: "4px 0 0", fontSize: 11, fontWeight: 700, color: "#dc2626", background: "#fee2e2", border: "1px solid #fecaca", borderRadius: 6, padding: "2px 8px", display: "inline-block" }}>
-                            🔴 Sin stock — no disponible
-                          </p>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <p style={{ margin: 0, fontSize: 14, fontWeight: 700, color: "#111" }}>{dish.name}</p>
+                          {dish.description && <p style={{ margin: "2px 0 0", fontSize: 11, color: "#9ca3af", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{dish.description}</p>}
+                          <p style={{ margin: "4px 0 0", fontSize: 14, fontWeight: 700, color: "#ea580c" }}>{formatBOB(dish.price)}</p>
+                          
+                          {/* Badge dinámico con la razón específica */}
+                          {isBlocked && (
+                            <p style={{ margin: "4px 0 0", fontSize: 11, fontWeight: 700, color: "#dc2626", background: "#fee2e2", border: "1px solid #fecaca", borderRadius: 6, padding: "2px 8px", display: "inline-block" }}>
+                              {stockIssue!.reason}
+                            </p>
+                          )}
+                        </div>
+
+                        {/* Botones: bloqueados si no hay stock */}
+                        {isBlocked ? (
+                          <div style={{
+                            width: 32, height: 32, borderRadius: "50%",
+                            border: "2px solid #fecaca", background: "#fee2e2",
+                            display: "flex", alignItems: "center", justifyContent: "center",
+                            fontSize: 14, flexShrink: 0,
+                          }}>
+                            🚫
+                          </div>
+                        ) : qty === 0 ? (
+                          <button onClick={() => addToCart(dish)} style={{ width: 32, height: 32, borderRadius: "50%", border: "none", background: "#ea580c", color: "#fff", fontSize: 20, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>+</button>
+                        ) : (
+                          <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
+                            <button onClick={() => removeFromCart(dish._id)} style={{ width: 28, height: 28, borderRadius: "50%", border: "1.5px solid #e5e7eb", background: "#fff", cursor: "pointer", fontSize: 16, display: "flex", alignItems: "center", justifyContent: "center" }}>−</button>
+                            <span style={{ fontSize: 14, fontWeight: 700, minWidth: 20, textAlign: "center" }}>{qty}</span>
+                            <button onClick={() => addToCart(dish)} style={{ width: 28, height: 28, borderRadius: "50%", border: "none", background: "#ea580c", color: "#fff", cursor: "pointer", fontSize: 16, display: "flex", alignItems: "center", justifyContent: "center" }}>+</button>
+                          </div>
                         )}
                       </div>
-
-                      {/* Botones: bloqueados si es crítico */}
-                      {isCritical ? (
-                        <div style={{
-                          width: 32, height: 32, borderRadius: "50%",
-                          border: "2px solid #fecaca", background: "#fee2e2",
-                          display: "flex", alignItems: "center", justifyContent: "center",
-                          fontSize: 14, flexShrink: 0,
-                        }}>
-                          🚫
-                        </div>
-                      ) : qty === 0 ? (
-                        <button onClick={() => addToCart(dish)} style={{ width: 32, height: 32, borderRadius: "50%", border: "none", background: "#ea580c", color: "#fff", fontSize: 20, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>+</button>
-                      ) : (
-                        <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
-                          <button onClick={() => removeFromCart(dish._id)} style={{ width: 28, height: 28, borderRadius: "50%", border: "1.5px solid #e5e7eb", background: "#fff", cursor: "pointer", fontSize: 16, display: "flex", alignItems: "center", justifyContent: "center" }}>−</button>
-                          <span style={{ fontSize: 14, fontWeight: 700, minWidth: 20, textAlign: "center" }}>{qty}</span>
-                          <button onClick={() => addToCart(dish)} style={{ width: 28, height: 28, borderRadius: "50%", border: "none", background: "#ea580c", color: "#fff", cursor: "pointer", fontSize: 16, display: "flex", alignItems: "center", justifyContent: "center" }}>+</button>
-                        </div>
-                    )}
-                </div>
-              );
-            })}
+                    );
+                  })}
             </div>
           </div>
 

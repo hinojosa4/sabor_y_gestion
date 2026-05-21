@@ -4,6 +4,7 @@ import Ingredient from "@/models/Ingredient";
 import IngredientCategory from "@/models/IngredientCategory";
 import "@/models/IngredientCategory";
 import mongoose from "mongoose";
+import { pusherServer } from "@/lib/pusher";
 
 const VALID_UNITS = ["kg", "lt", "unit", "gr", "ml"] as const;
 
@@ -111,6 +112,7 @@ export async function POST(req: NextRequest) {
 
     await ingredient.save({ validateBeforeSave: false });
     await ingredient.populate("category_id", "name");
+    await pusherServer.trigger("restaurant", "ingredient:created", {});
 
     return NextResponse.json(
       { ok: true, message: "Ingrediente creado correctamente", data: ingredient },

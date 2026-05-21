@@ -29,9 +29,13 @@ export async function GET() {
   try {
     await connectDB();
 
+    // IMPORTANTE: No usar .select() restrictivo en ingredients.ingredient_id
+    // El virtual stockStatus necesita currentStock y minStock para calcularse.
+    // Al omitir el select, Mongoose hidrata el documento completo y los virtuals
+    // (stockStatus) quedan disponibles en la respuesta JSON.
     const dishes = await Dish.find()
-      .populate("category_id", "name")        // ← "nombre" → "name"
-      .populate("ingredients.ingredient_id", "name unit currentStock minStock warningStock")  // ← "nombre unidad" → "name unit"
+      .populate("category_id", "name")
+      .populate("ingredients.ingredient_id") // sin select → virtual stockStatus incluido
       .sort({ createdAt: -1 });
 
     return NextResponse.json({ ok: true, data: dishes });

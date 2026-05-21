@@ -1,5 +1,5 @@
 "use client";
-import { useState, useEffect, useMemo, useCallback } from "react";
+import { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/useAuth";
 
@@ -182,6 +182,11 @@ function Modal({ title, children, onClose, isMobile = false }: {
     </div>
   );
 }
+
+// Muestra hasta 2 decimales, sin ceros innecesarios: 1.50 → "1.5", 1.00 → "1"
+const fmt = (n: number) => +n.toFixed(2) !== Math.round(n) 
+  ? n.toFixed(2).replace(/\.?0+$/, "") 
+  : String(Math.round(n));
 
 // ─── Formulario de ingrediente ────────────────────────────────────────────────
 function IngredientForm({ initial, categories, onSubmit, onCancel, error, submitLabel, isMobile, isCocinero }: {
@@ -457,7 +462,7 @@ function IngredientRow({ ing, onEdit, onDelete, isCocinero, isAdmin }: {
       </td>
       <td style={{ padding: "14px 16px", minWidth: 160 }}>
         <p style={{ margin: "0 0 6px", fontSize: 15, fontWeight: 700, color: "#1a1a1a" }}>
-          {ing.currentStock} {ing.unit}
+          {fmt(ing.currentStock)} {ing.unit}
         </p>
         <div style={{ height: 6, background: "#f0f0f0", borderRadius: 3, overflow: "hidden", width: 120 }}>
           <div style={{ height: "100%", borderRadius: 3, background: BAR_COLOR[ing.stockStatus], width: `${pct}%`, transition: "width 0.4s ease" }} />
@@ -465,10 +470,10 @@ function IngredientRow({ ing, onEdit, onDelete, isCocinero, isAdmin }: {
       </td>
       {/* Columna umbrales con los 4 valores y colores */}
       <td style={{ padding: "14px 16px", fontSize: 12, lineHeight: 2 }}>
-        <span style={{ color: "#e85d26" }}>🔴 {ing.minStock}</span><br />
-        <span style={{ color: "#d97706" }}>🟡 {ing.warningStock}</span><br />
-        <span style={{ color: "#3b82f6" }}>📋 {ing.reorderPoint}</span><br />
-        <span style={{ color: "#16a34a" }}>📦 {ing.maxStock}</span>
+        <span style={{ color: "#e85d26" }}>🔴 {fmt(ing.minStock)}</span><br />
+        <span style={{ color: "#d97706" }}>🟡 {fmt(ing.warningStock)}</span><br />
+        <span style={{ color: "#3b82f6" }}>📋 {fmt(ing.reorderPoint)}</span><br />
+        <span style={{ color: "#16a34a" }}>📦 {fmt(ing.maxStock)}</span>
         <span style={{ color: "#ccc" }}> {ing.unit}</span>
       </td>
       <td style={{ padding: "14px 16px" }}>
@@ -622,9 +627,47 @@ export default function InventoryPage() {
     }
   }, []);
 
-  useEffect(() => {
-    if (!userLoading && user) fetchData();
-  }, [userLoading, user, fetchData]);
+  const fetchDataRef = useRef(fetchData);
+    useEffect(() => { fetchDataRef.current = fetchData; }, [fetchData]);
+
+    useEffect(() => {
+      if (userLoading || !user) return;
+      fetchData();
+
+      let pusherInstance: InstanceType<typeof import("pusher-js")["default"]> | null = null;
+      let mounted = true;
+
+      const setup = async () => {
+        const { default: Pusher } = await import("pusher-js/with-encryption");
+        if (!mounted) return;
+
+        pusherInstance = new Pusher(process.env.NEXT_PUBLIC_PUSHER_KEY!, {
+          cluster: process.env.NEXT_PUBLIC_PUSHER_CLUSTER!,
+          forceTLS: true,
+        });
+
+        const channel = pusherInstance.subscribe("restaurant");
+
+        // Ingrediente creado, editado o eliminado
+        channel.bind("ingredient:created",  () => { if (mounted) fetchDataRef.current(); });
+        channel.bind("ingredient:updated",  () => { if (mounted) fetchDataRef.current(); });
+        channel.bind("ingredient:deleted",  () => { if (mounted) fetchDataRef.current(); });
+
+        // El stock se descuenta cuando cocina acepta una orden (in_kitchen)
+        channel.bind("order:updated", () => { if (mounted) fetchDataRef.current(); });
+
+        // Alerta de inventario — refresca para que los badges y barras reflejen el nuevo estado
+        channel.bind("inventory:alert", () => { if (mounted) fetchDataRef.current(); });
+      };
+
+      setup();
+
+      return () => {
+        mounted = false;
+        pusherInstance?.unsubscribe("restaurant");
+        pusherInstance?.disconnect();
+      };
+    }, [userLoading, user, fetchData]);
 
   const showSuccess = (msg: string) => {
     setSuccessMsg(msg);
@@ -967,7 +1010,7 @@ export default function InventoryPage() {
                     {/* Barra de progreso */}
                     <div style={{ marginBottom: 10 }}>
                       <p style={{ margin: "0 0 4px", fontSize: 16, fontWeight: 700, color: "#1a1a1a" }}>
-                        {ing.currentStock} {ing.unit}
+                        {fmt(ing.currentStock)} {ing.unit}
                       </p>
                       <div style={{ height: 8, background: "#f0f0f0", borderRadius: 4, overflow: "hidden" }}>
                         <div style={{ height: "100%", borderRadius: 4, background: BAR_COLOR[ing.stockStatus], width: `${pct}%`, transition: "width 0.4s ease" }} />
@@ -976,10 +1019,10 @@ export default function InventoryPage() {
 
                     {/* Umbrales en mobile: badges de colores compactos */}
                     <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 12 }}>
-                      <span style={{ fontSize: 11, color: "#e85d26", background: "#fff0ee", border: "1px solid #fecaca", borderRadius: 6, padding: "2px 7px" }}>🔴 {ing.minStock}</span>
-                      <span style={{ fontSize: 11, color: "#d97706", background: "#fffbeb", border: "1px solid #fde68a", borderRadius: 6, padding: "2px 7px" }}>🟡 {ing.warningStock}</span>
-                      <span style={{ fontSize: 11, color: "#3b82f6", background: "#eff6ff", border: "1px solid #bfdbfe", borderRadius: 6, padding: "2px 7px" }}>📋 {ing.reorderPoint}</span>
-                      <span style={{ fontSize: 11, color: "#16a34a", background: "#f0fdf4", border: "1px solid #bbf7d0", borderRadius: 6, padding: "2px 7px" }}>📦 {ing.maxStock}</span>
+                      <span style={{ fontSize: 11, color: "#e85d26", background: "#fff0ee", border: "1px solid #fecaca", borderRadius: 6, padding: "2px 7px" }}>🔴 {fmt(ing.minStock)}</span>
+                      <span style={{ fontSize: 11, color: "#d97706", background: "#fffbeb", border: "1px solid #fde68a", borderRadius: 6, padding: "2px 7px" }}>🟡 {fmt(ing.warningStock)}</span>
+                      <span style={{ fontSize: 11, color: "#3b82f6", background: "#eff6ff", border: "1px solid #bfdbfe", borderRadius: 6, padding: "2px 7px" }}>📋 {fmt(ing.reorderPoint)}</span>
+                      <span style={{ fontSize: 11, color: "#16a34a", background: "#f0fdf4", border: "1px solid #bbf7d0", borderRadius: 6, padding: "2px 7px" }}>📦 {fmt(ing.maxStock)}</span>
                       <span style={{ fontSize: 11, color: "#aaa" }}>{ing.unit}</span>
                     </div>
 
