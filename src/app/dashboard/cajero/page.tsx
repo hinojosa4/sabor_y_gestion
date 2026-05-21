@@ -195,10 +195,38 @@ export default function CajeroDashboard() {
 
     const { tables, loading, refreshTables } = useTableData(restaurantId);
 
-    const filteredTables = tables.filter(table =>
-        table.number.toString().includes(searchQuery) ||
-        table.location.toLowerCase().includes(searchQuery.toLowerCase())
-    );
+    const normalizeSearch = (value: string) =>
+        value
+            .toLowerCase()
+            .normalize("NFD")
+            .replace(/[\u0300-\u036f]/g, "")
+            .trim();
+
+    const normalizedSearch = normalizeSearch(searchQuery);
+    const tableNumberSearch = normalizedSearch.replace(/^mesa\s+/, "");
+    const isExplicitTableSearch = /^mesa\s+\d+$/.test(normalizedSearch);
+    const isNumericSearch = /^\d+$/.test(normalizedSearch);
+
+    const filteredTables = tables.filter(table => {
+        if (!normalizedSearch) return true;
+
+        const tableNumber = table.number.toString();
+        const tableLabel = `mesa ${tableNumber}`;
+        const location = normalizeSearch(table.location);
+        const status = normalizeSearch(table.status);
+
+        if (isExplicitTableSearch) {
+            return tableNumber === tableNumberSearch;
+        }
+
+        if (isNumericSearch) {
+            return tableNumber === normalizedSearch;
+        }
+
+        return tableLabel.includes(normalizedSearch) ||
+            location.includes(normalizedSearch) ||
+            status.includes(normalizedSearch);
+    });
 
     const billingTables = filteredTables.filter(t => t.status === 'Cuenta solicitada');
     const occupiedTables = filteredTables.filter(t =>

@@ -46,7 +46,6 @@ const modalStyle: React.CSSProperties = {
 function OrderSummary({ orderId }: { orderId: string }) {
     const [items, setItems] = useState<OrderItemType[]>([]);
     const [subtotal, setSubtotal] = useState(0);
-    const [iva, setIva] = useState(0);
     const [total, setTotal] = useState(0);
     const [loading, setLoading] = useState(true);
 
@@ -58,7 +57,6 @@ function OrderSummary({ orderId }: { orderId: string }) {
                 if (data.items) {
                     setItems(data.items);
                     setSubtotal(data.subtotal || 0);
-                    setIva(data.iva || 0);
                     setTotal(data.total || 0);
                 }
             } catch (error) {
@@ -93,10 +91,6 @@ function OrderSummary({ orderId }: { orderId: string }) {
                     <span>Subtotal</span>
                     <span>{formatCurrency(subtotal)}</span>
                 </div>
-                <div style={{ display: "flex", justifyContent: "space-between", fontSize: "0.75rem" }}>
-                    <span>IVA (13%)</span>
-                    <span>{formatCurrency(iva)}</span>
-                </div>
                 <div style={{ display: "flex", justifyContent: "space-between", fontWeight: "bold", marginTop: "0.25rem" }}>
                     <span>Total</span>
                     <span>{formatCurrency(total)}</span>
@@ -108,7 +102,7 @@ function OrderSummary({ orderId }: { orderId: string }) {
 
 export function PaymentModal({ isOpen, onClose, orderId, tableId, tableNumber, totalAmount, onSuccess }: PaymentModalProps) {
     const [loading, setLoading] = useState(false);
-    const [cashReceived, setCashReceived] = useState(totalAmount);
+    const [cashReceivedInput, setCashReceivedInput] = useState(String(totalAmount));
     const [customerEmail, setCustomerEmail] = useState('');
     const [observations, setObservations] = useState('');
     
@@ -120,7 +114,7 @@ export function PaymentModal({ isOpen, onClose, orderId, tableId, tableNumber, t
 
     useEffect(() => {
         if (isOpen) {
-            setCashReceived(totalAmount);
+            setCashReceivedInput(String(totalAmount));
             setCustomerEmail('');
             setObservations('');
         }
@@ -135,11 +129,28 @@ export function PaymentModal({ isOpen, onClose, orderId, tableId, tableNumber, t
         }).format(amount);
     };
 
-    const change = cashReceived - totalAmount;
-    const isValid = cashReceived >= totalAmount;
+    const cashReceived = Number(cashReceivedInput);
+    const hasCashValue = cashReceivedInput.trim() !== '' && !Number.isNaN(cashReceived);
+    const change = hasCashValue ? cashReceived - totalAmount : 0;
+    const isValid = hasCashValue && cashReceived >= totalAmount;
 
     const handleAmountClick = (amount: number) => {
-        setCashReceived(amount);
+        setCashReceivedInput(String(amount));
+    };
+
+    const handleCashReceivedChange = (value: string) => {
+        const normalized = value
+            .replace(',', '.')
+            .replace(/[^\d.]/g, '')
+            .replace(/(\..*)\./g, '$1');
+
+        if (normalized === '') {
+            setCashReceivedInput('');
+            return;
+        }
+
+        const withoutLeadingZeros = normalized.replace(/^0+(?=\d)/, '');
+        setCashReceivedInput(withoutLeadingZeros);
     };
 
     const handlePayment = async () => {
@@ -166,7 +177,7 @@ export function PaymentModal({ isOpen, onClose, orderId, tableId, tableNumber, t
                 const orderData = await orderRes.json();
                 setOrderItems(orderData.items || []);
                 setOrderSubtotal(orderData.subtotal || 0);
-                setOrderIva(orderData.iva || 0);
+                setOrderIva(0);
                 
                 // 3. Mostrar factura final y cerrar modal de pago
                 setShowFactura(true);
@@ -228,11 +239,10 @@ export function PaymentModal({ isOpen, onClose, orderId, tableId, tableNumber, t
                             ))}
                         </div>
                         <input
-                            type="number"
-                            value={cashReceived}
-                            onChange={(e) => setCashReceived(Number(e.target.value) || 0)}
-                            min={totalAmount}
-                            step="1"
+                            type="text"
+                            inputMode="decimal"
+                            value={cashReceivedInput}
+                            onChange={(e) => handleCashReceivedChange(e.target.value)}
                             autoFocus
                             style={{
                                 width: "100%",

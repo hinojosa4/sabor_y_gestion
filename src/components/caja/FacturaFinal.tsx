@@ -13,7 +13,7 @@ interface FacturaFinalProps {
     isOpen: boolean;
     onClose: () => void;
     orderId: string;
-    tableNumber: number;
+    tableNumber: number | null;
     items: OrderItem[];
     subtotal: number;
     iva: number;
@@ -56,7 +56,6 @@ export function FacturaFinal({
     tableNumber,
     items,
     subtotal,
-    iva,
     total,
     paymentMethod,
     cashReceived,
@@ -119,7 +118,7 @@ export function FacturaFinal({
 
                     <div style={{ borderTop: `1px solid var(--border)`, borderBottom: `1px solid var(--border)`, padding: "0.5rem 0", marginBottom: "1rem" }}>
                         <p style={{ margin: 0, fontSize: "0.75rem" }}><strong>N° Orden:</strong> {orderId}</p>
-                        <p style={{ margin: 0, fontSize: "0.75rem" }}><strong>Mesa:</strong> {tableNumber}</p>
+                        <p style={{ margin: 0, fontSize: "0.75rem" }}><strong>Mesa:</strong> {tableNumber ?? 'No disponible'}</p>
                         <p style={{ margin: 0, fontSize: "0.75rem" }}><strong>Fecha:</strong> {formatDate(paymentDate)}</p>
                         <p style={{ margin: 0, fontSize: "0.75rem" }}>
                             <strong>Método de pago:</strong> {paymentMethod === 'cash' ? 'Efectivo' : 'QR'}
@@ -154,7 +153,6 @@ export function FacturaFinal({
 
                     <div style={{ textAlign: "right", marginBottom: "1rem" }}>
                         <p style={{ margin: 0, fontSize: "0.75rem" }}>Subtotal: {formatCurrency(subtotal)}</p>
-                        <p style={{ margin: 0, fontSize: "0.75rem" }}>IVA (13%): {formatCurrency(iva)}</p>
                         <p style={{ margin: "0.5rem 0 0", fontWeight: "bold" }}>Total: {formatCurrency(total)}</p>
 
                         {paymentMethod === 'cash' && cashReceived !== undefined && (

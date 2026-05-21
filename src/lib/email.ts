@@ -33,7 +33,6 @@ export async function sendPaymentEmail({
     method,
     items,
     subtotal,
-    iva,
     total,
     change
 }: SendPaymentEmailParams) {
@@ -67,10 +66,6 @@ export async function sendPaymentEmail({
                     <tr>
                         <td style="padding: 8px; text-align: left;"><strong>Subtotal</strong></td>
                         <td style="padding: 8px; text-align: right;">${formatCurrency(subtotal)}</td>
-                    </tr>
-                    <tr>
-                        <td style="padding: 8px; text-align: left;"><strong>IVA (13%)</strong></td>
-                        <td style="padding: 8px; text-align: right;">${formatCurrency(iva)}</td>
                     </tr>
                     <tr>
                         <td style="padding: 8px; text-align: left;"><strong>Total</strong></td>

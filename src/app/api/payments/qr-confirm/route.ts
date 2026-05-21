@@ -6,22 +6,19 @@ import Order from '@/models/Order';
 import OrderItem from '@/models/OrderItem';
 import Table from '@/models/Table';
 import Payment from '@/models/Payment';
-import Dish from '@/models/Dish';
 import { sendPaymentEmail } from '@/lib/email';
+import '@/models/Dish';
 
 type LeanOrderItem = {
   _id: Types.ObjectId;
   order_id: Types.ObjectId;
-  dish_id?: Types.ObjectId;
+  dish_id?: {
+    name?: string;
+    price?: number;
+  } | null;
   quantity: number;
   unit_price: number;
   subtotal?: number;
-};
-
-type LeanDish = {
-  _id: Types.ObjectId;
-  name: string;
-  price: number;
 };
 
 export async function POST(req: NextRequest) {
@@ -32,7 +29,7 @@ export async function POST(req: NextRequest) {
 
     if (!email || !email.includes('@')) {
       return NextResponse.json(
-        { error: 'El correo electrónico es obligatorio' },
+        { error: 'El correo electrÃ³nico es obligatorio' },
         { status: 400 }
       );
     }
@@ -54,6 +51,7 @@ export async function POST(req: NextRequest) {
     }
 
     const items = await OrderItem.find({ order_id: orderId })
+      .populate({ path: 'dish_id', model: 'Dish', select: 'name price' })
       .lean<LeanOrderItem[]>();
 
     if (!items.length) {
@@ -63,27 +61,14 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const dishIds = items
-      .map((item) => item.dish_id)
-      .filter((dishId): dishId is Types.ObjectId => Boolean(dishId));
-
-    const dishes = await Dish.find({
-      _id: { $in: dishIds },
-    }).lean<LeanDish[]>();
-
-    const dishMap = new Map(
-      dishes.map((dish) => [dish._id.toString(), dish])
-    );
-
     let subtotal = 0;
 
     const formattedItems = items.map((item) => {
-      const dishId = item.dish_id?.toString();
-      const dish = dishId ? dishMap.get(dishId) : undefined;
+      const dish = item.dish_id;
 
       const price = item.unit_price ?? dish?.price ?? 0;
       const quantity = item.quantity ?? 1;
-      const subt = item.subtotal ?? price * quantity;
+      const subt = price * quantity;
 
       subtotal += subt;
 
@@ -97,8 +82,8 @@ export async function POST(req: NextRequest) {
       };
     });
 
-    const iva = subtotal * 0.13;
-    const total = subtotal + iva;
+    const iva = 0;
+    const total = subtotal;
     const totalAmount = total;
 
     await Payment.create({
@@ -106,6 +91,7 @@ export async function POST(req: NextRequest) {
       amount: totalAmount,
       method: 'qr',
       status: 'completed',
+      customer_email: email,
       timestamp: new Date(),
     });
 

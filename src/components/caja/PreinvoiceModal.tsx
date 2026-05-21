@@ -180,7 +180,6 @@ export function PreinvoiceModal({
   const [items, setItems] = useState<PreinvoiceItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [subtotal, setSubtotal] = useState(0);
-  const [iva, setIva] = useState(0);
   const [total, setTotal] = useState(0);
   const printRef = useRef<HTMLDivElement>(null);
   const [orderId, setOrderId] = useState('');
@@ -201,7 +200,6 @@ export function PreinvoiceModal({
       if (data.items) {
         setItems(data.items);
         setSubtotal(data.subtotal || 0);
-        setIva(data.iva || 0);
         setTotal(data.total || 0);
         setOrderId(data.orderId || '');
       }
@@ -218,6 +216,12 @@ export function PreinvoiceModal({
       currency: 'BOB'
     }).format(amount);
   };
+
+  const calculatedSubtotal = items.reduce((sum, item) => {
+    return sum + (item.dish?.price || 0) * item.quantity;
+  }, 0);
+  const displaySubtotal = calculatedSubtotal || subtotal;
+  const displayTotal = displaySubtotal || total;
 
   const handlePrint = () => {
     if (printRef.current) {
@@ -272,15 +276,11 @@ export function PreinvoiceModal({
               <div style={totalsContainerStyle}>
                 <div style={totalRowStyle}>
                   <span>Subtotal</span>
-                  <span>{formatCurrency(subtotal)}</span>
-                </div>
-                <div style={totalRowStyle}>
-                  <span>IVA (13%)</span>
-                  <span>{formatCurrency(iva)}</span>
+                  <span>{formatCurrency(displaySubtotal)}</span>
                 </div>
                 <div style={grandTotalStyle}>
                   <span>Total</span>
-                  <span>{formatCurrency(total)}</span>
+                  <span>{formatCurrency(displayTotal)}</span>
                 </div>
               </div>
 
@@ -307,7 +307,7 @@ export function PreinvoiceModal({
                   </button>
 
                   {onPay && (
-                    <button onClick={() => onPay(orderId, total)} style={buttonGreenStyle}>
+                    <button onClick={() => onPay(orderId, displayTotal)} style={buttonGreenStyle}>
                       <DollarSign size={16} />
                       Cobrar
                     </button>
@@ -352,9 +352,8 @@ export function PreinvoiceModal({
             </tbody>
           </table>
           <div style={{ marginTop: '1rem', textAlign: 'right' }}>
-            <p>Subtotal: {formatCurrency(subtotal)}</p>
-            <p>IVA (13%): {formatCurrency(iva)}</p>
-            <p><strong>Total: {formatCurrency(total)}</strong></p>
+            <p>Subtotal: {formatCurrency(displaySubtotal)}</p>
+            <p><strong>Total: {formatCurrency(displayTotal)}</strong></p>
           </div>
 
           <div style={{ marginTop: "1rem" }}>
