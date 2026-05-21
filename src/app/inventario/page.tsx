@@ -238,7 +238,7 @@ function IngredientForm({ initial, categories, onSubmit, onCancel, error, submit
       {/* ── Stock actual (ambos roles) ── */}
       <Field label="Stock Actual *" hint="Cantidad física en el almacén ahora mismo">
         <input
-          type="number" min={0} step="0.001"
+          type="number" step="0.001"
           value={form.currentStock}
           onChange={(e) => set("currentStock", e.target.value)}
           placeholder="0"
@@ -663,7 +663,10 @@ export default function InventoryPage() {
   const validateForm = (form: IngredientFormData, cocinero: boolean): string | null => {
     if (!form.name.trim()) return "El nombre es obligatorio";
     if (!form.unit) return "La unidad es obligatoria";
-    if (form.currentStock === "" || Number(form.currentStock) < 0) return "El stock actual es obligatorio";
+    // ANTES: if (form.currentStock === "" || Number(form.currentStock) < 0)
+    // DESPUÉS: solo valida que sea un número válido, permite negativos
+    if (form.currentStock === "" || isNaN(Number(form.currentStock)))
+      return "El stock actual es obligatorio";
     if (cocinero) return null;
     if (form.minStock === "" || Number(form.minStock) < 0) return "El stock mínimo es obligatorio";
     if (form.warningStock === "" || Number(form.warningStock) <= Number(form.minStock))

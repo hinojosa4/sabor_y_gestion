@@ -51,6 +51,8 @@ export async function PUT(req: NextRequest, { params }: Params) {
     }
 
     const body = await req.json();
+    console.log("PUT BODY:", JSON.stringify(body, null, 2));
+
     const {
       name, currentStock,
       minStock, warningStock, reorderPoint, maxStock,
@@ -61,13 +63,22 @@ export async function PUT(req: NextRequest, { params }: Params) {
       return NextResponse.json({ ok: false, message: "El nombre es obligatorio" }, { status: 400 });
     }
 
-    const numFields: [string, unknown, string][] = [
-      ["El stock actual",         currentStock, "no puede ser negativo"],
-      ["El stock mínimo",         minStock,     "no puede ser negativo"],
-      ["El stock de advertencia", warningStock, "no puede ser negativo"],
-      ["El punto de reorden",     reorderPoint, "no puede ser negativo"],
-      ["El stock máximo",         maxStock,     "no puede ser negativo"],
-    ];
+    if (currentStock === undefined || currentStock === null || typeof currentStock !== "number" || isNaN(currentStock)) {
+  return NextResponse.json({ ok: false, message: "El stock actual es obligatorio" }, { status: 400 });
+}
+
+  const numFields: [string, unknown, string][] = [
+    ["El stock mínimo",         minStock,     "no puede ser negativo"],
+    ["El stock de advertencia", warningStock, "no puede ser negativo"],
+    ["El punto de reorden",     reorderPoint, "no puede ser negativo"],
+    ["El stock máximo",         maxStock,     "no puede ser negativo"],
+  ];
+
+  for (const [label, val, msg] of numFields) {
+    if (val === undefined || val === null || typeof val !== "number" || isNaN(val as number) || (val as number) < 0) {
+      return NextResponse.json({ ok: false, message: `${label} ${msg}` }, { status: 400 });
+    }
+  }
 
     for (const [label, val, msg] of numFields) {
       if (val === undefined || val === null || typeof val !== "number" || (val as number) < 0) {

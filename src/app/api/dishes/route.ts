@@ -31,7 +31,7 @@ export async function GET() {
 
     const dishes = await Dish.find()
       .populate("category_id", "name")        // ← "nombre" → "name"
-      .populate("ingredients.ingredient_id", "name unit")  // ← "nombre unidad" → "name unit"
+      .populate("ingredients.ingredient_id", "name unit currentStock minStock warningStock")  // ← "nombre unidad" → "name unit"
       .sort({ createdAt: -1 });
 
     return NextResponse.json({ ok: true, data: dishes });

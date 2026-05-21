@@ -29,6 +29,7 @@ interface Dish {
   image_url?: string;
   category_id?: { _id: string; name: string } | null;
   isAvailable: boolean;
+  ingredients: DishIngredient[];  
 }
 
 interface OrderItemLocal {
@@ -56,6 +57,30 @@ interface ActiveOrder {
   items: ActiveOrderItem[];
 }
 
+// Alerta de inventario que llega por WebSocket
+interface InventoryAlerta {
+  ingredientId: string;
+  name: string;
+  currentStock: number;
+  unit: string;
+  stockStatus: "low" | "critical";
+  minStock: number;
+  warningStock: number;
+}
+
+interface DishIngredient {
+  ingredient_id: {
+    _id: string;
+    name: string;
+    unit: string;
+    currentStock: number;
+    minStock: number;
+    warningStock: number;
+    stockStatus: "ok" | "low" | "critical";
+  };
+  quantity: number;
+}
+
 // ─── Constantes ───────────────────────────────────────────────────
 const ALLOWED_ROLES: AuthUser["rol"][] = ["mesero", "admin"];
 
@@ -80,6 +105,12 @@ const ORDER_STATUS_CONFIG: Record<string, { label: string; color: string; bg: st
 const formatBOB = (amount: number) =>
   new Intl.NumberFormat("es-BO", { style: "currency", currency: "BOB" }).format(amount);
 
+function hasCriticalIngredient(dish: Dish): boolean {
+  return dish.ingredients?.some(
+    (ing) => ing.ingredient_id?.stockStatus === "critical"
+  ) ?? false;
+}
+
 function useElapsed(createdAt: string) {
   const [elapsed, setElapsed] = useState("");
   useEffect(() => {
@@ -94,6 +125,145 @@ function useElapsed(createdAt: string) {
     return () => clearInterval(t);
   }, [createdAt]);
   return elapsed;
+}
+
+// ─── Banner de alerta de inventario ──────────────────────────────
+function InventoryAlertBanner({
+  alertas,
+  onClose,
+}: {
+  alertas: InventoryAlerta[];
+  onClose: () => void;
+}) {
+  const criticos = alertas.filter((a) => a.stockStatus === "critical");
+  const bajos    = alertas.filter((a) => a.stockStatus === "low");
+
+  return (
+    <div
+      role="alert"
+      style={{
+        position: "fixed",
+        top: 70,
+        left: "50%",
+        transform: "translateX(-50%)",
+        zIndex: 9998,
+        width: "min(480px, 92vw)",
+        background: "#fff",
+        borderRadius: 14,
+        border: "2px solid #e85d26",
+        boxShadow: "0 8px 32px rgba(232,93,38,0.18)",
+        overflow: "hidden",
+        animation: "slideDown 0.25s ease",
+      }}
+    >
+      <style>{`
+        @keyframes slideDown {
+          from { opacity: 0; transform: translateX(-50%) translateY(-12px); }
+          to   { opacity: 1; transform: translateX(-50%) translateY(0); }
+        }
+      `}</style>
+
+      {/* Header */}
+      <div style={{
+        background: criticos.length > 0 ? "#fff0ee" : "#fffbeb",
+        padding: "12px 16px",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "space-between",
+        borderBottom: "1.5px solid #f0f0f0",
+      }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <span style={{ fontSize: 18 }}>
+            {criticos.length > 0 ? "🚨" : "⚠️"}
+          </span>
+          <span style={{
+            fontSize: 13,
+            fontWeight: 700,
+            color: criticos.length > 0 ? "#e85d26" : "#d97706",
+          }}>
+            Alerta de Inventario
+          </span>
+        </div>
+        <button
+          onClick={onClose}
+          aria-label="Cerrar alerta"
+          style={{
+            background: "none",
+            border: "none",
+            cursor: "pointer",
+            fontSize: 16,
+            color: "#888",
+            padding: "0 4px",
+          }}
+        >
+          ✕
+        </button>
+      </div>
+
+      {/* Body */}
+      <div style={{ padding: "12px 16px", display: "flex", flexDirection: "column", gap: 8 }}>
+        {criticos.length > 0 && (
+          <div>
+            <p style={{ margin: "0 0 6px", fontSize: 11, fontWeight: 700, color: "#e85d26", textTransform: "uppercase", letterSpacing: "0.05em" }}>
+              🔴 Stock Crítico — Operación en riesgo
+            </p>
+            {criticos.map((a) => (
+              <div key={a.ingredientId} style={{
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+                padding: "6px 10px",
+                background: "#fff0ee",
+                borderRadius: 8,
+                marginBottom: 4,
+                border: "1px solid #fecaca",
+              }}>
+                <span style={{ fontSize: 13, fontWeight: 600, color: "#1a1a1a" }}>
+                  {a.name}
+                </span>
+                <span style={{ fontSize: 12, color: "#e85d26", fontWeight: 700 }}>
+                  {a.currentStock} {a.unit} / mín {a.minStock} {a.unit}
+                </span>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {bajos.length > 0 && (
+          <div>
+            <p style={{ margin: "0 0 6px", fontSize: 11, fontWeight: 700, color: "#d97706", textTransform: "uppercase", letterSpacing: "0.05em" }}>
+              🟡 Stock Bajo — Comprar pronto
+            </p>
+            {bajos.map((a) => (
+              <div key={a.ingredientId} style={{
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+                padding: "6px 10px",
+                background: "#fffbeb",
+                borderRadius: 8,
+                marginBottom: 4,
+                border: "1px solid #fde68a",
+              }}>
+                <span style={{ fontSize: 13, fontWeight: 600, color: "#1a1a1a" }}>
+                  {a.name}
+                </span>
+                <span style={{ fontSize: 12, color: "#d97706", fontWeight: 700 }}>
+                  {a.currentStock} {a.unit} / adv {a.warningStock} {a.unit}
+                </span>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      <div style={{ padding: "8px 16px 14px", textAlign: "center" }}>
+        <p style={{ margin: 0, fontSize: 11, color: "#aaa" }}>
+          Stock descontado al iniciar preparación en cocina
+        </p>
+      </div>
+    </div>
+  );
 }
 
 // ─── TableCard ────────────────────────────────────────────────────
@@ -148,7 +318,6 @@ function TableCard({
             📋 Ver Comanda
           </button>
 
-          {/* Pedir cuenta solo si la orden fue marcada como servida (delivered) */}
           {canRequestBill ? (
             <button
               onClick={e => { e.stopPropagation(); onRequestBill(table._id); }}
@@ -245,7 +414,7 @@ function ActiveOrderCard({
         </div>
       )}
 
-      {/* Pedir cuenta — solo si ya fue servida (delivered) */}
+      {/* Pedir cuenta — solo si ya fue entregada */}
       {order.status === "delivered" && (
         <div style={{ padding: "0 16px 14px" }}>
           <button
@@ -264,7 +433,7 @@ function ActiveOrderCard({
         </div>
       )}
 
-      {/* Aviso si aún no está listo para servir */}
+      {/* Aviso si aún no está listo */}
       {(order.status === "pending" || order.status === "in_kitchen") && (
         <div style={{ padding: "0 16px 12px" }}>
           <div style={{ padding: "8px 12px", borderRadius: 8, background: "#fef3c7", border: "1px solid #fcd34d", fontSize: 12, color: "#92400e", textAlign: "center" }}>
@@ -351,29 +520,57 @@ function OrderModal({ table, onClose, onOrderCreated }: { table: Table; onClose:
               {loading ? (<p style={{ color: "#9ca3af", fontSize: 13, textAlign: "center", padding: 32 }}>Cargando menú...</p>
               ) : filteredDishes.length === 0 ? (<p style={{ color: "#9ca3af", fontSize: 13, textAlign: "center", padding: 32 }}>Sin platillos en esta categoría</p>
               ) : filteredDishes.map(dish => {
-                const qty = getQty(dish._id);
-                return (
-                  <div key={dish._id} style={{ display: "flex", alignItems: "center", gap: 12, padding: "12px", borderRadius: 12, border: "1.5px solid #f3f4f6", background: qty > 0 ? "#f0fdf4" : "#fff", transition: "background 0.15s" }}>
-                    <div style={{ width: 64, height: 64, borderRadius: 10, flexShrink: 0, background: dish.image_url ? "transparent" : "#f3f4f6", overflow: "hidden", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                      {dish.image_url ? <img src={dish.image_url} alt={dish.name} style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : <span style={{ fontSize: 24 }}>🍽</span>}
-                    </div>
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <p style={{ margin: 0, fontSize: 14, fontWeight: 700, color: "#111" }}>{dish.name}</p>
-                      {dish.description && <p style={{ margin: "2px 0 0", fontSize: 11, color: "#9ca3af", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{dish.description}</p>}
-                      <p style={{ margin: "4px 0 0", fontSize: 14, fontWeight: 700, color: "#ea580c" }}>{formatBOB(dish.price)}</p>
-                    </div>
-                    {qty === 0 ? (
-                      <button onClick={() => addToCart(dish)} style={{ width: 32, height: 32, borderRadius: "50%", border: "none", background: "#ea580c", color: "#fff", fontSize: 20, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>+</button>
-                    ) : (
-                      <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
-                        <button onClick={() => removeFromCart(dish._id)} style={{ width: 28, height: 28, borderRadius: "50%", border: "1.5px solid #e5e7eb", background: "#fff", cursor: "pointer", fontSize: 16, display: "flex", alignItems: "center", justifyContent: "center" }}>−</button>
-                        <span style={{ fontSize: 14, fontWeight: 700, minWidth: 20, textAlign: "center" }}>{qty}</span>
-                        <button onClick={() => addToCart(dish)} style={{ width: 28, height: 28, borderRadius: "50%", border: "none", background: "#ea580c", color: "#fff", cursor: "pointer", fontSize: 16, display: "flex", alignItems: "center", justifyContent: "center" }}>+</button>
+                  const qty = getQty(dish._id);
+                  const isCritical = hasCriticalIngredient(dish);   // ← nuevo
+                  return (
+                    <div key={dish._id} style={{
+                      display: "flex", alignItems: "center", gap: 12, padding: "12px",
+                      borderRadius: 12,
+                      border: isCritical ? "1.5px solid #fecaca" : "1.5px solid #f3f4f6",  // ← rojo si crítico
+                      background: isCritical ? "#fff5f5" : qty > 0 ? "#f0fdf4" : "#fff",
+                      transition: "background 0.15s",
+                      opacity: isCritical ? 0.75 : 1,               // ← atenuado
+                    }}>
+                      {/* imagen sin cambios */}
+                      <div style={{ width: 64, height: 64, borderRadius: 10, flexShrink: 0, background: dish.image_url ? "transparent" : "#f3f4f6", overflow: "hidden", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                        {dish.image_url ? <img src={dish.image_url} alt={dish.name} style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : <span style={{ fontSize: 24 }}>🍽</span>}
                       </div>
+
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <p style={{ margin: 0, fontSize: 14, fontWeight: 700, color: "#111" }}>{dish.name}</p>
+                        {dish.description && <p style={{ margin: "2px 0 0", fontSize: 11, color: "#9ca3af", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{dish.description}</p>}
+                        <p style={{ margin: "4px 0 0", fontSize: 14, fontWeight: 700, color: "#ea580c" }}>{formatBOB(dish.price)}</p>
+                        
+                        {/* ← NUEVO: badge de stock crítico */}
+                        {isCritical && (
+                          <p style={{ margin: "4px 0 0", fontSize: 11, fontWeight: 700, color: "#dc2626", background: "#fee2e2", border: "1px solid #fecaca", borderRadius: 6, padding: "2px 8px", display: "inline-block" }}>
+                            🔴 Sin stock — no disponible
+                          </p>
+                        )}
+                      </div>
+
+                      {/* Botones: bloqueados si es crítico */}
+                      {isCritical ? (
+                        <div style={{
+                          width: 32, height: 32, borderRadius: "50%",
+                          border: "2px solid #fecaca", background: "#fee2e2",
+                          display: "flex", alignItems: "center", justifyContent: "center",
+                          fontSize: 14, flexShrink: 0,
+                        }}>
+                          🚫
+                        </div>
+                      ) : qty === 0 ? (
+                        <button onClick={() => addToCart(dish)} style={{ width: 32, height: 32, borderRadius: "50%", border: "none", background: "#ea580c", color: "#fff", fontSize: 20, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>+</button>
+                      ) : (
+                        <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
+                          <button onClick={() => removeFromCart(dish._id)} style={{ width: 28, height: 28, borderRadius: "50%", border: "1.5px solid #e5e7eb", background: "#fff", cursor: "pointer", fontSize: 16, display: "flex", alignItems: "center", justifyContent: "center" }}>−</button>
+                          <span style={{ fontSize: 14, fontWeight: 700, minWidth: 20, textAlign: "center" }}>{qty}</span>
+                          <button onClick={() => addToCart(dish)} style={{ width: 28, height: 28, borderRadius: "50%", border: "none", background: "#ea580c", color: "#fff", cursor: "pointer", fontSize: 16, display: "flex", alignItems: "center", justifyContent: "center" }}>+</button>
+                        </div>
                     )}
-                  </div>
-                );
-              })}
+                </div>
+              );
+            })}
             </div>
           </div>
 
@@ -442,14 +639,23 @@ export default function MeseroPage() {
   const [comandaOrderId, setComandaOrderId] = useState<string | null>(null);
   const [comandaTableNumber, setComandaTableNumber] = useState<number | null>(null);
 
+  // ── Estado para alertas de inventario ────────────────────────────
+  const [inventoryAlertas, setInventoryAlertas] = useState<InventoryAlerta[] | null>(null);
+
   const showToast = useCallback((msg: string) => {
     setToast(msg);
     setTimeout(() => setToast(""), 3000);
   }, []);
 
   const fetchData = useCallback(async () => {
+    const token = localStorage.getItem("token");
     try {
-      const [tablesRes, ordersRes] = await Promise.all([fetch("/api/tables"), fetch("/api/orders/active")]);
+      const [tablesRes, ordersRes] = await Promise.all([
+        fetch("/api/tables"),
+        fetch("/api/orders/active", {
+          headers: token ? { Authorization: `Bearer ${token}` } : {},
+        }),
+      ]);
       const tablesRaw = await tablesRes.json();
       const ordersData = await ordersRes.json();
       setTables(Array.isArray(tablesRaw) ? tablesRaw : []);
@@ -469,10 +675,15 @@ export default function MeseroPage() {
     fetchData();
     let pusherInstance: InstanceType<typeof import("pusher-js")["default"]> | null = null;
     let mounted = true;
+
     const setup = async () => {
-      const { default: Pusher } = await import("pusher-js");
+      // FIX: usar pusher-js/with-encryption igual que pusherClient.ts
+      const { default: Pusher } = await import("pusher-js/with-encryption");
       if (!mounted) return;
-      pusherInstance = new Pusher(process.env.NEXT_PUBLIC_PUSHER_KEY!, { cluster: process.env.NEXT_PUBLIC_PUSHER_CLUSTER! });
+      pusherInstance = new Pusher(process.env.NEXT_PUBLIC_PUSHER_KEY!, {
+        cluster: process.env.NEXT_PUBLIC_PUSHER_CLUSTER!,
+        forceTLS: true,
+      });
       const channel = pusherInstance.subscribe("restaurant");
       channel.bind("order:new", () => { if (mounted) fetchDataRef.current(); });
       channel.bind("order:updated", (data: { newStatus: string }) => {
@@ -482,9 +693,23 @@ export default function MeseroPage() {
       });
       channel.bind("table:updated", () => { if (mounted) fetchDataRef.current(); });
       channel.bind("table:bill_requested", () => { if (mounted) fetchDataRef.current(); });
+
+      // ── Alerta de inventario ────────────────────────────────────
+      channel.bind("inventory:alert", (data: { alertas: InventoryAlerta[] }) => {
+        if (!mounted) return;
+        if (data.alertas?.length > 0) {
+          setInventoryAlertas(data.alertas);
+          setTimeout(() => setInventoryAlertas(null), 12000);
+        }
+      });
     };
+
     setup();
-    return () => { mounted = false; pusherInstance?.unsubscribe("restaurant"); pusherInstance?.disconnect(); };
+    return () => {
+      mounted = false;
+      pusherInstance?.unsubscribe("restaurant");
+      pusherInstance?.disconnect();
+    };
   }, [userLoading, user, fetchData, showToast]);
 
   // Marcar como servido — actualización optimista inmediata
@@ -506,7 +731,7 @@ export default function MeseroPage() {
         return;
       }
       showToast("✓ Orden marcada como entregada");
-      await fetchData(); // ← reemplaza el fetch manual de tablas
+      await fetchData();
     } catch {
       showToast("❌ Error al actualizar");
       await fetchData();
@@ -551,14 +776,19 @@ export default function MeseroPage() {
   };
 
   // Una mesa puede pedir cuenta solo si tiene alguna orden en estado "delivered"
+  // y ninguna orden pendiente/en cocina/lista
   const isTableDelivered = (tableId: string) => {
     const tableOrders = activeOrders.filter(o => o.table_id === tableId);
-    const hasActiveOrder = tableOrders.some(o => 
+    const hasActiveOrder = tableOrders.some(o =>
       ["pending", "in_kitchen", "ready"].includes(o.status)
     );
     const hasDelivered = tableOrders.some(o => o.status === "delivered");
     return hasDelivered && !hasActiveOrder;
   };
+
+  // Órdenes visibles en la sección "Órdenes Activas":
+  // se muestran TODAS excepto paid y cancelled — incluye delivered
+  const visibleOrders = activeOrders.filter(o => !["paid", "cancelled", "delivered"].includes(o.status));
 
   const occupiedCount  = tables.filter(t => ["Ocupada", "Cuenta solicitada"].includes(t.status)).length;
   const reservedCount  = tables.filter(t => t.status === "Reservada").length;
@@ -595,6 +825,14 @@ export default function MeseroPage() {
         </div>
       </div>
 
+      {/* Banner alerta inventario */}
+      {inventoryAlertas && inventoryAlertas.length > 0 && (
+        <InventoryAlertBanner
+          alertas={inventoryAlertas}
+          onClose={() => setInventoryAlertas(null)}
+        />
+      )}
+
       {/* Toast */}
       {toast && (
         <div style={{ position: "fixed", top: 20, left: "50%", transform: "translateX(-50%)", zIndex: 9999, background: "#111", color: "#fff", padding: "12px 24px", borderRadius: 10, fontSize: 13, fontWeight: 600, boxShadow: "0 8px 32px rgba(0,0,0,0.25)", whiteSpace: "nowrap" }}>
@@ -626,26 +864,40 @@ export default function MeseroPage() {
             )}
           </div>
 
-          {/* Órdenes activas */}
-          {activeOrders.filter(o => !["paid", "cancelled", "delivered"].includes(o.status)).length > 0 && (
-            <div style={{ background: "#fff", borderRadius: 20, border: "1.5px solid #f3f4f6", padding: "24px" }}>
-              <h2 style={{ margin: "0 0 4px", fontSize: 16, fontWeight: 800, color: "#111" }}>Órdenes Activas</h2>
-              <p style={{ margin: "0 0 20px", fontSize: 13, color: "#9ca3af" }}>Seguimiento de órdenes en proceso</p>
-              <div key={refreshKey} style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-                {activeOrders
-                  .filter(o => !["paid", "cancelled","delivered"].includes(o.status))
-                  .map(order => (
-                    <ActiveOrderCard
-                      key={`${order._id}-${order.status}`}
-                      order={order}
-                      onMarkServed={handleMarkServed}
-                      onRequestBill={handleRequestBill}
-                      loading={actionLoading}
-                    />
-                  ))}
+          {/* Órdenes activas — siempre visible, con estado vacío si no hay */}
+          <div style={{ background: "#fff", borderRadius: 20, border: "1.5px solid #f3f4f6", padding: "24px" }}>
+            <h2 style={{ margin: "0 0 4px", fontSize: 16, fontWeight: 800, color: "#111" }}>Órdenes Activas</h2>
+            <p style={{ margin: "0 0 20px", fontSize: 13, color: "#9ca3af" }}>Seguimiento de órdenes en proceso</p>
+
+            {loadingData ? (
+              <p style={{ color: "#9ca3af", fontSize: 13, textAlign: "center", padding: 32 }}>Cargando órdenes...</p>
+            ) : visibleOrders.length === 0 ? (
+              <div style={{
+                textAlign: "center", padding: "40px 16px",
+                border: "2px dashed #e5e7eb", borderRadius: 14,
+              }}>
+                <div style={{ fontSize: 36, marginBottom: 10 }}>📋</div>
+                <p style={{ margin: 0, fontSize: 14, fontWeight: 600, color: "#6b7280" }}>
+                  No hay órdenes activas
+                </p>
+                <p style={{ margin: "6px 0 0", fontSize: 12, color: "#9ca3af" }}>
+                  Las nuevas órdenes aparecerán aquí automáticamente
+                </p>
               </div>
-            </div>
-          )}
+            ) : (
+              <div key={refreshKey} style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+                {visibleOrders.map(order => (
+                  <ActiveOrderCard
+                    key={`${order._id}-${order.status}`}
+                    order={order}
+                    onMarkServed={handleMarkServed}
+                    onRequestBill={handleRequestBill}
+                    loading={actionLoading}
+                  />
+                ))}
+              </div>
+            )}
+          </div>
         </div>
 
         {/* Sidebar */}

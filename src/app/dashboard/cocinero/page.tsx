@@ -766,9 +766,12 @@ export default function CocineroPage() {
       {/* ── Filtros de categoría ── */}
       {allCategories.length > 0 && (
         <div style={{
-          padding: `12px ${px} 0`,
+          paddingTop: "12px",
+          paddingRight: px,
+          paddingBottom: 4,
+          paddingLeft: px,
           display: "flex", gap: 8,
-          overflowX: "auto", paddingBottom: 4,
+          overflowX: "auto",
           WebkitOverflowScrolling: "touch",
           msOverflowStyle: "none",
           scrollbarWidth: "none",

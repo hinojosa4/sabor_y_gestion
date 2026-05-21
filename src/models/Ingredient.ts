@@ -34,8 +34,8 @@ const IngredientSchema = new Schema<IIngredient>(
     currentStock: {
       type: Number,
       required: [true, "El stock actual es obligatorio"],
-      min: [0, "El stock no puede ser negativo"],
       default: 0,
+      // ← sin min
     },
     // 🔴 Si el stock llega aquí, el restaurante no puede operar con normalidad
     minStock: {
