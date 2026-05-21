@@ -15,7 +15,6 @@ interface FacturaFinalProps {
     orderId: string;
     tableNumber: number | null;
     items: OrderItem[];
-    subtotal: number;
     iva: number;
     total: number;
     paymentMethod: 'cash' | 'qr';
@@ -55,7 +54,6 @@ export function FacturaFinal({
     orderId,
     tableNumber,
     items,
-    subtotal,
     total,
     paymentMethod,
     cashReceived,
@@ -136,7 +134,7 @@ export function FacturaFinal({
                                 <th style={{ textAlign: "left", padding: "0.5rem 0", fontSize: "0.75rem" }}>Producto</th>
                                 <th style={{ textAlign: "center", padding: "0.5rem 0", fontSize: "0.75rem" }}>Cant.</th>
                                 <th style={{ textAlign: "right", padding: "0.5rem 0", fontSize: "0.75rem" }}>Precio</th>
-                                <th style={{ textAlign: "right", padding: "0.5rem 0", fontSize: "0.75rem" }}>Subtotal</th>
+                                <th style={{ textAlign: "right", padding: "0.5rem 0", fontSize: "0.75rem" }}>Total</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -152,7 +150,6 @@ export function FacturaFinal({
                     </table>
 
                     <div style={{ textAlign: "right", marginBottom: "1rem" }}>
-                        <p style={{ margin: 0, fontSize: "0.75rem" }}>Subtotal: {formatCurrency(subtotal)}</p>
                         <p style={{ margin: "0.5rem 0 0", fontWeight: "bold" }}>Total: {formatCurrency(total)}</p>
 
                         {paymentMethod === 'cash' && cashReceived !== undefined && (
