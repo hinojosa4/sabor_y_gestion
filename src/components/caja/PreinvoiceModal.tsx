@@ -116,21 +116,11 @@ const totalsContainerStyle: React.CSSProperties = {
   marginTop: "0.5rem",
 };
 
-const totalRowStyle: React.CSSProperties = {
-  display: "flex",
-  justifyContent: "space-between",
-  fontSize: "0.875rem",
-  marginBottom: "0.5rem",
-};
-
 const grandTotalStyle: React.CSSProperties = {
   display: "flex",
   justifyContent: "space-between",
   fontWeight: "var(--font-weight-medium)",
   fontSize: "1.125rem",
-  marginTop: "1rem",
-  paddingTop: "0.5rem",
-  borderTop: `1px solid var(--border)`,
 };
 
 const actionsStyle: React.CSSProperties = {
@@ -274,10 +264,6 @@ export function PreinvoiceModal({
               </div>
 
               <div style={totalsContainerStyle}>
-                <div style={totalRowStyle}>
-                  <span>Subtotal</span>
-                  <span>{formatCurrency(displaySubtotal)}</span>
-                </div>
                 <div style={grandTotalStyle}>
                   <span>Total</span>
                   <span>{formatCurrency(displayTotal)}</span>
@@ -337,7 +323,7 @@ export function PreinvoiceModal({
                 <th style={{ textAlign: 'left', padding: '0.5rem 0' }}>Plato</th>
                 <th style={{ textAlign: 'center', padding: '0.5rem 0' }}>Cantidad</th>
                 <th style={{ textAlign: 'right', padding: '0.5rem 0' }}>Precio</th>
-                <th style={{ textAlign: 'right', padding: '0.5rem 0' }}>Subtotal</th>
+                <th style={{ textAlign: 'right', padding: '0.5rem 0' }}>Total</th>
               </tr>
             </thead>
             <tbody>
@@ -352,7 +338,6 @@ export function PreinvoiceModal({
             </tbody>
           </table>
           <div style={{ marginTop: '1rem', textAlign: 'right' }}>
-            <p>Subtotal: {formatCurrency(displaySubtotal)}</p>
             <p><strong>Total: {formatCurrency(displayTotal)}</strong></p>
           </div>
 
