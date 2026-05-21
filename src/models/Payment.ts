@@ -6,6 +6,7 @@ export interface IPayment extends Document {
   amount: number;
   method: 'cash' | 'card' | 'qr';
   status: 'pending' | 'completed';
+  customer_email?: string;
   timestamp: Date;
 }
 
@@ -14,6 +15,7 @@ const PaymentSchema = new Schema<IPayment>({
   amount: { type: Number, required: true },
   method: { type: String, enum: ['cash', 'card', 'qr'], required: true },
   status: { type: String, enum: ['pending', 'completed'], default: 'pending' },
+  customer_email: { type: String, trim: true, default: null },
   timestamp: { type: Date, default: Date.now },
 });
 

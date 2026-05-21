@@ -56,7 +56,6 @@ export function FacturaFinal({
     tableNumber,
     items,
     subtotal,
-    iva,
     total,
     paymentMethod,
     cashReceived,
@@ -154,7 +153,6 @@ export function FacturaFinal({
 
                     <div style={{ textAlign: "right", marginBottom: "1rem" }}>
                         <p style={{ margin: 0, fontSize: "0.75rem" }}>Subtotal: {formatCurrency(subtotal)}</p>
-                        <p style={{ margin: 0, fontSize: "0.75rem" }}>IVA (13%): {formatCurrency(iva)}</p>
                         <p style={{ margin: "0.5rem 0 0", fontWeight: "bold" }}>Total: {formatCurrency(total)}</p>
 
                         {paymentMethod === 'cash' && cashReceived !== undefined && (
