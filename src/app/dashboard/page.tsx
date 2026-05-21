@@ -23,6 +23,12 @@ interface Stats {
   clienteCount: number;
 }
 
+interface RevenueStats {
+  salesTotal: number;
+  cashTotal: number;
+  qrTotal: number;
+}
+
 const ROL_LABEL: Record<string, string> = {
   admin: "Administrador",
   cajero: "Cajero",
@@ -44,6 +50,12 @@ export default function DashboardPage() {
     cocineroCount: 0, meseroCount: 0, clienteCount: 0,
   });
   const [loading, setLoading] = useState(true);
+  const [revenue, setRevenue] = useState<RevenueStats>({
+    salesTotal: 0,
+    cashTotal: 0,
+    qrTotal: 0,
+  });
+  const [revenueLoading, setRevenueLoading] = useState(true);
   const [time, setTime] = useState(new Date());
   const [isMobile, setIsMobile] = useState(false);
 
@@ -108,10 +120,66 @@ export default function DashboardPage() {
     }
   }, []); // sin dependencias — solo llama APIs públicas
 
+  const fetchRevenue = useCallback(async () => {
+    try {
+      const res = await fetch("/api/cash-register/current");
+      const data = await res.json();
+
+      if (!res.ok || data.status === "cerrado") {
+        setRevenue({ salesTotal: 0, cashTotal: 0, qrTotal: 0 });
+        return;
+      }
+
+      setRevenue({
+        salesTotal: data.salesTotal || 0,
+        cashTotal: data.cashTotal || 0,
+        qrTotal: data.qrTotal || 0,
+      });
+    } catch (error) {
+      console.error("Error al obtener ingresos del dashboard:", error);
+      setRevenue({ salesTotal: 0, cashTotal: 0, qrTotal: 0 });
+    } finally {
+      setRevenueLoading(false);
+    }
+  }, []);
+
   useEffect(() => {
     if (userLoading || !user) return;
     fetchStats();
-  }, [userLoading, user, fetchStats]); // ← sin eslint-disable, dependencias correctas
+    fetchRevenue();
+  }, [userLoading, user, fetchStats, fetchRevenue]); // dependencias correctas
+
+  useEffect(() => {
+    if (userLoading || !user) return;
+
+    let pusherInstance: InstanceType<typeof import("pusher-js")["default"]> | null = null;
+    let mounted = true;
+
+    const setup = async () => {
+      const { default: Pusher } = await import("pusher-js");
+      if (!mounted) return;
+
+      pusherInstance = new Pusher(process.env.NEXT_PUBLIC_PUSHER_KEY!, {
+        cluster: process.env.NEXT_PUBLIC_PUSHER_CLUSTER!,
+      });
+
+      const channel = pusherInstance.subscribe("restaurant");
+      channel.bind("payment:completed", () => {
+        if (mounted) fetchRevenue();
+      });
+      channel.bind("table:updated", () => {
+        if (mounted) fetchRevenue();
+      });
+    };
+
+    setup();
+
+    return () => {
+      mounted = false;
+      pusherInstance?.unsubscribe("restaurant");
+      pusherInstance?.disconnect();
+    };
+  }, [userLoading, user, fetchRevenue]);
 
   // ── resto del componente sin cambios ──────────────────────────────────────
   const greeting = () => {
@@ -126,6 +194,13 @@ export default function DashboardPage() {
 
   const formatDate = (d: Date) =>
     d.toLocaleDateString("es-BO", { weekday: "long", day: "numeric", month: "long" });
+
+  const formatCurrency = (amount: number) =>
+    new Intl.NumberFormat("es-BO", {
+      style: "currency",
+      currency: "BOB",
+      maximumFractionDigits: 2,
+    }).format(amount);
 
   if (userLoading) {
     return (
@@ -144,6 +219,7 @@ export default function DashboardPage() {
     { label: "Categorías",   value: loading ? "—" : stats.totalCategories, sub: loading ? "" : `${stats.activeCategories} activas`,    subColor: "#27ae60", icon: "🏷️", iconBg: "#f0f6ff" },
     { label: "Usuarios",     value: loading ? "—" : stats.totalUsers,      sub: loading ? "" : `${stats.activeUsers} activos`,         subColor: "#27ae60", icon: "👥",  iconBg: "#f0fdf4" },
     { label: "Mesas",        value: loading ? "—" : stats.totalTables,     sub: loading ? "" : `${stats.availableTables} libres`,      subColor: "#7c3aed", icon: "🪑",  iconBg: "#f5f3ff" },
+    { label: "Ingresos",     value: revenueLoading ? "—" : formatCurrency(revenue.salesTotal), sub: revenueLoading ? "" : `Efectivo ${formatCurrency(revenue.cashTotal)} · QR ${formatCurrency(revenue.qrTotal)}`, subColor: "#e85d26", icon: "Bs", iconBg: "#fff8f5" },
   ];
 
   const quickActions = [
@@ -167,8 +243,6 @@ export default function DashboardPage() {
     { label: "Ocupadas",   count: stats.occupiedTables,  color: "#e85d26", icon: "🔴" },
     { label: "Reservadas", count: stats.reservedTables,  color: "#2563eb", icon: "🔵" },
   ];
-
-  const px = isMobile ? "16px" : "40px";
 
   return (
     <div style={{ minHeight: "100vh", background: "#f8f7f4", fontFamily: "'Georgia', serif" }}>
