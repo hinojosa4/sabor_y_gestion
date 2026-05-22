@@ -1,5 +1,7 @@
 "use client";
 
+// src/app/dashboard/cliente/delivery/page.tsx
+
 import React, { useMemo, useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/useAuth";
@@ -10,6 +12,7 @@ import { DeliveryEstimateBanner } from "@/components/clientScreen/delivery/Deliv
 import { CategoryTabs } from "@/components/clientScreen/delivery/CategoryTabs";
 import { DishCard, Dish } from "@/components/clientScreen/delivery/DishCard";
 import { OrderCart, CartItem } from "@/components/clientScreen/delivery/OrderCart";
+import { haversineKm, calcDeliveryFee, DELIVERY_CONFIG } from "@/lib/deliveryConfig";
 
 // ── Tipos ──────────────────────────────────────────────────────────────────────
 
@@ -22,6 +25,16 @@ interface ApiDish {
 
 type PaymentMethod = "Efectivo" | "QR / Transferencia";
 const PAYMENT_METHODS: PaymentMethod[] = ["Efectivo", "QR / Transferencia"];
+
+// Estado del proceso de geolocalización
+type GeoStatus =
+  | "idle"          // sin iniciar
+  | "requesting"    // solicitando permiso al navegador
+  | "locating"      // obteniendo coordenadas
+  | "done"          // coordenadas obtenidas, fee calculado
+  | "out_of_range"  // fuera del radio de 4 km
+  | "denied"        // permiso denegado
+  | "error";        // error genérico
 
 const BG_COLORS = [
   "#fde68a","#fecaca","#bbf7d0","#fed7aa",
@@ -50,17 +63,24 @@ export default function DeliveryPage() {
   const [cart, setCart]         = useState<CartItem[]>([]);
   const [submitting, setSubmitting] = useState(false);
 
-  const [toastMsg, setToastMsg]     = useState<string | null>(null);
-  const [toastType, setToastType]   = useState<"success" | "info">("success");
+  const [toastMsg, setToastMsg]   = useState<string | null>(null);
+  const [toastType, setToastType] = useState<"success" | "info">("success");
 
-  const [showOrderForm, setShowOrderForm]   = useState(false);
-  const [address, setAddress]               = useState("");
-  const [phone, setPhone]                   = useState("");
-  const [paymentMethod, setPaymentMethod]   = useState<PaymentMethod>("Efectivo");
-  const [notes, setNotes]                   = useState("");
-  const [lastOrderId, setLastOrderId]       = useState<string | null>(null);
+  const [showOrderForm, setShowOrderForm] = useState(false);
+  const [address, setAddress]             = useState("");
+  const [phone, setPhone]                 = useState("");
+  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("Efectivo");
+  const [notes, setNotes]                 = useState("");
+  const [lastOrderId, setLastOrderId]     = useState<string | null>(null);
 
-  // ── Carga de datos ────────────────────────────────────────────────────────────
+  // ── Estado de geolocalización ─────────────────────────────────────────────
+  const [geoStatus, setGeoStatus]       = useState<GeoStatus>("idle");
+  const [geoError, setGeoError]         = useState<string | null>(null);
+  const [clientCoords, setClientCoords] = useState<{ lat: number; lng: number } | null>(null);
+  const [distanceKm, setDistanceKm]     = useState<number | null>(null);
+  const [deliveryFee, setDeliveryFee]   = useState<number | null | undefined>(undefined);
+
+  // ── Carga de datos ────────────────────────────────────────────────────────
   const loadData = useCallback(async () => {
     setLoadingData(true);
     setLoadError(null);
@@ -80,7 +100,78 @@ export default function DeliveryPage() {
 
   useEffect(() => { if (!authLoading) loadData(); }, [authLoading, loadData]);
 
-  // ── Pusher: escuchar cambios de estado de MI última orden ─────────────────────
+  // ── Geolocalización ───────────────────────────────────────────────────────
+  const requestGeolocation = useCallback(() => {
+    if (!navigator.geolocation) {
+      setGeoStatus("error");
+      setGeoError("Tu navegador no soporta geolocalización. Ingresa tu dirección manualmente.");
+      return;
+    }
+
+    setGeoStatus("requesting");
+    setGeoError(null);
+    setClientCoords(null);
+    setDistanceKm(null);
+    setDeliveryFee(undefined);
+
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        const lat = pos.coords.latitude;
+        const lng = pos.coords.longitude;
+        setGeoStatus("locating");
+
+        const dist = haversineKm(
+          DELIVERY_CONFIG.restaurant.lat,
+          DELIVERY_CONFIG.restaurant.lng,
+          lat,
+          lng,
+        );
+        const fee = calcDeliveryFee(dist);
+
+        setClientCoords({ lat, lng });
+        setDistanceKm(Math.round(dist * 100) / 100);
+
+        if (fee === null) {
+          setDeliveryFee(null);
+          setGeoStatus("out_of_range");
+        } else {
+          setDeliveryFee(fee);
+          setGeoStatus("done");
+        }
+      },
+      (err) => {
+        if (err.code === err.PERMISSION_DENIED) {
+          setGeoStatus("denied");
+          setGeoError("Permiso de ubicación denegado. Ingresa tu dirección manualmente y el costo de envío se calculará al confirmar.");
+        } else {
+          setGeoStatus("error");
+          setGeoError("No pudimos obtener tu ubicación. Verifica tu conexión e intenta de nuevo.");
+        }
+        setDeliveryFee(undefined);
+      },
+      { enableHighAccuracy: true, timeout: 10000, maximumAge: 60000 }
+    );
+  }, []);
+
+  // Solicitar geolocalización automáticamente al abrir el modal
+  useEffect(() => {
+    if (showOrderForm && geoStatus === "idle") {
+      requestGeolocation();
+    }
+  }, [showOrderForm, geoStatus, requestGeolocation]);
+
+  // Limpiar estado geo al cerrar el modal
+  const handleCloseModal = useCallback(() => {
+    if (submitting) return;
+    setShowOrderForm(false);
+    setGeoStatus("idle");
+    setGeoError(null);
+    setClientCoords(null);
+    setDistanceKm(null);
+    setDeliveryFee(undefined);
+  }, [submitting]);
+
+  // ── Pusher ─────────────────────────────────────────────────────────────────
   useEffect(() => {
     if (!lastOrderId) return;
 
@@ -111,12 +202,10 @@ export default function DeliveryPage() {
     };
 
     let cancelled = false;
-
     getPusherClient().then((client) => {
       if (cancelled) return;
       const channel = client.subscribe("restaurant");
       const deliveryChannel = client.subscribe("delivery");
-
       channel.bind("order:status_updated", handleStatusUpdate);
       channel.bind("order:updated", handleKitchenUpdate);
       deliveryChannel.bind("order:status_updated", handleStatusUpdate);
@@ -132,7 +221,7 @@ export default function DeliveryPage() {
     };
   }, [lastOrderId]);
 
-  // ── Mapeos ────────────────────────────────────────────────────────────────────
+  // ── Mapeos ─────────────────────────────────────────────────────────────────
   const dishes: Dish[] = useMemo(() =>
     apiDishes.map((d, i) => ({
       id: d._id, name: d.name, description: d.description ?? "",
@@ -149,9 +238,9 @@ export default function DeliveryPage() {
     [dishes, selectedCategory]
   );
 
-  const cartTotal = cart.reduce((s, it) => s + it.dish.price * it.quantity, 0);
+  const cartSubtotal = cart.reduce((s, it) => s + it.dish.price * it.quantity, 0);
 
-  // ── Carrito ───────────────────────────────────────────────────────────────────
+  // ── Carrito ────────────────────────────────────────────────────────────────
   const handleAdd = (dish: Dish) =>
     setCart((prev) => {
       const ex = prev.find((it) => it.dish.id === dish.id);
@@ -171,9 +260,10 @@ export default function DeliveryPage() {
 
   const handleRemove = (id: string) => setCart((prev) => prev.filter((it) => it.dish.id !== id));
 
-  // ── Confirmar orden ───────────────────────────────────────────────────────────
+  // ── Confirmar orden ────────────────────────────────────────────────────────
   const handleConfirmOrder = async () => {
     if (!address.trim()) return;
+    if (deliveryFee === null) return; // fuera de rango, no debería llegar aquí
     const token = localStorage.getItem("token");
     if (!token) return;
 
@@ -185,9 +275,12 @@ export default function DeliveryPage() {
         body: JSON.stringify({
           service_type: "delivery",
           delivery_address: address.trim(),
+          delivery_coords: clientCoords ?? undefined,
           delivery_phone: phone.trim() || undefined,
           payment_method: paymentMethod,
           notes: notes.trim() || undefined,
+          delivery_fee: deliveryFee,
+          delivery_distance_km: distanceKm,
           items: cart.map((it) => ({
             dish_id: it.dish.id, quantity: it.quantity, unit_price: it.dish.price,
           })),
@@ -197,8 +290,9 @@ export default function DeliveryPage() {
       if (!json.ok) throw new Error(json.message ?? "Error al crear orden");
 
       setLastOrderId(json.data.order._id);
-      setCart([]); setAddress(""); setPhone(""); setNotes(""); setPaymentMethod("Efectivo");
-      setShowOrderForm(false);
+      setCart([]);
+      setAddress(""); setPhone(""); setNotes(""); setPaymentMethod("Efectivo");
+      handleCloseModal();
       setToastMsg("✅ ¡Pedido enviado! Te avisaremos cuando esté en camino.");
       setToastType("success");
       setTimeout(() => setToastMsg(null), 5000);
@@ -208,6 +302,19 @@ export default function DeliveryPage() {
       setSubmitting(false);
     }
   };
+
+  // ── Helpers de UI ──────────────────────────────────────────────────────────
+  const canConfirm =
+    address.trim().length > 0 &&
+    !submitting &&
+    deliveryFee !== null &&     // no fuera de rango
+    geoStatus !== "requesting" &&
+    geoStatus !== "locating";
+
+  const totalConEnvio =
+    typeof deliveryFee === "number"
+      ? cartSubtotal + deliveryFee
+      : cartSubtotal;
 
   if (authLoading) return <main style={s.main}><div style={s.centered}>Verificando sesión…</div></main>;
 
@@ -248,6 +355,8 @@ export default function DeliveryPage() {
         <aside style={s.sidebar}>
           <OrderCart
             items={cart}
+            shippingFee={deliveryFee}
+            distanceKm={distanceKm}
             onIncrement={handleIncrement}
             onDecrement={handleDecrement}
             onRemove={handleRemove}
@@ -256,16 +365,87 @@ export default function DeliveryPage() {
         </aside>
       </div>
 
+      {/* ── Modal de confirmación ─────────────────────────────────────────── */}
       {showOrderForm && (
-        <div style={s.overlay} onClick={() => !submitting && setShowOrderForm(false)}>
+        <div style={s.overlay} onClick={handleCloseModal}>
           <div style={s.modal} onClick={(e) => e.stopPropagation()}>
             <h3 style={s.modalTitle}>Confirmar pedido</h3>
 
+            {/* Resumen de productos */}
             <div style={s.summaryBox}>
               <span style={s.summaryText}>{cart.length} producto{cart.length !== 1 ? "s" : ""}</span>
-              <span style={s.summaryTotal}>${cartTotal.toFixed(2)}</span>
+              <span style={s.summaryTotal}>Bs. {cartSubtotal.toFixed(2)}</span>
             </div>
 
+            {/* ── Bloque de geolocalización ─────────────────────────────── */}
+            <div style={s.geoBlock}>
+              <div style={s.geoHeader}>
+                <span style={s.geoTitle}>📍 Ubicación de entrega</span>
+                {(geoStatus === "error" || geoStatus === "denied" || geoStatus === "out_of_range") && (
+                  <button style={s.geoRetryBtn} onClick={requestGeolocation} disabled={submitting}>
+                    Reintentar
+                  </button>
+                )}
+              </div>
+
+              {/* Solicitando */}
+              {(geoStatus === "requesting" || geoStatus === "locating") && (
+                <div style={s.geoStatusRow}>
+                  <span style={s.geoSpinner}>⏳</span>
+                  <span style={s.geoStatusText}>Obteniendo tu ubicación…</span>
+                </div>
+              )}
+
+              {/* Éxito */}
+              {geoStatus === "done" && distanceKm !== null && deliveryFee !== null && (
+                <div style={s.geoSuccess}>
+                  <div style={s.geoSuccessRow}>
+                    <span style={s.geoSuccessIcon}>✅</span>
+                    <span style={s.geoSuccessText}>Ubicación detectada</span>
+                  </div>
+                  <div style={s.geoDetails}>
+                    <div style={s.geoDetailItem}>
+                      <span style={s.geoDetailLabel}>Distancia:</span>
+                      <span style={s.geoDetailValue}>{distanceKm.toFixed(2)} km</span>
+                    </div>
+                    <div style={s.geoDetailItem}>
+                      <span style={s.geoDetailLabel}>Costo de envío:</span>
+                      <span style={{ ...s.geoDetailValue, color: "#f97316", fontWeight: 700 }}>
+                        Bs. {(deliveryFee as number).toFixed(2)}
+                      </span>
+                    </div>
+                    <div style={s.geoDetailItem}>
+                      <span style={s.geoDetailLabel}>Total con envío:</span>
+                      <span style={{ ...s.geoDetailValue, color: "#059669", fontWeight: 700 }}>
+                        Bs. {totalConEnvio.toFixed(2)}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Fuera de rango */}
+              {geoStatus === "out_of_range" && distanceKm !== null && (
+                <div style={s.geoError}>
+                  <span>❌ Tu ubicación está a <strong>{distanceKm.toFixed(2)} km</strong> del restaurante.</span>
+                  <span style={s.geoErrorSub}>
+                    Solo realizamos entregas dentro de los {DELIVERY_CONFIG.maxDistanceKm} km. Lo sentimos.
+                  </span>
+                </div>
+              )}
+
+              {/* Permiso denegado o error */}
+              {(geoStatus === "denied" || geoStatus === "error") && geoError && (
+                <div style={{ ...s.geoError, ...s.geoErrorWarning }}>
+                  <span>⚠️ {geoError}</span>
+                  <span style={s.geoErrorSub}>
+                    Puedes continuar sin geolocalización. El costo de envío se calculará con tu dirección.
+                  </span>
+                </div>
+              )}
+            </div>
+
+            {/* Dirección */}
             <label style={s.label}>Dirección de entrega *</label>
             <input
               style={s.input}
@@ -275,6 +455,7 @@ export default function DeliveryPage() {
               disabled={submitting}
             />
 
+            {/* Teléfono */}
             <label style={s.label}>Teléfono de contacto (opcional)</label>
             <input
               style={s.input}
@@ -284,6 +465,7 @@ export default function DeliveryPage() {
               disabled={submitting}
             />
 
+            {/* Forma de pago */}
             <label style={s.label}>Forma de pago *</label>
             <div style={s.paymentGrid}>
               {PAYMENT_METHODS.map((m) => (
@@ -302,6 +484,7 @@ export default function DeliveryPage() {
               ))}
             </div>
 
+            {/* Notas */}
             <label style={s.label}>Notas adicionales (opcional)</label>
             <textarea
               style={s.textarea}
@@ -312,14 +495,44 @@ export default function DeliveryPage() {
               disabled={submitting}
             />
 
+            {/* Resumen final visible solo cuando hay fee calculado */}
+            {geoStatus === "done" && typeof deliveryFee === "number" && (
+              <div style={s.finalSummary}>
+                <div style={s.finalRow}>
+                  <span style={s.finalLabel}>Subtotal</span>
+                  <span style={s.finalValue}>Bs. {cartSubtotal.toFixed(2)}</span>
+                </div>
+                <div style={s.finalRow}>
+                  <span style={s.finalLabel}>Envío ({distanceKm?.toFixed(2)} km)</span>
+                  <span style={s.finalValue}>Bs. {deliveryFee.toFixed(2)}</span>
+                </div>
+                <div style={{ ...s.finalRow, ...s.finalRowTotal }}>
+                  <span style={s.finalLabelTotal}>Total</span>
+                  <span style={s.finalValueTotal}>Bs. {totalConEnvio.toFixed(2)}</span>
+                </div>
+              </div>
+            )}
+
+            {/* Acciones */}
             <div style={s.modalActions}>
-              <button style={s.cancelBtn} onClick={() => setShowOrderForm(false)} disabled={submitting}>
+              <button style={s.cancelBtn} onClick={handleCloseModal} disabled={submitting}>
                 Cancelar
               </button>
               <button
-                style={{ ...s.confirmBtn, opacity: !address.trim() || submitting ? 0.6 : 1 }}
+                style={{
+                  ...s.confirmBtn,
+                  opacity: !canConfirm ? 0.6 : 1,
+                  cursor: !canConfirm ? "not-allowed" : "pointer",
+                }}
                 onClick={handleConfirmOrder}
-                disabled={!address.trim() || submitting}
+                disabled={!canConfirm}
+                title={
+                  geoStatus === "out_of_range"
+                    ? "Tu ubicación está fuera del radio de entrega"
+                    : !address.trim()
+                    ? "Ingresa una dirección"
+                    : undefined
+                }
               >
                 {submitting ? "Enviando…" : "Confirmar pedido"}
               </button>
@@ -344,19 +557,56 @@ const s: { [k: string]: React.CSSProperties } = {
   retryBtn:    { backgroundColor: "#f97316", color: "#fff", border: "none", borderRadius: 8, padding: "0.5rem 1.25rem", fontWeight: 600, cursor: "pointer" },
   toast:       { margin: "1rem 2rem 0", padding: "0.85rem 1.25rem", backgroundColor: "#ecfdf5", border: "1px solid #6ee7b7", borderRadius: 10, color: "#065f46", fontWeight: 600, fontSize: "0.95rem" },
   toastInfo:   { backgroundColor: "#fef3c7", border: "1px solid #fcd34d", color: "#92400e" },
+
+  // ── Modal ──────────────────────────────────────────────────────────────────
   overlay:     { position: "fixed", inset: 0, backgroundColor: "rgba(17,24,39,0.55)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000, padding: "1rem" },
-  modal:       { backgroundColor: "#fff", borderRadius: 16, width: "100%", maxWidth: 480, padding: "1.75rem", display: "flex", flexDirection: "column", gap: "0.75rem", boxShadow: "0 25px 50px -12px rgba(0,0,0,0.25)", maxHeight: "90vh", overflowY: "auto" },
+  modal:       { backgroundColor: "#fff", borderRadius: 16, width: "100%", maxWidth: 500, padding: "1.75rem", display: "flex", flexDirection: "column", gap: "0.85rem", boxShadow: "0 25px 50px -12px rgba(0,0,0,0.25)", maxHeight: "90vh", overflowY: "auto" },
   modalTitle:  { margin: 0, fontSize: "1.25rem", fontWeight: 700, color: "#111827" },
   summaryBox:  { display: "flex", justifyContent: "space-between", alignItems: "center", backgroundColor: "#fff7ed", border: "1px solid #fed7aa", borderRadius: 8, padding: "0.65rem 1rem" },
-  summaryText: { margin: 0, fontSize: "0.875rem", color: "#92400e" },
-  summaryTotal:{ margin: 0, fontSize: "1.1rem", fontWeight: 700, color: "#f97316" },
-  label:       { fontSize: "0.85rem", fontWeight: 600, color: "#374151", marginTop: "0.25rem" },
-  input:       { width: "100%", padding: "0.65rem 0.9rem", border: "1px solid #e5e7eb", borderRadius: 8, fontSize: "0.95rem", color: "#111827", outline: "none", boxSizing: "border-box" },
-  textarea:    { width: "100%", padding: "0.65rem 0.9rem", border: "1px solid #e5e7eb", borderRadius: 8, fontSize: "0.9rem", color: "#111827", outline: "none", resize: "vertical", fontFamily: "inherit", boxSizing: "border-box" },
-  paymentGrid: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.75rem" },
-  paymentBtn:  { padding: "0.85rem 0.5rem", borderRadius: 10, borderWidth: "1.5px", borderStyle: "solid", borderColor: "#e5e7eb", backgroundColor: "#f9fafb", color: "#374151", fontSize: "0.9rem", fontWeight: 500, cursor: "pointer", textAlign: "center" },
+  summaryText: { fontSize: "0.875rem", color: "#92400e" },
+  summaryTotal:{ fontSize: "1.1rem", fontWeight: 700, color: "#f97316" },
+
+  // ── Bloque geo ─────────────────────────────────────────────────────────────
+  geoBlock:       { backgroundColor: "#f8fafc", border: "1px solid #e5e7eb", borderRadius: 10, padding: "0.9rem 1rem", display: "flex", flexDirection: "column", gap: "0.6rem" },
+  geoHeader:      { display: "flex", justifyContent: "space-between", alignItems: "center" },
+  geoTitle:       { fontSize: "0.9rem", fontWeight: 600, color: "#374151" },
+  geoRetryBtn:    { fontSize: "0.78rem", fontWeight: 600, color: "#f97316", background: "none", border: "1px solid #fed7aa", borderRadius: 6, padding: "0.2rem 0.65rem", cursor: "pointer" },
+  geoStatusRow:   { display: "flex", alignItems: "center", gap: "0.5rem" },
+  geoSpinner:     { fontSize: "1rem" },
+  geoStatusText:  { fontSize: "0.875rem", color: "#6b7280" },
+
+  geoSuccess:     { display: "flex", flexDirection: "column", gap: "0.5rem" },
+  geoSuccessRow:  { display: "flex", alignItems: "center", gap: "0.4rem" },
+  geoSuccessIcon: { fontSize: "0.95rem" },
+  geoSuccessText: { fontSize: "0.875rem", color: "#059669", fontWeight: 600 },
+  geoDetails:     { display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "0.5rem", backgroundColor: "#fff", border: "1px solid #e5e7eb", borderRadius: 8, padding: "0.6rem 0.75rem" },
+  geoDetailItem:  { display: "flex", flexDirection: "column", gap: 2 },
+  geoDetailLabel: { fontSize: "0.7rem", color: "#9ca3af", textTransform: "uppercase", letterSpacing: "0.04em" },
+  geoDetailValue: { fontSize: "0.9rem", fontWeight: 600, color: "#111827" },
+
+  geoError:       { display: "flex", flexDirection: "column", gap: "0.3rem", backgroundColor: "#fef2f2", border: "1px solid #fecaca", borderRadius: 8, padding: "0.65rem 0.85rem", fontSize: "0.875rem", color: "#b91c1c" },
+  geoErrorWarning:{ backgroundColor: "#fffbeb", borderColor: "#fde68a", color: "#92400e" },
+  geoErrorSub:    { fontSize: "0.78rem", color: "#6b7280", marginTop: 2 },
+
+  // ── Inputs ─────────────────────────────────────────────────────────────────
+  label:        { fontSize: "0.85rem", fontWeight: 600, color: "#374151" },
+  input:        { width: "100%", padding: "0.65rem 0.9rem", border: "1px solid #e5e7eb", borderRadius: 8, fontSize: "0.95rem", color: "#111827", outline: "none", boxSizing: "border-box" },
+  textarea:     { width: "100%", padding: "0.65rem 0.9rem", border: "1px solid #e5e7eb", borderRadius: 8, fontSize: "0.9rem", color: "#111827", outline: "none", resize: "vertical", fontFamily: "inherit", boxSizing: "border-box" },
+  paymentGrid:  { display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.75rem" },
+  paymentBtn:   { padding: "0.85rem 0.5rem", borderRadius: 10, borderWidth: "1.5px", borderStyle: "solid", borderColor: "#e5e7eb", backgroundColor: "#f9fafb", color: "#374151", fontSize: "0.9rem", fontWeight: 500, cursor: "pointer", textAlign: "center" },
   paymentBtnActive: { backgroundColor: "#fff7ed", borderColor: "#f97316", color: "#f97316", fontWeight: 700 },
-  modalActions:{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.75rem", marginTop: "0.25rem" },
-  cancelBtn:   { backgroundColor: "#fff", color: "#111827", border: "1px solid #e5e7eb", borderRadius: 10, padding: "0.75rem", fontWeight: 600, cursor: "pointer", fontSize: "0.95rem" },
-  confirmBtn:  { backgroundColor: "#f97316", color: "#fff", border: "none", borderRadius: 10, padding: "0.75rem", fontWeight: 600, cursor: "pointer", fontSize: "0.95rem" },
+
+  // ── Resumen final ──────────────────────────────────────────────────────────
+  finalSummary:   { backgroundColor: "#f9fafb", border: "1px solid #e5e7eb", borderRadius: 10, padding: "0.85rem 1rem", display: "flex", flexDirection: "column", gap: "0.4rem" },
+  finalRow:       { display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: "0.875rem" },
+  finalLabel:     { color: "#6b7280" },
+  finalValue:     { fontWeight: 600, color: "#374151" },
+  finalRowTotal:  { paddingTop: "0.5rem", borderTop: "1px solid #e5e7eb", marginTop: "0.2rem" },
+  finalLabelTotal:{ fontSize: "1rem", fontWeight: 700, color: "#111827" },
+  finalValueTotal:{ fontSize: "1.2rem", fontWeight: 700, color: "#059669" },
+
+  // ── Acciones ───────────────────────────────────────────────────────────────
+  modalActions: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.75rem", marginTop: "0.25rem" },
+  cancelBtn:    { backgroundColor: "#fff", color: "#111827", border: "1px solid #e5e7eb", borderRadius: 10, padding: "0.75rem", fontWeight: 600, cursor: "pointer", fontSize: "0.95rem" },
+  confirmBtn:   { backgroundColor: "#f97316", color: "#fff", border: "none", borderRadius: 10, padding: "0.75rem", fontWeight: 600, fontSize: "0.95rem" },
 };

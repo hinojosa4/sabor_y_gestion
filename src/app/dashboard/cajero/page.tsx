@@ -217,13 +217,18 @@ export default function CajeroDashboard() {
 
     const { tables, loading, refreshTables } = useTableData(restaurantId);
 
-    const fetchActiveOrders = useCallback(async () => {
+     const fetchActiveOrders = useCallback(async () => {
         try {
-            const res = await fetch('/api/orders/active');
+            const token = localStorage.getItem("token");
+            const headers: Record<string, string> = token
+                ? { Authorization: `Bearer ${token}` }
+                : {};
+ 
+            const res = await fetch('/api/orders/active', { headers });
             const data = await res.json();
-
+ 
             const nextOrderIdsByTable: Record<string, string> = {};
-
+ 
             if (!res.ok || !data.ok) {
                 console.error('Error al cargar ordenes activas:', data);
             } else {
@@ -234,17 +239,16 @@ export default function CajeroDashboard() {
                     }
                 });
             }
-
+ 
             const tablesNeedingFallback = tables.filter((table) =>
                 table.status !== 'Libre' && !nextOrderIdsByTable[table._id]
             );
-
+ 
             const fallbackOrderIds = await Promise.all(
                 tablesNeedingFallback.map(async (table) => {
                     try {
                         const preinvoiceRes = await fetch(`/api/orders/preinvoice/${encodeURIComponent(table._id)}`);
                         const preinvoiceData = await preinvoiceRes.json();
-
                         if (!preinvoiceRes.ok || !preinvoiceData.orderId) return null;
                         return [table._id, preinvoiceData.orderId] as const;
                     } catch (error) {
@@ -253,13 +257,13 @@ export default function CajeroDashboard() {
                     }
                 })
             );
-
+ 
             fallbackOrderIds.forEach((entry) => {
                 if (!entry) return;
                 const [tableId, orderId] = entry;
                 nextOrderIdsByTable[tableId] = orderId;
             });
-
+ 
             setOrderIdsByTable(nextOrderIdsByTable);
         } catch (error) {
             console.error('Error al cargar ordenes activas:', error);

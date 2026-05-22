@@ -1,9 +1,11 @@
+// src/app/api/orders/cliente/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { connectDB } from "@/lib/db";
 import Order from "@/models/Order";
 import OrderItem from "@/models/OrderItem";
 import { verifyToken } from "@/lib/jwt";
 import { pusherServer } from "@/lib/pusher";
+import { haversineKm, calcDeliveryFee, DELIVERY_CONFIG } from "@/lib/deliveryConfig";
 
 export async function POST(req: NextRequest) {
   try {
@@ -31,10 +33,12 @@ export async function POST(req: NextRequest) {
       delivery_phone,
       table_id,
       notes,
-      payment_method,   // ← nuevo campo
+      payment_method,
+      delivery_fee: clientFee,          // ← recibido del cliente
+      delivery_distance_km: clientDist, // ← recibido del cliente
     } = body;
 
-    // ── Validaciones ──────────────────────────────────────────────────────────
+    // ── Validaciones básicas ──────────────────────────────────────────────────
     const VALID_TYPES = ["delivery", "pick_up", "dine_in"];
     if (!service_type || !VALID_TYPES.includes(service_type)) {
       return NextResponse.json(
@@ -66,11 +70,51 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    const total_amount = items.reduce(
+    // ── Validación server-side del delivery fee ───────────────────────────────
+    // Re-calculamos en el servidor para evitar manipulación desde el cliente.
+    let delivery_fee = 0;
+    let delivery_distance_km: number | null = null;
+
+    if (service_type === "delivery" && delivery_coords?.lat && delivery_coords?.lng) {
+      const distKm = haversineKm(
+        DELIVERY_CONFIG.restaurant.lat,
+        DELIVERY_CONFIG.restaurant.lng,
+        delivery_coords.lat,
+        delivery_coords.lng,
+      );
+      const serverFee = calcDeliveryFee(distKm);
+
+      // Si la distancia supera el límite, rechazar la orden
+      if (serverFee === null) {
+        return NextResponse.json(
+          {
+            ok: false,
+            message: `Lo sentimos, tu ubicación está fuera del radio de entrega (${DELIVERY_CONFIG.maxDistanceKm} km).`,
+          },
+          { status: 400 }
+        );
+      }
+
+      delivery_fee = serverFee;
+      delivery_distance_km = Math.round(distKm * 100) / 100;
+
+      // Sanity-check: si el cliente envió un fee diferente al calculado, usamos el del servidor
+      if (typeof clientFee === "number" && Math.abs(clientFee - serverFee) > 0.5) {
+        console.warn(
+          `[delivery fee mismatch] cliente envió ${clientFee}, servidor calculó ${serverFee}. Usando servidor.`
+        );
+      }
+    }
+
+    // ── Totales ───────────────────────────────────────────────────────────────
+    const items_total = items.reduce(
       (sum: number, i: { quantity: number; unit_price: number }) =>
         sum + i.quantity * i.unit_price,
       0
     );
+
+    // total_amount incluye el costo de envío
+    const total_amount = items_total + delivery_fee;
 
     // ── Crear orden ───────────────────────────────────────────────────────────
     const order = await Order.create({
@@ -80,7 +124,9 @@ export async function POST(req: NextRequest) {
       service_type,
       status: "pending",
       total_amount,
-      payment_method: payment_method ?? "Efectivo",   // ← guardado
+      delivery_fee,
+      delivery_distance_km,
+      payment_method: payment_method ?? "Efectivo",
       table_id: table_id ?? undefined,
       delivery_address: delivery_address ?? undefined,
       delivery_coords: delivery_coords ?? undefined,

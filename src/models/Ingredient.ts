@@ -1,13 +1,15 @@
 import mongoose, { Document, Schema } from "mongoose";
-
+ 
 export type UnitOfMeasure = "kg" | "lt" | "unit" | "gr" | "ml";
 export type StockStatus = "ok" | "low" | "critical";
-
+ 
 export interface IIngredient extends Document {
   name: string;
   currentStock: number;
-  minStock: number;
-  maxStock: number;
+  minStock: number;       // 🔴 Crítico: no alcanza para el servicio
+  warningStock: number;   // 🟡 Bajo: hay que comprar pronto
+  reorderPoint: number;   // 📋 Referencia de gestión: cuándo llamar al proveedor
+  maxStock: number;       // 📦 Capacidad máxima del almacén
   unit: UnitOfMeasure;
   supplier?: string;
   category_id?: mongoose.Types.ObjectId;
@@ -16,9 +18,9 @@ export interface IIngredient extends Document {
   updatedAt: Date;
   stockStatus: StockStatus;
 }
-
+ 
 type IngredientDocType = mongoose.HydratedDocument<IIngredient>;
-
+ 
 const IngredientSchema = new Schema<IIngredient>(
   {
     name: {
@@ -32,14 +34,28 @@ const IngredientSchema = new Schema<IIngredient>(
     currentStock: {
       type: Number,
       required: [true, "El stock actual es obligatorio"],
-      min: [0, "El stock no puede ser negativo"],
       default: 0,
+      // ← sin min
     },
+    // 🔴 Si el stock llega aquí, el restaurante no puede operar con normalidad
     minStock: {
       type: Number,
-      required: [true, "El stock mínimo es obligatorio"],
+      required: [true, "El stock mínimo (crítico) es obligatorio"],
       min: [0, "El stock mínimo no puede ser negativo"],
     },
+    // 🟡 Zona de advertencia: hay que comprar antes de quedarse sin stock
+    warningStock: {
+      type: Number,
+      required: [true, "El stock de advertencia es obligatorio"],
+      min: [0, "El stock de advertencia no puede ser negativo"],
+    },
+    // 📋 Solo gestión: cuándo contactar al proveedor (no afecta badge de color)
+    reorderPoint: {
+      type: Number,
+      required: [true, "El punto de reorden es obligatorio"],
+      min: [0, "El punto de reorden no puede ser negativo"],
+    },
+    // 📦 Capacidad máxima del almacén/frigorífico
     maxStock: {
       type: Number,
       required: [true, "El stock máximo es obligatorio"],
@@ -75,25 +91,58 @@ const IngredientSchema = new Schema<IIngredient>(
     versionKey: false,
   }
 );
-
-// Validación maxStock > minStock separada del schema para evitar problemas de tipado
-IngredientSchema.path("maxStock").validate(function (this: IngredientDocType, value: number) {
+ 
+// ── Validaciones de jerarquía ──────────────────────────────────────────────────
+// Orden obligatorio: minStock < warningStock < reorderPoint < maxStock
+ 
+IngredientSchema.path("warningStock").validate(function (
+  this: IngredientDocType,
+  value: number
+) {
   return value > this.minStock;
-}, "El stock máximo debe ser mayor al stock mínimo");
-
-IngredientSchema.virtual("stockStatus").get(function (this: IngredientDocType): StockStatus {
-  if (this.currentStock <= 0) return "critical";
-  if (this.currentStock <= this.minStock) return "low";
+}, "El stock de advertencia (🟡) debe ser mayor al stock mínimo (🔴)");
+ 
+IngredientSchema.path("reorderPoint").validate(function (
+  this: IngredientDocType,
+  value: number
+) {
+  return value > this.warningStock;
+}, "El punto de reorden debe ser mayor al stock de advertencia (🟡)");
+ 
+IngredientSchema.path("maxStock").validate(function (
+  this: IngredientDocType,
+  value: number
+) {
+  return value > this.reorderPoint;
+}, "El stock máximo debe ser mayor al punto de reorden");
+ 
+/**
+ * Virtual stockStatus — lógica de restaurante real
+ *
+ * Ejemplo con pollo (kg):
+ *   maxStock:     50  → capacidad del frigorífico
+ *   reorderPoint: 15  → llamar al proveedor (gestión, no afecta badge)
+ *   warningStock:  8  → 🟡 BAJO — hay que comprar pronto
+ *   minStock:      2  → 🔴 CRÍTICO — no alcanza para el servicio
+ *
+ *   currentStock = 20 → ok       ✅ (sobre warningStock)
+ *   currentStock =  6 → low      🟡 (entre minStock y warningStock)
+ *   currentStock =  2 → critical 🔴 (en el límite o por debajo)
+ */
+IngredientSchema.virtual("stockStatus").get(function (
+  this: IngredientDocType
+): StockStatus {
+  if (this.currentStock <= this.minStock) return "critical";
+  if (this.currentStock <= this.warningStock) return "low";
   return "ok";
 });
-
+ 
 IngredientSchema.index({ name: "text", supplier: "text" });
-
 IngredientSchema.set("toJSON", { virtuals: true });
 IngredientSchema.set("toObject", { virtuals: true });
-
+ 
 const Ingredient =
   (mongoose.models.Ingredient as mongoose.Model<IIngredient>) ||
   mongoose.model<IIngredient>("Ingredient", IngredientSchema);
-
+ 
 export default Ingredient;

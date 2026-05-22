@@ -10,7 +10,6 @@ import { ComandaCocineroModal } from "@/components/comanda/ComandaModals";
 type OrderStatus = "pending" | "in_kitchen" | "ready" | "delivered" | "paid" | "cancelled";
 type ItemStatus  = "pending" | "in_kitchen" | "ready" | "served" | "cancelled";
 
-
 interface OrderItem {
   _id: string;
   quantity: number;
@@ -25,7 +24,6 @@ interface OrderItem {
   } | null;
 }
 
-
 interface KitchenOrder {
   _id: string;
   status: OrderStatus;
@@ -37,10 +35,19 @@ interface KitchenOrder {
   total_amount: number;
 }
 
+// Alerta de inventario que llega por WebSocket
+interface InventoryAlerta {
+  ingredientId: string;
+  name: string;
+  currentStock: number;
+  unit: string;
+  stockStatus: "low" | "critical";
+  minStock: number;
+  warningStock: number;
+}
 
 // ─── Constantes ───────────────────────────────────────────────────────────────
 const ALLOWED_ROLES: AuthUser["rol"][] = ["cocinero", "admin"];
-
 
 const STATUS_CONFIG = {
   pending:    { label: "Pendiente",      bg: "#fffbeb", border: "#fbbf24", accent: "#d97706", dot: "#f59e0b" },
@@ -48,13 +55,11 @@ const STATUS_CONFIG = {
   ready:      { label: "Listo",          bg: "#f0fdf4", border: "#4ade80", accent: "#16a34a", dot: "#22c55e" },
 };
 
-
 const SERVICE_CONFIG = {
   dine_in:  { label: "Mesa",     icon: "🪑", color: "#6366f1" },
   delivery: { label: "Delivery", icon: "🛵", color: "#8b5cf6" },
   pick_up:  { label: "Pickup",   icon: "🏃", color: "#f59e0b" },
 };
-
 
 // ─── Hook responsive ──────────────────────────────────────────────────────────
 function useIsMobile() {
@@ -68,7 +73,6 @@ function useIsMobile() {
   return isMobile;
 }
 
-
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 function getElapsed(createdAt: string): string {
   const diff = Math.floor((Date.now() - new Date(createdAt).getTime()) / 1000);
@@ -77,11 +81,9 @@ function getElapsed(createdAt: string): string {
   return `${Math.floor(diff / 3600)}h ${Math.floor((diff % 3600) / 60)}min`;
 }
 
-
 function getOrderNumber(id: string): string {
   return "#" + id.slice(-4).toUpperCase();
 }
-
 
 function getUrgency(createdAt: string): "normal" | "warning" | "critical" {
   const mins = Math.floor((Date.now() - new Date(createdAt).getTime()) / 60000);
@@ -90,13 +92,150 @@ function getUrgency(createdAt: string): "normal" | "warning" | "critical" {
   return "normal";
 }
 
-
 const URGENCY_COLORS = {
   normal:   { timer: "#888" },
   warning:  { timer: "#d97706" },
   critical: { timer: "#dc2626" },
 };
 
+// ─── Banner de alerta de inventario ──────────────────────────────────────────
+function InventoryAlertBanner({
+  alertas,
+  onClose,
+}: {
+  alertas: InventoryAlerta[];
+  onClose: () => void;
+}) {
+  const criticos = alertas.filter((a) => a.stockStatus === "critical");
+  const bajos    = alertas.filter((a) => a.stockStatus === "low");
+
+  return (
+    <div
+      role="alert"
+      style={{
+        position: "fixed",
+        top: 70,
+        left: "50%",
+        transform: "translateX(-50%)",
+        zIndex: 9998,
+        width: "min(480px, 92vw)",
+        background: "#fff",
+        borderRadius: 14,
+        border: "2px solid #e85d26",
+        boxShadow: "0 8px 32px rgba(232,93,38,0.18)",
+        overflow: "hidden",
+        animation: "slideDown 0.25s ease",
+      }}
+    >
+      <style>{`
+        @keyframes slideDown {
+          from { opacity: 0; transform: translateX(-50%) translateY(-12px); }
+          to   { opacity: 1; transform: translateX(-50%) translateY(0); }
+        }
+      `}</style>
+
+      {/* Header */}
+      <div style={{
+        background: criticos.length > 0 ? "#fff0ee" : "#fffbeb",
+        padding: "12px 16px",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "space-between",
+        borderBottom: "1.5px solid #f0f0f0",
+      }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <span style={{ fontSize: 18 }}>
+            {criticos.length > 0 ? "🚨" : "⚠️"}
+          </span>
+          <span style={{
+            fontSize: 13,
+            fontWeight: 700,
+            color: criticos.length > 0 ? "#e85d26" : "#d97706",
+          }}>
+            Alerta de Inventario
+          </span>
+        </div>
+        <button
+          onClick={onClose}
+          aria-label="Cerrar alerta"
+          style={{
+            background: "none",
+            border: "none",
+            cursor: "pointer",
+            fontSize: 16,
+            color: "#888",
+            padding: "0 4px",
+          }}
+        >
+          ✕
+        </button>
+      </div>
+
+      {/* Body */}
+      <div style={{ padding: "12px 16px", display: "flex", flexDirection: "column", gap: 8 }}>
+        {criticos.length > 0 && (
+          <div>
+            <p style={{ margin: "0 0 6px", fontSize: 11, fontWeight: 700, color: "#e85d26", textTransform: "uppercase", letterSpacing: "0.05em" }}>
+              🔴 Stock Crítico — Operación en riesgo
+            </p>
+            {criticos.map((a) => (
+              <div key={a.ingredientId} style={{
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+                padding: "6px 10px",
+                background: "#fff0ee",
+                borderRadius: 8,
+                marginBottom: 4,
+                border: "1px solid #fecaca",
+              }}>
+                <span style={{ fontSize: 13, fontWeight: 600, color: "#1a1a1a" }}>
+                  {a.name}
+                </span>
+                <span style={{ fontSize: 12, color: "#e85d26", fontWeight: 700 }}>
+                  {a.currentStock} {a.unit} / mín {a.minStock} {a.unit}
+                </span>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {bajos.length > 0 && (
+          <div>
+            <p style={{ margin: "0 0 6px", fontSize: 11, fontWeight: 700, color: "#d97706", textTransform: "uppercase", letterSpacing: "0.05em" }}>
+              🟡 Stock Bajo — Comprar pronto
+            </p>
+            {bajos.map((a) => (
+              <div key={a.ingredientId} style={{
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+                padding: "6px 10px",
+                background: "#fffbeb",
+                borderRadius: 8,
+                marginBottom: 4,
+                border: "1px solid #fde68a",
+              }}>
+                <span style={{ fontSize: 13, fontWeight: 600, color: "#1a1a1a" }}>
+                  {a.name}
+                </span>
+                <span style={{ fontSize: 12, color: "#d97706", fontWeight: 700 }}>
+                  {a.currentStock} {a.unit} / adv {a.warningStock} {a.unit}
+                </span>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      <div style={{ padding: "8px 16px 14px", textAlign: "center" }}>
+        <p style={{ margin: 0, fontSize: 11, color: "#aaa" }}>
+          Se descargó stock al iniciar preparación de la orden
+        </p>
+      </div>
+    </div>
+  );
+}
 
 // ─── Componente: Timer vivo ───────────────────────────────────────────────────
 function LiveTimer({ createdAt }: { createdAt: string }) {
@@ -125,7 +264,6 @@ function LiveTimer({ createdAt }: { createdAt: string }) {
   );
 }
 
-
 // ─── Componente: Badge de estado ──────────────────────────────────────────────
 function StatusBadge({ status }: { status: OrderStatus }) {
   const cfg = STATUS_CONFIG[status as keyof typeof STATUS_CONFIG];
@@ -140,7 +278,6 @@ function StatusBadge({ status }: { status: OrderStatus }) {
     </span>
   );
 }
-
 
 // ─── Componente: Tarjeta de orden ─────────────────────────────────────────────
 function OrderCard({
@@ -158,8 +295,6 @@ function OrderCard({
   const activeItems = order.items.filter(i => i.status !== "cancelled");
   const readyItems  = activeItems.filter(i => i.status === "ready" || i.status === "served");
   const allReady    = activeItems.length > 0 && readyItems.length === activeItems.length;
-
-  console.log("Order:", order._id, "activeItems:", activeItems.map(i => ({ id: i._id, status: i.status })), "allReady:", allReady);
 
   return (
     <div style={{
@@ -210,7 +345,6 @@ function OrderCard({
           activeItems.map((item, idx) => {
             const isReady = item.status === "ready" || item.status === "served";
             const catName = item.dish_id?.category_id?.name;
-
             return (
               <div key={item._id}>
                 {idx > 0 && <div style={{ height: 1, background: "#f3f4f6", margin: "8px 0" }} />}
@@ -239,24 +373,27 @@ function OrderCard({
                       </p>
                     )}
                   </div>
-
-                  {/* Toggle item — solo en in_kitchen */}
                   {order.status === "in_kitchen" && (
                     <button
                       onClick={() => onItemToggle(item._id, item.status)}
                       disabled={loading}
-                      title={isReady ? "Marcar como pendiente" : "Marcar como listo"}
                       style={{
-                        width: 32, height: 32, borderRadius: "50%",
+                        padding: "5px 12px",
+                        borderRadius: 20,
                         border: `2px solid ${isReady ? "#22c55e" : "#d1d5db"}`,
-                        background: isReady ? "#22c55e" : "#fff",
+                        background: isReady ? "#f0fdf4" : "#f9fafb",
                         cursor: loading ? "not-allowed" : "pointer",
-                        display: "flex", alignItems: "center", justifyContent: "center",
-                        fontSize: 14, color: isReady ? "#fff" : "#9ca3af",
+                        display: "flex", alignItems: "center", gap: 5,
+                        fontSize: 12, fontWeight: 700,
+                        color: isReady ? "#16a34a" : "#6b7280",
                         flexShrink: 0, transition: "all 0.15s",
+                        whiteSpace: "nowrap",
                       }}
                     >
-                      {isReady ? "✓" : "○"}
+                      {isReady
+                        ? <><span style={{ fontSize: 14 }}>✓</span> Listo</>
+                        : <><span style={{ fontSize: 14 }}>○</span> Marcar listo</>
+                      }
                     </button>
                   )}
                 </div>
@@ -266,7 +403,7 @@ function OrderCard({
         )}
       </div>
 
-      {/* Progress bar — in_kitchen */}
+      {/* Progress bar */}
       {order.status === "in_kitchen" && activeItems.length > 0 && (
         <div style={{ padding: "0 16px 8px" }}>
           <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 4 }}>
@@ -336,7 +473,6 @@ function OrderCard({
           </div>
         )}
 
-        {/* ── Botón Ver Comanda ── */}
         <button
           onClick={() => onViewComanda(order._id)}
           style={{
@@ -354,7 +490,6 @@ function OrderCard({
   );
 }
 
-
 // ─── Page principal ───────────────────────────────────────────────────────────
 export default function CocineroPage() {
   const router = useRouter();
@@ -367,7 +502,10 @@ export default function CocineroPage() {
   const [toast, setToast]                 = useState("");
   const [filterCat, setFilterCat]         = useState("all");
   const [lastUpdate, setLastUpdate]       = useState(new Date());
-  const [comandaOrderId, setComandaOrderId] = useState<string | null>(null); // ← nuevo
+  const [comandaOrderId, setComandaOrderId] = useState<string | null>(null);
+
+  // ── Estado para alertas de inventario ────────────────────────────────────
+  const [inventoryAlertas, setInventoryAlertas] = useState<InventoryAlerta[] | null>(null);
 
   const showToast = useCallback((msg: string) => {
     setToast(msg);
@@ -402,15 +540,42 @@ export default function CocineroPage() {
       pusherInstance = new Pusher(process.env.NEXT_PUBLIC_PUSHER_KEY!, {
         cluster: process.env.NEXT_PUBLIC_PUSHER_CLUSTER!,
       });
+
+      // ── Canal de cocina: nuevas órdenes y cambios internos ──────────────
       const channel = pusherInstance.subscribe("restaurant");
-      channel.bind("order:new", () => fetchOrders());
+
+      channel.bind("order:new",     () => fetchOrders());
       channel.bind("order:updated", () => fetchOrders());
+
+      channel.bind("inventory:alert", (data: { alertas: InventoryAlerta[] }) => {
+        if (data.alertas?.length > 0) {
+          setInventoryAlertas(data.alertas);
+          setTimeout(() => setInventoryAlertas(null), 12000);
+        }
+      });
+
+      // ── Canal delivery: escuchar cuando el repartidor recoge la orden ───
+      // Cuando llega picked_up, in_transit o delivered la orden sale de cocina
+      // sin necesidad de refrescar toda la lista.
+      const deliveryChannel = pusherInstance.subscribe("delivery");
+
+      deliveryChannel.bind(
+        "order:status_updated",
+        (data: { orderId: string; status: string }) => {
+          const REMOVE_ON = ["picked_up", "in_transit", "delivered", "paid", "cancelled"];
+          if (REMOVE_ON.includes(data.status)) {
+            setOrders((prev) => prev.filter((o) => o._id !== data.orderId));
+            setLastUpdate(new Date());
+          }
+        }
+      );
     };
 
     setup();
 
     return () => {
       pusherInstance?.unsubscribe("restaurant");
+      pusherInstance?.unsubscribe("delivery");
       pusherInstance?.disconnect();
     };
   }, [userLoading, user, fetchOrders]);
@@ -451,7 +616,6 @@ export default function CocineroPage() {
         body: JSON.stringify({ status: newStatus, chef_id: user?._id }),
       });
       const data = await res.json();
-      console.log("Item toggle response:", data);
       if (!data.ok) {
         showToast("❌ " + data.message);
       } else {
@@ -473,9 +637,7 @@ export default function CocineroPage() {
   const allCategories = Array.from(
     new Set(
       orders.flatMap(o =>
-        o.items
-          .map(i => i.dish_id?.category_id?.name)
-          .filter(Boolean) as string[]
+        o.items.map(i => i.dish_id?.category_id?.name).filter(Boolean) as string[]
       )
     )
   );
@@ -519,7 +681,6 @@ export default function CocineroPage() {
         gap: 12, position: "sticky", top: 0, zIndex: 100,
         flexWrap: isMobile ? "wrap" : "nowrap",
       }}>
-        {/* Logo + título */}
         <div style={{ display: "flex", alignItems: "center", gap: isMobile ? 10 : 14, minWidth: 0 }}>
           <button
             onClick={() => router.push("/dashboard/cocinero")}
@@ -550,9 +711,7 @@ export default function CocineroPage() {
           </div>
         </div>
 
-        {/* Stats + usuario + salir */}
         <div style={{ display: "flex", gap: isMobile ? 6 : 12, alignItems: "center", flexShrink: 0 }}>
-          {/* Stats resumen */}
           <div style={{ display: "flex", gap: isMobile ? 6 : 10 }}>
             {[
               { label: "Pend.",  value: pendingOrders.length,   color: "#d97706" },
@@ -577,7 +736,6 @@ export default function CocineroPage() {
             ))}
           </div>
 
-          {/* Usuario + salir */}
           <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
             {!isMobile && (
               <div style={{ textAlign: "right" }}>
@@ -601,6 +759,14 @@ export default function CocineroPage() {
         </div>
       </div>
 
+      {/* ── Banner alerta inventario ── */}
+      {inventoryAlertas && inventoryAlertas.length > 0 && (
+        <InventoryAlertBanner
+          alertas={inventoryAlertas}
+          onClose={() => setInventoryAlertas(null)}
+        />
+      )}
+
       {/* ── Toast ── */}
       {toast && (
         <div style={{
@@ -620,9 +786,12 @@ export default function CocineroPage() {
       {/* ── Filtros de categoría ── */}
       {allCategories.length > 0 && (
         <div style={{
-          padding: `12px ${px} 0`,
+          paddingTop: "12px",
+          paddingRight: px,
+          paddingBottom: 4,
+          paddingLeft: px,
           display: "flex", gap: 8,
-          overflowX: "auto", paddingBottom: 4,
+          overflowX: "auto",
           WebkitOverflowScrolling: "touch",
           msOverflowStyle: "none",
           scrollbarWidth: "none",
@@ -645,8 +814,6 @@ export default function CocineroPage() {
               {cat === "all" ? "Todos" : cat}
             </button>
           ))}
-
-          {/* Botón refresh manual */}
           <button
             onClick={fetchOrders}
             disabled={actionLoading}
@@ -687,7 +854,6 @@ export default function CocineroPage() {
             </p>
           </div>
         ) : isMobile ? (
-          /* ── Vista mobile: tabs por estado ── */
           <MobileKanban
             columns={columns}
             onStatusChange={handleStatusChange}
@@ -696,7 +862,6 @@ export default function CocineroPage() {
             onViewComanda={setComandaOrderId}
           />
         ) : (
-          /* ── Grid kanban 3 columnas desktop ── */
           <div style={{
             display: "grid",
             gridTemplateColumns: "repeat(3, 1fr)",
@@ -727,7 +892,6 @@ export default function CocineroPage() {
   );
 }
 
-
 // ─── Columna Kanban (desktop) ─────────────────────────────────────────────────
 function KanbanColumn({ col, onStatusChange, onItemToggle, actionLoading, onViewComanda }: {
   col: { key: string; title: string; orders: KitchenOrder[]; color: string; dot: string };
@@ -738,7 +902,6 @@ function KanbanColumn({ col, onStatusChange, onItemToggle, actionLoading, onView
 }) {
   return (
     <div>
-      {/* Cabecera columna */}
       <div style={{
         display: "flex", alignItems: "center", gap: 10,
         marginBottom: 14, padding: "0 4px",
@@ -757,7 +920,6 @@ function KanbanColumn({ col, onStatusChange, onItemToggle, actionLoading, onView
         </span>
       </div>
 
-      {/* Tarjetas */}
       <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
         {col.orders.length === 0 ? (
           <div style={{
@@ -784,8 +946,7 @@ function KanbanColumn({ col, onStatusChange, onItemToggle, actionLoading, onView
   );
 }
 
-
-// ─── Vista mobile: tabs por estado ───────────────────────────────────────────
+// ─── Vista mobile ─────────────────────────────────────────────────────────────
 function MobileKanban({ columns, onStatusChange, onItemToggle, actionLoading, onViewComanda }: {
   columns: { key: string; title: string; orders: KitchenOrder[]; color: string; dot: string }[];
   onStatusChange: (orderId: string, status: OrderStatus) => Promise<void>;
@@ -798,7 +959,6 @@ function MobileKanban({ columns, onStatusChange, onItemToggle, actionLoading, on
 
   return (
     <div>
-      {/* Tabs */}
       <div style={{
         display: "flex", gap: 0, marginBottom: 16,
         background: "#fff", borderRadius: 12,
@@ -821,24 +981,16 @@ function MobileKanban({ columns, onStatusChange, onItemToggle, actionLoading, on
             }}
           >
             <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
-              <div style={{
-                width: 8, height: 8, borderRadius: "50%",
-                background: activeTab === i ? c.color : "#e2e8f0",
-              }} />
+              <div style={{ width: 8, height: 8, borderRadius: "50%", background: activeTab === i ? c.color : "#e2e8f0" }} />
               <span>{c.title}</span>
             </div>
-            <span style={{
-              fontSize: 18, fontWeight: 800,
-              color: activeTab === i ? c.color : "#94a3b8",
-              lineHeight: 1,
-            }}>
+            <span style={{ fontSize: 18, fontWeight: 800, color: activeTab === i ? c.color : "#94a3b8", lineHeight: 1 }}>
               {c.orders.length}
             </span>
           </button>
         ))}
       </div>
 
-      {/* Tarjetas del tab activo */}
       <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
         {col.orders.length === 0 ? (
           <div style={{
