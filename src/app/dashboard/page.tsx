@@ -23,6 +23,12 @@ interface Stats {
   clienteCount: number;
 }
 
+interface RevenueStats {
+  salesTotal: number;
+  cashTotal: number;
+  qrTotal: number;
+}
+
 const ROL_LABEL: Record<string, string> = {
   admin: "Administrador",
   cajero: "Cajero",
@@ -44,6 +50,12 @@ export default function DashboardPage() {
     cocineroCount: 0, meseroCount: 0, clienteCount: 0,
   });
   const [loading, setLoading] = useState(true);
+  const [revenue, setRevenue] = useState<RevenueStats>({
+    salesTotal: 0,
+    cashTotal: 0,
+    qrTotal: 0,
+  });
+  const [revenueLoading, setRevenueLoading] = useState(true);
   const [time, setTime] = useState(new Date());
   const [isMobile, setIsMobile] = useState(false);
 
@@ -108,10 +120,66 @@ export default function DashboardPage() {
     }
   }, []); // sin dependencias — solo llama APIs públicas
 
+  const fetchRevenue = useCallback(async () => {
+    try {
+      const res = await fetch("/api/cash-register/current");
+      const data = await res.json();
+
+      if (!res.ok || data.status === "cerrado") {
+        setRevenue({ salesTotal: 0, cashTotal: 0, qrTotal: 0 });
+        return;
+      }
+
+      setRevenue({
+        salesTotal: data.salesTotal || 0,
+        cashTotal: data.cashTotal || 0,
+        qrTotal: data.qrTotal || 0,
+      });
+    } catch (error) {
+      console.error("Error al obtener ingresos del dashboard:", error);
+      setRevenue({ salesTotal: 0, cashTotal: 0, qrTotal: 0 });
+    } finally {
+      setRevenueLoading(false);
+    }
+  }, []);
+
   useEffect(() => {
     if (userLoading || !user) return;
     fetchStats();
-  }, [userLoading, user, fetchStats]); // ← sin eslint-disable, dependencias correctas
+    fetchRevenue();
+  }, [userLoading, user, fetchStats, fetchRevenue]); // dependencias correctas
+
+  useEffect(() => {
+    if (userLoading || !user) return;
+
+    let pusherInstance: InstanceType<typeof import("pusher-js")["default"]> | null = null;
+    let mounted = true;
+
+    const setup = async () => {
+      const { default: Pusher } = await import("pusher-js");
+      if (!mounted) return;
+
+      pusherInstance = new Pusher(process.env.NEXT_PUBLIC_PUSHER_KEY!, {
+        cluster: process.env.NEXT_PUBLIC_PUSHER_CLUSTER!,
+      });
+
+      const channel = pusherInstance.subscribe("restaurant");
+      channel.bind("payment:completed", () => {
+        if (mounted) fetchRevenue();
+      });
+      channel.bind("table:updated", () => {
+        if (mounted) fetchRevenue();
+      });
+    };
+
+    setup();
+
+    return () => {
+      mounted = false;
+      pusherInstance?.unsubscribe("restaurant");
+      pusherInstance?.disconnect();
+    };
+  }, [userLoading, user, fetchRevenue]);
 
   // ── resto del componente sin cambios ──────────────────────────────────────
   const greeting = () => {
@@ -126,6 +194,13 @@ export default function DashboardPage() {
 
   const formatDate = (d: Date) =>
     d.toLocaleDateString("es-BO", { weekday: "long", day: "numeric", month: "long" });
+
+  const formatCurrency = (amount: number) =>
+    new Intl.NumberFormat("es-BO", {
+      style: "currency",
+      currency: "BOB",
+      maximumFractionDigits: 2,
+    }).format(amount);
 
   if (userLoading) {
     return (
@@ -144,6 +219,7 @@ export default function DashboardPage() {
     { label: "Categorías",   value: loading ? "—" : stats.totalCategories, sub: loading ? "" : `${stats.activeCategories} activas`,    subColor: "#27ae60", icon: "🏷️", iconBg: "#f0f6ff" },
     { label: "Usuarios",     value: loading ? "—" : stats.totalUsers,      sub: loading ? "" : `${stats.activeUsers} activos`,         subColor: "#27ae60", icon: "👥",  iconBg: "#f0fdf4" },
     { label: "Mesas",        value: loading ? "—" : stats.totalTables,     sub: loading ? "" : `${stats.availableTables} libres`,      subColor: "#7c3aed", icon: "🪑",  iconBg: "#f5f3ff" },
+    { label: "Ingresos",     value: revenueLoading ? "—" : formatCurrency(revenue.salesTotal), sub: revenueLoading ? "" : `Efectivo ${formatCurrency(revenue.cashTotal)} · QR ${formatCurrency(revenue.qrTotal)}`, subColor: "#e85d26", icon: "Bs", iconBg: "#fff8f5" },
   ];
 
   const quickActions = [
@@ -167,8 +243,6 @@ export default function DashboardPage() {
     { label: "Ocupadas",   count: stats.occupiedTables,  color: "#e85d26", icon: "🔴" },
     { label: "Reservadas", count: stats.reservedTables,  color: "#2563eb", icon: "🔵" },
   ];
-
-  const px = isMobile ? "16px" : "40px";
 
   return (
     <div style={{ minHeight: "100vh", background: "#f8f7f4", fontFamily: "'Georgia', serif" }}>
@@ -272,25 +346,83 @@ export default function DashboardPage() {
         gridTemplateColumns: isMobile ? "repeat(2, 1fr)" : "repeat(auto-fill, minmax(200px, 1fr))",
         gap: isMobile ? 10 : 16,
       }}>
-        {statCards.map((s) => (
+        {statCards.map((s) => {
+          const isRevenueCard = s.label === "Ingresos";
+
+          return (
           <div key={s.label} style={{
             background: "#fff",
             border: "1.5px solid #e8e8e8",
             borderRadius: isMobile ? 12 : 16,
             padding: isMobile ? "14px 16px" : "20px 24px",
             display: "flex",
+            flexDirection: isRevenueCard ? "column" : "row",
             alignItems: "center",
+            justifyContent: isRevenueCard ? "center" : undefined,
             gap: isMobile ? 10 : 16,
             boxShadow: "0 2px 8px rgba(0,0,0,0.03)",
+            minWidth: 0,
+            gridColumn: isMobile && isRevenueCard ? "1 / -1" : undefined,
           }}>
-            <div style={{ width: isMobile ? 38 : 48, height: isMobile ? 38 : 48, borderRadius: isMobile ? 10 : 12, background: s.iconBg, display: "flex", alignItems: "center", justifyContent: "center", fontSize: isMobile ? 18 : 22, flexShrink: 0 }}>{s.icon}</div>
-            <div style={{ minWidth: 0 }}>
+            {isRevenueCard ? (
+              <>
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 8, width: "100%" }}>
+                  <span style={{ width: 30, height: 30, borderRadius: 8, background: s.iconBg, display: "inline-flex", alignItems: "center", justifyContent: "center", fontSize: 14, flexShrink: 0 }}>{s.icon}</span>
+                  <p style={{ margin: 0, fontSize: isMobile ? 10 : 11, color: "#888" }}>{s.label}</p>
+                </div>
+                <p style={{
+                  margin: 0,
+                  width: "100%",
+                  fontSize: isMobile ? 26 : 28,
+                  fontWeight: 700,
+                  color: "#1a1a1a",
+                  lineHeight: 1.05,
+                  textAlign: "center",
+                  whiteSpace: "nowrap",
+                  fontVariantNumeric: "tabular-nums",
+                }}>{s.value}</p>
+                {!revenueLoading && (
+                  <div style={{ width: "100%", display: "grid", gap: 2, textAlign: "center" }}>
+                    <p style={{ margin: 0, fontSize: isMobile ? 10 : 11, color: s.subColor, fontWeight: 600, lineHeight: 1.2 }}>
+                      Efectivo {formatCurrency(revenue.cashTotal)}
+                    </p>
+                    <p style={{ margin: 0, fontSize: isMobile ? 10 : 11, color: s.subColor, fontWeight: 600, lineHeight: 1.2 }}>
+                      QR {formatCurrency(revenue.qrTotal)}
+                    </p>
+                  </div>
+                )}
+              </>
+            ) : (
+            <>
+              <div style={{ width: isMobile ? 38 : 48, height: isMobile ? 38 : 48, borderRadius: isMobile ? 10 : 12, background: s.iconBg, display: "flex", alignItems: "center", justifyContent: "center", fontSize: isMobile ? 18 : 22, flexShrink: 0 }}>{s.icon}</div>
+              <div style={{ minWidth: 0, flex: 1 }}>
               <p style={{ margin: 0, fontSize: isMobile ? 10 : 11, color: "#888", marginBottom: 2 }}>{s.label}</p>
-              <p style={{ margin: 0, fontSize: isMobile ? 22 : 28, fontWeight: 700, color: "#1a1a1a", lineHeight: 1 }}>{s.value}</p>
-              {s.sub && <p style={{ margin: "3px 0 0", fontSize: isMobile ? 10 : 11, color: s.subColor, fontWeight: 600 }}>{s.sub}</p>}
-            </div>
+              <p style={{
+                margin: 0,
+                fontSize: isMobile ? 22 : 28,
+                fontWeight: 700,
+                color: "#1a1a1a",
+                lineHeight: 1,
+                maxWidth: "100%",
+                overflowWrap: "anywhere",
+                wordBreak: "break-word",
+              }}>{s.value}</p>
+              {s.sub && <p style={{
+                margin: "3px 0 0",
+                fontSize: isMobile ? 10 : 11,
+                color: s.subColor,
+                fontWeight: 600,
+                lineHeight: 1.25,
+                maxWidth: "100%",
+                whiteSpace: "normal",
+                overflowWrap: "anywhere",
+              }}>{s.sub}</p>}
+              </div>
+            </>
+            )}
           </div>
-        ))}
+          );
+        })}
       </div>
 
       {/* ── Contenido inferior ── */}

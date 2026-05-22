@@ -1,6 +1,6 @@
 // src/app/dashboard/cajero/page.tsx
 "use client";
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { useAuth } from '@/lib/useAuth';
 import { CAJERO } from '@/lib/roles';
 import { Search, DollarSign, Receipt, Clock } from 'lucide-react';
@@ -8,6 +8,14 @@ import Link from 'next/link';
 import { useTableData } from '@/hooks/useTableData';
 import { PreinvoiceModal } from '@/components/caja/PreinvoiceModal';
 import { PaymentModal } from '@/components/caja/PaymentModal';
+import { formatShortOrderId } from '@/lib/orderDisplay';
+
+interface ActiveOrder {
+    _id: string;
+    table_id?: string;
+    status: string;
+    createdAt?: string;
+}
 
 const containerStyle: React.CSSProperties = {
     minHeight: "100vh",
@@ -136,6 +144,19 @@ const iconCircleStyle: React.CSSProperties = {
     justifyContent: "center",
 };
 
+const orderIdBadgeBaseStyle: React.CSSProperties = {
+    maxWidth: 138,
+    borderRadius: "9999px",
+    padding: "0.35rem 0.55rem",
+    fontSize: "0.7rem",
+    fontWeight: 700,
+    lineHeight: 1,
+    whiteSpace: "nowrap",
+    overflow: "hidden",
+    textOverflow: "ellipsis",
+    border: "1px solid transparent",
+};
+
 const buttonFullStyle: React.CSSProperties = {
     width: "100%",
     marginTop: "0.75rem",
@@ -192,8 +213,59 @@ export default function CajeroDashboard() {
     const [currentOrderId, setCurrentOrderId] = useState('');
     const [currentTotal, setCurrentTotal] = useState(0);
     const [currentTableId, setCurrentTableId] = useState('');
+    const [orderIdsByTable, setOrderIdsByTable] = useState<Record<string, string>>({});
 
     const { tables, loading, refreshTables } = useTableData(restaurantId);
+
+    const fetchActiveOrders = useCallback(async () => {
+        try {
+            const res = await fetch('/api/orders/active');
+            const data = await res.json();
+
+            const nextOrderIdsByTable: Record<string, string> = {};
+
+            if (!res.ok || !data.ok) {
+                console.error('Error al cargar ordenes activas:', data);
+            } else {
+                (data.data as ActiveOrder[]).forEach((order) => {
+                    if (!order.table_id || !order._id) return;
+                    if (!nextOrderIdsByTable[order.table_id]) {
+                        nextOrderIdsByTable[order.table_id] = order._id;
+                    }
+                });
+            }
+
+            const tablesNeedingFallback = tables.filter((table) =>
+                table.status !== 'Libre' && !nextOrderIdsByTable[table._id]
+            );
+
+            const fallbackOrderIds = await Promise.all(
+                tablesNeedingFallback.map(async (table) => {
+                    try {
+                        const preinvoiceRes = await fetch(`/api/orders/preinvoice/${encodeURIComponent(table._id)}`);
+                        const preinvoiceData = await preinvoiceRes.json();
+
+                        if (!preinvoiceRes.ok || !preinvoiceData.orderId) return null;
+                        return [table._id, preinvoiceData.orderId] as const;
+                    } catch (error) {
+                        console.error(`Error al cargar prefactura de mesa ${table._id}:`, error);
+                        return null;
+                    }
+                })
+            );
+
+            fallbackOrderIds.forEach((entry) => {
+                if (!entry) return;
+                const [tableId, orderId] = entry;
+                nextOrderIdsByTable[tableId] = orderId;
+            });
+
+            setOrderIdsByTable(nextOrderIdsByTable);
+        } catch (error) {
+            console.error('Error al cargar ordenes activas:', error);
+            setOrderIdsByTable({});
+        }
+    }, [tables]);
 
     const normalizeSearch = (value: string) =>
         value
@@ -241,9 +313,18 @@ export default function CajeroDashboard() {
         }
     };
     const refreshTablesRef = useRef(refreshTables);
+    const fetchActiveOrdersRef = useRef(fetchActiveOrders);
     useEffect(() => {
     refreshTablesRef.current = refreshTables;
     }, [refreshTables]);
+
+    useEffect(() => {
+        fetchActiveOrdersRef.current = fetchActiveOrders;
+    }, [fetchActiveOrders]);
+
+    useEffect(() => {
+        fetchActiveOrders();
+    }, [fetchActiveOrders]);
 
     useEffect(() => {
     let pusherInstance: InstanceType<typeof import("pusher-js")["default"]> | null = null;
@@ -261,17 +342,26 @@ export default function CajeroDashboard() {
 
         // Nueva orden creada → puede cambiar estado de mesa
         channel.bind("order:new", () => {
-        if (mounted) refreshTablesRef.current();
+        if (mounted) {
+            refreshTablesRef.current();
+            fetchActiveOrdersRef.current();
+        }
         });
 
         // Mesa actualizada (pagado, cuenta solicitada)
         channel.bind("table:updated", () => {
-        if (mounted) refreshTablesRef.current();
+        if (mounted) {
+            refreshTablesRef.current();
+            fetchActiveOrdersRef.current();
+        }
         });
 
         // Mesero pide cuenta
         channel.bind("table:bill_requested", () => {
-        if (mounted) refreshTablesRef.current();
+        if (mounted) {
+            refreshTablesRef.current();
+            fetchActiveOrdersRef.current();
+        }
         });
     };
 
@@ -306,6 +396,42 @@ export default function CajeroDashboard() {
     const responsiveGrid: React.CSSProperties = {
         ...gridStyle,
         gridTemplateColumns: isMobile ? "1fr" : "repeat(auto-fill, minmax(300px, 1fr))",
+    };
+
+    const renderOrderIdentifier = (
+        orderId: string | undefined,
+        variant: 'billing' | 'occupied' | 'free',
+        fallback: React.ReactNode
+    ) => {
+        if (!orderId) return fallback;
+
+        const variants: Record<typeof variant, React.CSSProperties> = {
+            billing: {
+                backgroundColor: "#ffedd5",
+                borderColor: "#fed7aa",
+                color: "#c2410c",
+            },
+            occupied: {
+                backgroundColor: "#eff6ff",
+                borderColor: "#bfdbfe",
+                color: "#1d4ed8",
+            },
+            free: {
+                backgroundColor: "#dcfce7",
+                borderColor: "#bbf7d0",
+                color: "#15803d",
+            },
+        };
+
+        return (
+            <span
+                style={{ ...orderIdBadgeBaseStyle, ...variants[variant] }}
+                title={`/api/orders/${orderId}`}
+                aria-label={`Orden ${orderId}`}
+            >
+                {formatShortOrderId(orderId)}
+            </span>
+        );
     };
 
     return (
@@ -416,9 +542,13 @@ export default function CajeroDashboard() {
                                             <p style={locationStyle}>{table.location}</p>
                                             <p style={{ ...statusTextStyle, color: "#ea580c" }}>Solicita cuenta</p>
                                         </div>
-                                        <div style={{ ...iconCircleStyle, backgroundColor: "#f97316" }}>
-                                            <Receipt size={20} color="white" />
-                                        </div>
+                                        {renderOrderIdentifier(
+                                            orderIdsByTable[table._id],
+                                            'billing',
+                                            <div style={{ ...iconCircleStyle, backgroundColor: "#f97316" }}>
+                                                <Receipt size={20} color="white" />
+                                            </div>
+                                        )}
                                     </div>
                                     <button style={{ ...buttonFullStyle, backgroundColor: "#ea580c", marginTop: "0.75rem" }}>
                                         Ver cuenta
@@ -450,9 +580,13 @@ export default function CajeroDashboard() {
                                                 {table.status === 'Ocupada' ? 'En servicio' : 'Reservada'}
                                             </p>
                                         </div>
-                                        <div style={{ ...iconCircleStyle, backgroundColor: "var(--muted)" }}>
-                                            <Clock size={20} color="var(--muted-foreground)" />
-                                        </div>
+                                        {renderOrderIdentifier(
+                                            orderIdsByTable[table._id],
+                                            'occupied',
+                                            <div style={{ ...iconCircleStyle, backgroundColor: "var(--muted)" }}>
+                                                <Clock size={20} color="var(--muted-foreground)" />
+                                            </div>
+                                        )}
                                     </div>
                                     <button style={buttonOutlineFullStyle} disabled>
                                         Esperando solicitud
@@ -480,9 +614,13 @@ export default function CajeroDashboard() {
                                             <h3 style={{ ...tableNumberStyle, color: "#16a34a" }}>Mesa {table.number}</h3>
                                             <p style={locationStyle}>{table.location}</p>
                                         </div>
-                                        <div style={{ ...iconCircleStyle, backgroundColor: "#dcfce7" }}>
-                                            <div style={{ width: 20, height: 20, borderRadius: "50%", backgroundColor: "#16a34a" }} />
-                                        </div>
+                                        {renderOrderIdentifier(
+                                            orderIdsByTable[table._id],
+                                            'free',
+                                            <div style={{ ...iconCircleStyle, backgroundColor: "#dcfce7" }}>
+                                                <div style={{ width: 20, height: 20, borderRadius: "50%", backgroundColor: "#16a34a" }} />
+                                            </div>
+                                        )}
                                     </div>
                                     <button style={buttonOutlineFullStyle} disabled>
                                         Disponible
@@ -506,6 +644,7 @@ export default function CajeroDashboard() {
                     setIsPreinvoiceOpen(false);
                     setSelectedTable(null);
                     refreshTables();
+                    fetchActiveOrders();
                 }}
                 tableId={selectedTable?.id || ''}
                 tableNumber={selectedTable?.number || 0}
@@ -536,6 +675,7 @@ export default function CajeroDashboard() {
                 onSuccess={() => {
                     setIsPaymentModalOpen(false);
                     refreshTables();
+                    fetchActiveOrders();
                     alert('Pago registrado exitosamente');
                 }}
             />

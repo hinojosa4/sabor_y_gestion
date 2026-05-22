@@ -51,10 +51,18 @@ export async function POST(req: Request) {
     if (order.service_type === 'dine_in' && tableId) {
       await Table.findByIdAndUpdate(tableId, { status: 'Libre' });
     }
-      await pusherServer.trigger("restaurant", "table:updated", {
-        tableId,
-        newStatus: "Libre",
-      });
+    await pusherServer.trigger("restaurant", "table:updated", {
+      tableId,
+      newStatus: "Libre",
+    });
+
+    await pusherServer.trigger("restaurant", "payment:completed", {
+      paymentId: payment._id.toString(),
+      orderId,
+      method,
+      amount,
+      tableId,
+    });
 
     return NextResponse.json(payment, { status: 201 });
   } catch (error) {

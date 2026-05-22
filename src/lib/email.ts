@@ -32,7 +32,6 @@ export async function sendPaymentEmail({
     orderId,
     method,
     items,
-    subtotal,
     total,
     change
 }: SendPaymentEmailParams) {
@@ -56,17 +55,13 @@ export async function sendPaymentEmail({
                 <thead>
                     <tr style="background-color: #f5f5f5;">
                         <th style="padding: 8px; text-align: left;">Producto</th>
-                        <th style="padding: 8px; text-align: right;">Subtotal</th>
+                        <th style="padding: 8px; text-align: right;">Total</th>
                     </tr>
                 </thead>
                 <tbody>
                     ${itemsHtml}
                 </tbody>
                 <tfoot>
-                    <tr>
-                        <td style="padding: 8px; text-align: left;"><strong>Subtotal</strong></td>
-                        <td style="padding: 8px; text-align: right;">${formatCurrency(subtotal)}</td>
-                    </tr>
                     <tr>
                         <td style="padding: 8px; text-align: left;"><strong>Total</strong></td>
                         <td style="padding: 8px; text-align: right;"><strong>${formatCurrency(total)}</strong></td>

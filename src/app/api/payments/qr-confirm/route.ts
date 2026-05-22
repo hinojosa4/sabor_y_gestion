@@ -7,6 +7,7 @@ import OrderItem from '@/models/OrderItem';
 import Table from '@/models/Table';
 import Payment from '@/models/Payment';
 import { sendPaymentEmail } from '@/lib/email';
+import { pusherServer } from '@/lib/pusher';
 import '@/models/Dish';
 
 type LeanOrderItem = {
@@ -86,7 +87,7 @@ export async function POST(req: NextRequest) {
     const total = subtotal;
     const totalAmount = total;
 
-    await Payment.create({
+    const payment = await Payment.create({
       order_id: orderId,
       amount: totalAmount,
       method: 'qr',
@@ -102,6 +103,19 @@ export async function POST(req: NextRequest) {
     if (order.service_type === 'dine_in' && order.table_id) {
       await Table.findByIdAndUpdate(order.table_id, { status: 'Libre' });
     }
+
+    await pusherServer.trigger("restaurant", "table:updated", {
+      tableId: order.table_id,
+      newStatus: "Libre",
+    });
+
+    await pusherServer.trigger("restaurant", "payment:completed", {
+      paymentId: payment._id.toString(),
+      orderId,
+      method: 'qr',
+      amount: totalAmount,
+      tableId: order.table_id,
+    });
 
     await sendPaymentEmail({
       to: email,

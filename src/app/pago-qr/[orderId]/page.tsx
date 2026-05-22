@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { FacturaFinal } from '@/components/caja/FacturaFinal';
+import { formatOrderLabel } from '@/lib/orderDisplay';
 
 // Estilos
 const containerStyle: React.CSSProperties = {
@@ -104,7 +105,6 @@ export default function PagoQRPage() {
     const [loading, setLoading] = useState(true);
     const [submitting, setSubmitting] = useState(false);
     const [items, setItems] = useState<OrderItem[]>([]);
-    const [subtotal, setSubtotal] = useState(0);
     const [iva, setIva] = useState(0);
     const [total, setTotal] = useState(0);
     const [email, setEmail] = useState('');
@@ -117,7 +117,6 @@ export default function PagoQRPage() {
     const [paymentData, setPaymentData] = useState<{
         orderId: string;
         items: OrderItem[];
-        subtotal: number;
         iva: number;
         total: number;
         customerEmail: string;
@@ -132,7 +131,6 @@ export default function PagoQRPage() {
                 const data = await res.json();
                 if (data.items) {
                     setItems(data.items);
-                    setSubtotal(data.subtotal || 0);
                     setIva(data.iva || 0);
                     setTotal(data.total || 0);
                     setTableNumber(data.tableNumber ?? null);
@@ -190,7 +188,6 @@ export default function PagoQRPage() {
                 setPaymentData({
                     orderId,
                     items,
-                    subtotal,
                     iva,
                     total,
                     customerEmail: email,
@@ -238,6 +235,9 @@ export default function PagoQRPage() {
 
                     {/* Resumen de la orden */}
                     <div style={orderSummaryStyle}>
+                        <p style={{ margin: "0 0 0.5rem", fontSize: "0.875rem", fontWeight: "bold" }}>
+                            {formatOrderLabel(orderId)}
+                        </p>
                         <h3 style={{ margin: "0 0 0.5rem", fontSize: "1rem" }}>Resumen de tu pedido</h3>
                         {items.map((item, idx) => (
                             <div key={idx} style={{ display: "flex", justifyContent: "space-between", marginBottom: "0.25rem", fontSize: "0.875rem" }}>
@@ -246,11 +246,7 @@ export default function PagoQRPage() {
                             </div>
                         ))}
                         <div style={{ borderTop: "1px solid var(--border)", marginTop: "0.5rem", paddingTop: "0.5rem" }}>
-                            <div style={{ display: "flex", justifyContent: "space-between" }}>
-                                <span>Subtotal</span>
-                                <span>{formatCurrency(subtotal)}</span>
-                            </div>
-                            <div style={{ display: "flex", justifyContent: "space-between", fontWeight: "bold", marginTop: "0.25rem" }}>
+                            <div style={{ display: "flex", justifyContent: "space-between", fontWeight: "bold" }}>
                                 <span>Total</span>
                                 <span>{formatCurrency(total)}</span>
                             </div>
@@ -294,7 +290,6 @@ export default function PagoQRPage() {
                     orderId={paymentData.orderId}
                     tableNumber={tableNumber}
                     items={paymentData.items}
-                    subtotal={paymentData.subtotal}
                     iva={paymentData.iva}
                     total={paymentData.total}
                     paymentMethod="qr"

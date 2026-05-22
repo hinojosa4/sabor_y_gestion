@@ -2,6 +2,7 @@
 import { useState, useEffect } from 'react';
 import { X } from 'lucide-react';
 import { FacturaFinal } from './FacturaFinal';
+import { formatOrderLabel } from '@/lib/orderDisplay';
 
 interface PaymentModalProps {
     isOpen: boolean;
@@ -45,7 +46,6 @@ const modalStyle: React.CSSProperties = {
 // Componente para resumen de la orden
 function OrderSummary({ orderId }: { orderId: string }) {
     const [items, setItems] = useState<OrderItemType[]>([]);
-    const [subtotal, setSubtotal] = useState(0);
     const [total, setTotal] = useState(0);
     const [loading, setLoading] = useState(true);
 
@@ -56,7 +56,6 @@ function OrderSummary({ orderId }: { orderId: string }) {
                 const data = await res.json();
                 if (data.items) {
                     setItems(data.items);
-                    setSubtotal(data.subtotal || 0);
                     setTotal(data.total || 0);
                 }
             } catch (error) {
@@ -79,6 +78,11 @@ function OrderSummary({ orderId }: { orderId: string }) {
 
     return (
         <div style={{ marginBottom: "1rem", padding: "0.5rem", backgroundColor: "var(--muted)", borderRadius: "var(--radius-md)" }}>
+            {orderId && (
+                <p style={{ margin: "0 0 0.5rem", fontSize: "0.875rem", fontWeight: "bold" }}>
+                    {formatOrderLabel(orderId)}
+                </p>
+            )}
             <h3 style={{ margin: "0 0 0.5rem", fontSize: "0.875rem", fontWeight: "bold" }}>Productos</h3>
             {items.map((item, idx) => (
                 <div key={idx} style={{ display: "flex", justifyContent: "space-between", fontSize: "0.75rem", marginBottom: "0.25rem" }}>
@@ -87,11 +91,7 @@ function OrderSummary({ orderId }: { orderId: string }) {
                 </div>
             ))}
             <div style={{ borderTop: `1px solid var(--border)`, marginTop: "0.5rem", paddingTop: "0.5rem" }}>
-                <div style={{ display: "flex", justifyContent: "space-between", fontSize: "0.75rem" }}>
-                    <span>Subtotal</span>
-                    <span>{formatCurrency(subtotal)}</span>
-                </div>
-                <div style={{ display: "flex", justifyContent: "space-between", fontWeight: "bold", marginTop: "0.25rem" }}>
+                <div style={{ display: "flex", justifyContent: "space-between", fontWeight: "bold" }}>
                     <span>Total</span>
                     <span>{formatCurrency(total)}</span>
                 </div>
@@ -109,7 +109,6 @@ export function PaymentModal({ isOpen, onClose, orderId, tableId, tableNumber, t
     // Estados para la factura final
     const [showFactura, setShowFactura] = useState(false);
     const [orderItems, setOrderItems] = useState<OrderItemType[]>([]);
-    const [orderSubtotal, setOrderSubtotal] = useState(0);
     const [orderIva, setOrderIva] = useState(0);
 
     useEffect(() => {
@@ -176,7 +175,6 @@ export function PaymentModal({ isOpen, onClose, orderId, tableId, tableNumber, t
                 const orderRes = await fetch(`/api/orders/preinvoice/order/${orderId}`);
                 const orderData = await orderRes.json();
                 setOrderItems(orderData.items || []);
-                setOrderSubtotal(orderData.subtotal || 0);
                 setOrderIva(0);
                 
                 // 3. Mostrar factura final y cerrar modal de pago
@@ -346,7 +344,6 @@ export function PaymentModal({ isOpen, onClose, orderId, tableId, tableNumber, t
                 orderId={orderId}
                 tableNumber={tableNumber}
                 items={orderItems}
-                subtotal={orderSubtotal}
                 iva={orderIva}
                 total={totalAmount}
                 paymentMethod="cash"

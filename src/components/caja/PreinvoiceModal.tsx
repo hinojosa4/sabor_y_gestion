@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { DollarSign, X, Printer } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
+import { formatOrderLabel } from '@/lib/orderDisplay';
 
 interface PreinvoiceItem {
   dish: {
@@ -75,6 +76,13 @@ const tableInfoStyle: React.CSSProperties = {
   color: "var(--muted-foreground)",
 };
 
+const orderInfoStyle: React.CSSProperties = {
+  margin: "-0.5rem 0 1rem",
+  fontSize: "0.875rem",
+  fontWeight: 700,
+  color: "var(--foreground)",
+};
+
 const loadingContainerStyle: React.CSSProperties = {
   textAlign: "center",
   padding: "2rem",
@@ -116,21 +124,11 @@ const totalsContainerStyle: React.CSSProperties = {
   marginTop: "0.5rem",
 };
 
-const totalRowStyle: React.CSSProperties = {
-  display: "flex",
-  justifyContent: "space-between",
-  fontSize: "0.875rem",
-  marginBottom: "0.5rem",
-};
-
 const grandTotalStyle: React.CSSProperties = {
   display: "flex",
   justifyContent: "space-between",
   fontWeight: "var(--font-weight-medium)",
   fontSize: "1.125rem",
-  marginTop: "1rem",
-  paddingTop: "0.5rem",
-  borderTop: `1px solid var(--border)`,
 };
 
 const actionsStyle: React.CSSProperties = {
@@ -249,6 +247,7 @@ export function PreinvoiceModal({
           </div>
 
           <p style={tableInfoStyle}>Mesa {tableNumber}</p>
+          {orderId && <p style={orderInfoStyle}>{formatOrderLabel(orderId)}</p>}
 
           {loading ? (
             <div style={loadingContainerStyle}>
@@ -274,10 +273,6 @@ export function PreinvoiceModal({
               </div>
 
               <div style={totalsContainerStyle}>
-                <div style={totalRowStyle}>
-                  <span>Subtotal</span>
-                  <span>{formatCurrency(displaySubtotal)}</span>
-                </div>
                 <div style={grandTotalStyle}>
                   <span>Total</span>
                   <span>{formatCurrency(displayTotal)}</span>
@@ -331,13 +326,14 @@ export function PreinvoiceModal({
         <div style={{ padding: '2rem', fontFamily: 'sans-serif' }}>
           <h2 style={{ textAlign: 'center', marginBottom: '1rem' }}>Pre-factura</h2>
           <p style={{ marginBottom: '1rem' }}>Mesa {tableNumber}</p>
+          {orderId && <p style={{ marginBottom: '1rem' }}><strong>{formatOrderLabel(orderId)}</strong></p>}
           <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: '1rem' }}>
             <thead>
               <tr style={{ borderBottom: '1px solid #ccc' }}>
                 <th style={{ textAlign: 'left', padding: '0.5rem 0' }}>Plato</th>
                 <th style={{ textAlign: 'center', padding: '0.5rem 0' }}>Cantidad</th>
                 <th style={{ textAlign: 'right', padding: '0.5rem 0' }}>Precio</th>
-                <th style={{ textAlign: 'right', padding: '0.5rem 0' }}>Subtotal</th>
+                <th style={{ textAlign: 'right', padding: '0.5rem 0' }}>Total</th>
               </tr>
             </thead>
             <tbody>
@@ -352,7 +348,6 @@ export function PreinvoiceModal({
             </tbody>
           </table>
           <div style={{ marginTop: '1rem', textAlign: 'right' }}>
-            <p>Subtotal: {formatCurrency(displaySubtotal)}</p>
             <p><strong>Total: {formatCurrency(displayTotal)}</strong></p>
           </div>
 
