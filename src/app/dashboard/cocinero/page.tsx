@@ -541,26 +541,41 @@ export default function CocineroPage() {
         cluster: process.env.NEXT_PUBLIC_PUSHER_CLUSTER!,
       });
 
+      // ── Canal de cocina: nuevas órdenes y cambios internos ──────────────
       const channel = pusherInstance.subscribe("restaurant");
 
-      // Órdenes
       channel.bind("order:new",     () => fetchOrders());
       channel.bind("order:updated", () => fetchOrders());
 
-      // ── Nuevo: alerta de inventario ───────────────────────────────────────
       channel.bind("inventory:alert", (data: { alertas: InventoryAlerta[] }) => {
         if (data.alertas?.length > 0) {
           setInventoryAlertas(data.alertas);
-          // Auto-cerrar después de 12 segundos
           setTimeout(() => setInventoryAlertas(null), 12000);
         }
       });
+
+      // ── Canal delivery: escuchar cuando el repartidor recoge la orden ───
+      // Cuando llega picked_up, in_transit o delivered la orden sale de cocina
+      // sin necesidad de refrescar toda la lista.
+      const deliveryChannel = pusherInstance.subscribe("delivery");
+
+      deliveryChannel.bind(
+        "order:status_updated",
+        (data: { orderId: string; status: string }) => {
+          const REMOVE_ON = ["picked_up", "in_transit", "delivered", "paid", "cancelled"];
+          if (REMOVE_ON.includes(data.status)) {
+            setOrders((prev) => prev.filter((o) => o._id !== data.orderId));
+            setLastUpdate(new Date());
+          }
+        }
+      );
     };
 
     setup();
 
     return () => {
       pusherInstance?.unsubscribe("restaurant");
+      pusherInstance?.unsubscribe("delivery");
       pusherInstance?.disconnect();
     };
   }, [userLoading, user, fetchOrders]);

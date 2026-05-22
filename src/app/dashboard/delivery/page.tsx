@@ -5,7 +5,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Truck, LogOut, Package, User, Phone, MapPin,
   Navigation, ShoppingBag, DollarSign, Clock,
-  CheckCircle2, XCircle, RefreshCw,
+  CheckCircle2, XCircle, RefreshCw, Bike,
 } from "lucide-react";
 import { useAuth } from "@/lib/useAuth";
 import { DELIVERY } from "@/lib/roles";
@@ -36,6 +36,8 @@ interface RawOrder {
   _id: string;
   status: BackendStatus;
   total_amount: number;
+  delivery_fee?: number;              // ← costo de envío
+  delivery_distance_km?: number | null; // ← distancia en km
   delivery_address?: string;
   delivery_phone?: string;
   delivery_coords?: { lat?: number; lng?: number };
@@ -50,6 +52,8 @@ interface CompletedRaw {
   _id: string;
   status: BackendStatus;
   total_amount: number;
+  delivery_fee?: number;
+  delivery_distance_km?: number | null;
   delivery_address?: string;
   user_id?: { name?: string } | string;
   createdAt: string;
@@ -87,7 +91,7 @@ const ADVANCE_LABEL: Partial<Record<BackendStatus, string>> = {
 function formatTime(d: string) {
   return new Date(d).toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit" });
 }
-function formatMoney(v: number) { return `$${v.toFixed(2)}`; }
+function formatMoney(v: number) { return `Bs. ${v.toFixed(2)}`; }
 function customerName(u: RawOrder["user_id"]): string {
   if (!u || typeof u === "string") return "Cliente";
   return u.name ?? u.email ?? "Cliente";
@@ -139,14 +143,19 @@ function ActiveOrderCard({
   onCancel: (id: string) => void;
   loading: boolean;
 }) {
-  const displayStatus = STATUS_MAP[order.status];
-  const advanceLabel  = ADVANCE_LABEL[order.status];
-  const nextStatus    = NEXT_STATUS[order.status];
-  const showCancel    = order.status === "picked_up" || order.status === "in_transit";
-  const isGreen       = order.status === "in_transit";
+  const displayStatus  = STATUS_MAP[order.status];
+  const advanceLabel   = ADVANCE_LABEL[order.status];
+  const nextStatus     = NEXT_STATUS[order.status];
+  const showCancel     = order.status === "picked_up" || order.status === "in_transit";
+  const isGreen        = order.status === "in_transit";
   const isPickupAction = nextStatus === "picked_up";
   const canPickup      = order.status === "ready";
   const btnDisabled    = loading || (isPickupAction && !canPickup);
+
+  // Calcular subtotal de items (sin envío)
+  const itemsSubtotal = order.items.reduce((s, it) => s + it.subtotal, 0);
+  const deliveryFee   = order.delivery_fee ?? 0;
+  const hasDistInfo   = typeof order.delivery_distance_km === "number" && order.delivery_distance_km !== null;
 
   return (
     <div className={styles.orderCard}>
@@ -184,12 +193,30 @@ function ActiveOrderCard({
           )}
         </div>
 
-        {/* Ubicación */}
+        {/* Ubicación + distancia ── MEJORADO */}
         <div className={`${styles.infoBox} ${styles.infoBoxGreen}`}>
           <div className={styles.infoHeader}>
             <Navigation size={16} className={styles.iconGreen} />
             <h4 className={styles.infoTitle}>Ubicación y Distancia</h4>
           </div>
+
+          {/* Chips de distancia y tarifa */}
+          {(hasDistInfo || deliveryFee > 0) && (
+            <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap", marginBottom: "0.4rem" }}>
+              {hasDistInfo && (
+                <span style={chipStyles.distChip}>
+                  <Bike size={12} style={{ marginRight: 4 }} />
+                  {(order.delivery_distance_km as number).toFixed(2)} km
+                </span>
+              )}
+              {deliveryFee > 0 && (
+                <span style={chipStyles.feeChip}>
+                  Envío: Bs. {deliveryFee.toFixed(2)}
+                </span>
+              )}
+            </div>
+          )}
+
           {order.delivery_coords?.lat ? (
             <p className={styles.locationCoords}>
               {order.delivery_coords.lat?.toFixed(4)}, {order.delivery_coords.lng?.toFixed(4)}
@@ -221,7 +248,7 @@ function ActiveOrderCard({
           </ul>
         </div>
 
-        {/* Pago */}
+        {/* Pago ── MEJORADO con desglose envío */}
         <div className={`${styles.infoBox} ${styles.infoBoxPurple}`}>
           <div className={styles.infoHeader}>
             <DollarSign size={16} className={styles.iconPurple} />
@@ -233,6 +260,22 @@ function ActiveOrderCard({
                 <span className={styles.paymentLabel}>Método</span>
                 <span className={styles.paymentValue}>{order.payment_method}</span>
               </div>
+            )}
+            {/* Desglose solo si hay delivery_fee */}
+            {deliveryFee > 0 && (
+              <>
+                <div className={styles.paymentRow}>
+                  <span className={styles.paymentLabel}>Subtotal productos</span>
+                  <span className={styles.paymentValue}>{formatMoney(itemsSubtotal)}</span>
+                </div>
+                <div className={styles.paymentRow}>
+                  <span className={styles.paymentLabel}>
+                    Costo de envío
+                    {hasDistInfo && ` (${(order.delivery_distance_km as number).toFixed(2)} km)`}
+                  </span>
+                  <span className={styles.paymentValue}>{formatMoney(deliveryFee)}</span>
+                </div>
+              </>
             )}
             <div className={styles.totalRow}>
               <span className={styles.totalLabel}>Total:</span>
@@ -269,7 +312,6 @@ function ActiveOrderCard({
           </div>
         )}
 
-        {/* Aviso cuando aún no está lista */}
         {isPickupAction && !canPickup && (
           <p className={styles.notReadyNote}>
             ⏳ Esperando que cocina marque la orden como lista…
@@ -286,10 +328,7 @@ export default function DeliveryPage() {
   const { user, loading: authLoading, logout } = useAuth(DELIVERY);
 
   const tokenRef = useRef<string | null>(null);
-  useEffect(() => {
-    tokenRef.current = localStorage.getItem("token");
-  }, []);
-
+  useEffect(() => { tokenRef.current = localStorage.getItem("token"); }, []);
   const getToken = () => tokenRef.current;
 
   const [activeOrders, setActiveOrders]       = useState<RawOrder[]>([]);
@@ -299,7 +338,7 @@ export default function DeliveryPage() {
   const [error, setError]                     = useState<string | null>(null);
   const [newOrderAlert, setNewOrderAlert]     = useState(false);
 
-  // ── Carga ─────────────────────────────────────────────────────────────────────
+  // ── Carga ─────────────────────────────────────────────────────────────────
   const loadOrders = useCallback(async () => {
     const token = getToken();
     setError(null);
@@ -318,16 +357,14 @@ export default function DeliveryPage() {
 
   useEffect(() => { if (!authLoading && user) loadOrders(); }, [authLoading, user, loadOrders]);
 
-  // ── Pusher ────────────────────────────────────────────────────────────────────
+  // ── Pusher ─────────────────────────────────────────────────────────────────
   useEffect(() => {
     if (!user) return;
-
     let cancelled = false;
 
     getPusherClient().then((client) => {
       if (cancelled) return;
 
-      // Canal delivery: nuevas órdenes y cambios de estado propios del repartidor
       const deliveryChannel = client.subscribe("delivery");
 
       deliveryChannel.bind("order:new_delivery", (data: { order: RawOrder }) => {
@@ -341,12 +378,10 @@ export default function DeliveryPage() {
 
       deliveryChannel.bind("order:status_updated", (data: { orderId: string; status: BackendStatus }) => {
         const isFinished = data.status === "delivered" || data.status === "paid" || data.status === "cancelled";
-
         if (isFinished) {
           setActiveOrders((prev) => {
             const moved = prev.find((o) => o._id === data.orderId);
             if (moved && data.status !== "cancelled") {
-              // FIX Bug 2: evitar duplicados al mover a completados
               setCompletedOrders((c) => {
                 const map = new Map(c.map((o) => [String(o._id), o]));
                 map.set(String(data.orderId), { ...moved, status: data.status });
@@ -362,14 +397,10 @@ export default function DeliveryPage() {
         }
       });
 
-      // FIX Bug 1: canal restaurant para recibir cuando cocina marca "ready"
       const restaurantChannel = client.subscribe("restaurant");
-
       restaurantChannel.bind("order:updated", (data: { orderId: string; newStatus: BackendStatus }) => {
         setActiveOrders((prev) =>
-          prev.map((o) =>
-            o._id === data.orderId ? { ...o, status: data.newStatus } : o
-          )
+          prev.map((o) => o._id === data.orderId ? { ...o, status: data.newStatus } : o)
         );
       });
     });
@@ -378,12 +409,12 @@ export default function DeliveryPage() {
       cancelled = true;
       getPusherClient().then((client) => {
         client.unsubscribe("delivery");
-        client.unsubscribe("restaurant"); // FIX Bug 1: limpiar suscripción
+        client.unsubscribe("restaurant");
       });
     };
   }, [user]);
 
-  // ── Acciones ──────────────────────────────────────────────────────────────────
+  // ── Acciones ───────────────────────────────────────────────────────────────
   const handleAdvance = async (orderId: string, nextStatus: BackendStatus) => {
     const token = getToken();
     if (!token) return;
@@ -440,16 +471,20 @@ export default function DeliveryPage() {
     }
   };
 
-  // ── Stats ─────────────────────────────────────────────────────────────────────
+  // ── Stats ─────────────────────────────────────────────────────────────────
   const stats = useMemo(() => {
-    const pendientes = activeOrders.filter((o) => ["pending","in_kitchen","ready"].includes(o.status)).length;
-    const recogidos  = activeOrders.filter((o) => o.status === "picked_up").length;
-    const enTransito = activeOrders.filter((o) => o.status === "in_transit").length;
-    const entregados = completedOrders.filter((o) => ["delivered","paid"].includes(o.status)).length;
-    const recaudado  = completedOrders
+    const pendientes   = activeOrders.filter((o) => ["pending","in_kitchen","ready"].includes(o.status)).length;
+    const recogidos    = activeOrders.filter((o) => o.status === "picked_up").length;
+    const enTransito   = activeOrders.filter((o) => o.status === "in_transit").length;
+    const entregados   = completedOrders.filter((o) => ["delivered","paid"].includes(o.status)).length;
+    const recaudado    = completedOrders
       .filter((o) => ["delivered","paid"].includes(o.status))
       .reduce((s, o) => s + o.total_amount, 0);
-    return { pendientes, recogidos, enTransito, entregados, recaudado };
+    // Total solo de fees cobrados hoy
+    const feesHoy      = completedOrders
+      .filter((o) => ["delivered","paid"].includes(o.status))
+      .reduce((s, o) => s + (o.delivery_fee ?? 0), 0);
+    return { pendientes, recogidos, enTransito, entregados, recaudado, feesHoy };
   }, [activeOrders, completedOrders]);
 
   if (authLoading) return <div className={styles.page}><div className={styles.centered}>Verificando sesión…</div></div>;
@@ -484,13 +519,9 @@ export default function DeliveryPage() {
       </header>
 
       <main className={styles.main}>
-        {/* Alerta nueva orden */}
         {newOrderAlert && (
-          <div className={styles.newOrderAlert}>
-            🛵 ¡Nueva orden de delivery recibida!
-          </div>
+          <div className={styles.newOrderAlert}>🛵 ¡Nueva orden de delivery recibida!</div>
         )}
-
         {error && (
           <div className={styles.errorBanner}>
             {error}{" "}
@@ -536,7 +567,6 @@ export default function DeliveryPage() {
                   <p className={styles.completedEmpty}>Aún no hay entregas completadas hoy.</p>
                 ) : (
                   <div className={styles.completedList}>
-                    {/* FIX Bug 2: key por _id solo, sin índice */}
                     {completedOrders.filter((o) => o.status !== "cancelled").map((order) => (
                       <div key={order._id} className={styles.completedItem}>
                         <div className={styles.completedLeft}>
@@ -549,6 +579,13 @@ export default function DeliveryPage() {
                                 : "Cliente"}
                             </p>
                             {order.delivery_address && <p className={styles.completedDist}>{order.delivery_address}</p>}
+                            {/* Distancia en el historial */}
+                            {typeof order.delivery_distance_km === "number" && (
+                              <p className={styles.completedDist}>
+                                📍 {(order.delivery_distance_km as number).toFixed(2)} km
+                                {(order.delivery_fee ?? 0) > 0 && ` · Envío: Bs. ${(order.delivery_fee as number).toFixed(2)}`}
+                              </p>
+                            )}
                           </div>
                         </div>
                         <div className={styles.completedRight}>
@@ -572,7 +609,14 @@ export default function DeliveryPage() {
                   <div className={styles.summaryRow}><span className={styles.summaryLabel}>Pedidos Pendientes</span><span className={`${styles.summaryValue} ${styles.valueYellow}`}>{stats.pendientes}</span></div>
                   <div className={styles.summaryRow}><span className={styles.summaryLabel}>En Tránsito</span><span className={`${styles.summaryValue} ${styles.valuePurple}`}>{stats.enTransito}</span></div>
                   <div className={styles.summaryRow}><span className={styles.summaryLabel}>Entregados Hoy</span><span className={`${styles.summaryValue} ${styles.valueGreen}`}>{stats.entregados}</span></div>
-                  <div className={styles.summaryDivider}><span className={styles.summaryLabel}>Total Recaudado</span><span className={`${styles.summaryValue} ${styles.valuePurpleStrong}`}>{formatMoney(stats.recaudado)}</span></div>
+                  {/* ── Fila de fees recaudados ── */}
+                  {stats.feesHoy > 0 && (
+                    <div className={styles.summaryRow}>
+                      <span className={styles.summaryLabel}>Total en Envíos</span>
+                      <span className={`${styles.summaryValue} ${styles.valuePurple}`}>Bs. {stats.feesHoy.toFixed(2)}</span>
+                    </div>
+                  )}
+                  <div className={styles.summaryDivider}><span className={styles.summaryLabel}>Total Recaudado</span><span className={`${styles.summaryValue} ${styles.valuePurpleStrong}`}>Bs. {stats.recaudado.toFixed(2)}</span></div>
                 </div>
               </div>
             </section>
@@ -594,3 +638,31 @@ export default function DeliveryPage() {
     </div>
   );
 }
+
+// ── Estilos inline para los chips de distancia/fee ────────────────────────────
+// (el resto de estilos ya están en page.module.css)
+
+const chipStyles: { [k: string]: React.CSSProperties } = {
+  distChip: {
+    display: "inline-flex",
+    alignItems: "center",
+    backgroundColor: "#ecfdf5",
+    border: "1px solid #6ee7b7",
+    color: "#065f46",
+    fontSize: "0.75rem",
+    fontWeight: 600,
+    padding: "0.2rem 0.55rem",
+    borderRadius: 999,
+  },
+  feeChip: {
+    display: "inline-flex",
+    alignItems: "center",
+    backgroundColor: "#fff7ed",
+    border: "1px solid #fed7aa",
+    color: "#c2410c",
+    fontSize: "0.75rem",
+    fontWeight: 600,
+    padding: "0.2rem 0.55rem",
+    borderRadius: 999,
+  },
+};

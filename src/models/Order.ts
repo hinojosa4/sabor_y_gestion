@@ -1,3 +1,4 @@
+// src/models/Order.ts
 import mongoose, { Document, Schema } from 'mongoose';
 
 export interface IOrder extends Document {
@@ -9,12 +10,14 @@ export interface IOrder extends Document {
   service_type: 'dine_in' | 'delivery' | 'pick_up';
   status: 'pending' | 'in_kitchen' | 'ready' | 'picked_up' | 'in_transit' | 'delivered' | 'paid' | 'cancelled';
   total_amount: number;
+  delivery_fee: number;           // ← costo de envío calculado (Bs.)
   payment_method?: string;
   createdAt: Date;
   updatedAt: Date;
   user_id: Schema.Types.ObjectId;
   delivery_address: string;
   delivery_coords: { lat: number | null; lng: number | null };
+  delivery_distance_km: number | null;  // ← distancia calculada guardada
   delivery_phone: string;
   notes: string;
 }
@@ -35,8 +38,9 @@ const OrderSchema = new Schema<IOrder>({
     enum: ['pending', 'in_kitchen', 'ready', 'picked_up', 'in_transit', 'delivered', 'paid', 'cancelled'],
     default: 'pending',
   },
-  total_amount: { type: Number, default: 0 },
-  // ── Nuevo campo ──────────────────────────────────────────────────────────────
+  total_amount:         { type: Number, default: 0 },
+  delivery_fee:         { type: Number, default: 0 },           // ← nuevo
+  delivery_distance_km: { type: Number, default: null },        // ← nuevo
   payment_method: {
     type: String,
     enum: ['Efectivo', 'Tarjeta de Débito', 'Tarjeta de Crédito', 'QR / Transferencia'],

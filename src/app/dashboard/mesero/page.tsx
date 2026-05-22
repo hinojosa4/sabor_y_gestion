@@ -29,7 +29,7 @@ interface Dish {
   image_url?: string;
   category_id?: { _id: string; name: string } | null;
   isAvailable: boolean;
-  ingredients: DishIngredient[];  
+  ingredients: DishIngredient[];
 }
 
 interface OrderItemLocal {
@@ -57,7 +57,13 @@ interface ActiveOrder {
   items: ActiveOrderItem[];
 }
 
-// Alerta de inventario que llega por WebSocket
+// Estado global de mesas (sin filtro por mesero) ──────────────────
+interface TableOrderState {
+  canRequestBill: boolean;      // true cuando puede pedir cuenta
+  activeOrderId: string | null; // orden más reciente para ver comanda
+  statuses: string[];           // todos los estados activos de esa mesa
+}
+
 interface InventoryAlerta {
   ingredientId: string;
   name: string;
@@ -107,17 +113,12 @@ const formatBOB = (amount: number) =>
 
 function getStockIssue(dish: Dish, cartQty: number): { blocked: boolean; reason: string } | null {
   if (!dish.ingredients?.length) return null;
-  
   for (const ing of dish.ingredients) {
     const ingData = ing.ingredient_id;
     if (!ingData) continue;
-    
-    // Stock crítico siempre bloquea
     if (ingData.stockStatus === "critical") {
       return { blocked: true, reason: `🔴 Sin stock de ${ingData.name}` };
     }
-    
-    // Verificar si hay stock suficiente para la cantidad pedida
     const needed = ing.quantity * Math.max(cartQty, 1);
     if (ingData.currentStock < needed) {
       return {
@@ -146,13 +147,7 @@ function useElapsed(createdAt: string) {
 }
 
 // ─── Banner de alerta de inventario ──────────────────────────────
-function InventoryAlertBanner({
-  alertas,
-  onClose,
-}: {
-  alertas: InventoryAlerta[];
-  onClose: () => void;
-}) {
+function InventoryAlertBanner({ alertas, onClose }: { alertas: InventoryAlerta[]; onClose: () => void }) {
   const criticos = alertas.filter((a) => a.stockStatus === "critical");
   const bajos    = alertas.filter((a) => a.stockStatus === "low");
 
@@ -160,18 +155,10 @@ function InventoryAlertBanner({
     <div
       role="alert"
       style={{
-        position: "fixed",
-        top: 70,
-        left: "50%",
-        transform: "translateX(-50%)",
-        zIndex: 9998,
-        width: "min(480px, 92vw)",
-        background: "#fff",
-        borderRadius: 14,
-        border: "2px solid #e85d26",
-        boxShadow: "0 8px 32px rgba(232,93,38,0.18)",
-        overflow: "hidden",
-        animation: "slideDown 0.25s ease",
+        position: "fixed", top: 70, left: "50%", transform: "translateX(-50%)",
+        zIndex: 9998, width: "min(480px, 92vw)", background: "#fff", borderRadius: 14,
+        border: "2px solid #e85d26", boxShadow: "0 8px 32px rgba(232,93,38,0.18)",
+        overflow: "hidden", animation: "slideDown 0.25s ease",
       }}
     >
       <style>{`
@@ -180,105 +167,39 @@ function InventoryAlertBanner({
           to   { opacity: 1; transform: translateX(-50%) translateY(0); }
         }
       `}</style>
-
-      {/* Header */}
-      <div style={{
-        background: criticos.length > 0 ? "#fff0ee" : "#fffbeb",
-        padding: "12px 16px",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "space-between",
-        borderBottom: "1.5px solid #f0f0f0",
-      }}>
+      <div style={{ background: criticos.length > 0 ? "#fff0ee" : "#fffbeb", padding: "12px 16px", display: "flex", alignItems: "center", justifyContent: "space-between", borderBottom: "1.5px solid #f0f0f0" }}>
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-          <span style={{ fontSize: 18 }}>
-            {criticos.length > 0 ? "🚨" : "⚠️"}
-          </span>
-          <span style={{
-            fontSize: 13,
-            fontWeight: 700,
-            color: criticos.length > 0 ? "#e85d26" : "#d97706",
-          }}>
-            Alerta de Inventario
-          </span>
+          <span style={{ fontSize: 18 }}>{criticos.length > 0 ? "🚨" : "⚠️"}</span>
+          <span style={{ fontSize: 13, fontWeight: 700, color: criticos.length > 0 ? "#e85d26" : "#d97706" }}>Alerta de Inventario</span>
         </div>
-        <button
-          onClick={onClose}
-          aria-label="Cerrar alerta"
-          style={{
-            background: "none",
-            border: "none",
-            cursor: "pointer",
-            fontSize: 16,
-            color: "#888",
-            padding: "0 4px",
-          }}
-        >
-          ✕
-        </button>
+        <button onClick={onClose} aria-label="Cerrar alerta" style={{ background: "none", border: "none", cursor: "pointer", fontSize: 16, color: "#888", padding: "0 4px" }}>✕</button>
       </div>
-
-      {/* Body */}
       <div style={{ padding: "12px 16px", display: "flex", flexDirection: "column", gap: 8 }}>
         {criticos.length > 0 && (
           <div>
-            <p style={{ margin: "0 0 6px", fontSize: 11, fontWeight: 700, color: "#e85d26", textTransform: "uppercase", letterSpacing: "0.05em" }}>
-              🔴 Stock Crítico — Operación en riesgo
-            </p>
+            <p style={{ margin: "0 0 6px", fontSize: 11, fontWeight: 700, color: "#e85d26", textTransform: "uppercase", letterSpacing: "0.05em" }}>🔴 Stock Crítico — Operación en riesgo</p>
             {criticos.map((a) => (
-              <div key={a.ingredientId} style={{
-                display: "flex",
-                justifyContent: "space-between",
-                alignItems: "center",
-                padding: "6px 10px",
-                background: "#fff0ee",
-                borderRadius: 8,
-                marginBottom: 4,
-                border: "1px solid #fecaca",
-              }}>
-                <span style={{ fontSize: 13, fontWeight: 600, color: "#1a1a1a" }}>
-                  {a.name}
-                </span>
-                <span style={{ fontSize: 12, color: "#e85d26", fontWeight: 700 }}>
-                  {a.currentStock} {a.unit} / mín {a.minStock} {a.unit}
-                </span>
+              <div key={a.ingredientId} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "6px 10px", background: "#fff0ee", borderRadius: 8, marginBottom: 4, border: "1px solid #fecaca" }}>
+                <span style={{ fontSize: 13, fontWeight: 600, color: "#1a1a1a" }}>{a.name}</span>
+                <span style={{ fontSize: 12, color: "#e85d26", fontWeight: 700 }}>{a.currentStock} {a.unit} / mín {a.minStock} {a.unit}</span>
               </div>
             ))}
           </div>
         )}
-
         {bajos.length > 0 && (
           <div>
-            <p style={{ margin: "0 0 6px", fontSize: 11, fontWeight: 700, color: "#d97706", textTransform: "uppercase", letterSpacing: "0.05em" }}>
-              🟡 Stock Bajo — Comprar pronto
-            </p>
+            <p style={{ margin: "0 0 6px", fontSize: 11, fontWeight: 700, color: "#d97706", textTransform: "uppercase", letterSpacing: "0.05em" }}>🟡 Stock Bajo — Comprar pronto</p>
             {bajos.map((a) => (
-              <div key={a.ingredientId} style={{
-                display: "flex",
-                justifyContent: "space-between",
-                alignItems: "center",
-                padding: "6px 10px",
-                background: "#fffbeb",
-                borderRadius: 8,
-                marginBottom: 4,
-                border: "1px solid #fde68a",
-              }}>
-                <span style={{ fontSize: 13, fontWeight: 600, color: "#1a1a1a" }}>
-                  {a.name}
-                </span>
-                <span style={{ fontSize: 12, color: "#d97706", fontWeight: 700 }}>
-                  {a.currentStock} {a.unit} / adv {a.warningStock} {a.unit}
-                </span>
+              <div key={a.ingredientId} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "6px 10px", background: "#fffbeb", borderRadius: 8, marginBottom: 4, border: "1px solid #fde68a" }}>
+                <span style={{ fontSize: 13, fontWeight: 600, color: "#1a1a1a" }}>{a.name}</span>
+                <span style={{ fontSize: 12, color: "#d97706", fontWeight: 700 }}>{a.currentStock} {a.unit} / adv {a.warningStock} {a.unit}</span>
               </div>
             ))}
           </div>
         )}
       </div>
-
       <div style={{ padding: "8px 16px 14px", textAlign: "center" }}>
-        <p style={{ margin: 0, fontSize: 11, color: "#aaa" }}>
-          Stock descontado al iniciar preparación en cocina
-        </p>
+        <p style={{ margin: 0, fontSize: 11, color: "#aaa" }}>Stock descontado al iniciar preparación en cocina</p>
       </div>
     </div>
   );
@@ -286,16 +207,19 @@ function InventoryAlertBanner({
 
 // ─── TableCard ────────────────────────────────────────────────────
 function TableCard({
-  table, onClick, onRequestBill, onViewComanda, canRequestBill,
+  table, tableOrderState, onClick, onRequestBill, onViewComanda,
 }: {
   table: Table;
+  tableOrderState: TableOrderState | undefined;
   onClick: () => void;
   onRequestBill: (tableId: string) => void;
   onViewComanda: (tableId: string) => void;
-  canRequestBill: boolean;
 }) {
   const cfg = TABLE_STATUS_CONFIG[table.status] ?? TABLE_STATUS_CONFIG["Libre"];
   const isClickable = !["Reservada", "Inactiva", "Ocupada", "Cuenta solicitada"].includes(table.status);
+
+  // canRequestBill viene del estado global de mesas (sin filtro por mesero)
+  const canRequestBill = tableOrderState?.canRequestBill ?? false;
 
   return (
     <div
@@ -329,6 +253,7 @@ function TableCard({
 
       {table.status === "Ocupada" && (
         <div style={{ width: "100%", display: "flex", flexDirection: "column", gap: 6, marginTop: 4 }}>
+          {/* Ver Comanda — cualquier mesero puede ver la comanda de la mesa */}
           <button
             onClick={e => { e.stopPropagation(); onViewComanda(table._id); }}
             style={{ width: "100%", padding: "7px", borderRadius: 10, border: "1.5px solid #2563eb", background: "#eff6ff", color: "#2563eb", fontSize: 12, fontWeight: 700, cursor: "pointer" }}
@@ -336,6 +261,7 @@ function TableCard({
             📋 Ver Comanda
           </button>
 
+          {/* Pedir Cuenta — disponible para cualquier mesero si la mesa puede */}
           {canRequestBill ? (
             <button
               onClick={e => { e.stopPropagation(); onRequestBill(table._id); }}
@@ -349,7 +275,7 @@ function TableCard({
               border: "1.5px solid #e5e7eb", background: "#f9fafb", color: "#9ca3af",
               fontSize: 12, fontWeight: 600, textAlign: "center",
             }}>
-              Marcar como servido primero
+              Esperando que el plato esté listo
             </div>
           )}
         </div>
@@ -422,8 +348,7 @@ function ActiveOrderCard({
             style={{
               width: "100%", padding: "12px", borderRadius: 10, border: "none",
               background: loading ? "#94a3b8" : "#111", color: "#fff",
-              fontSize: 13, fontWeight: 700,
-              cursor: loading ? "not-allowed" : "pointer",
+              fontSize: 13, fontWeight: 700, cursor: loading ? "not-allowed" : "pointer",
               display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
             }}
           >
@@ -432,7 +357,7 @@ function ActiveOrderCard({
         </div>
       )}
 
-      {/* Pedir cuenta — solo si ya fue entregada */}
+      {/* Pedir cuenta desde la tarjeta de orden — solo si delivered */}
       {order.status === "delivered" && (
         <div style={{ padding: "0 16px 14px" }}>
           <button
@@ -441,8 +366,7 @@ function ActiveOrderCard({
             style={{
               width: "100%", padding: "10px", borderRadius: 10,
               border: "1.5px solid #ea580c", background: "#fff7ed", color: "#ea580c",
-              fontSize: 13, fontWeight: 700,
-              cursor: loading ? "not-allowed" : "pointer",
+              fontSize: 13, fontWeight: 700, cursor: loading ? "not-allowed" : "pointer",
               display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
             }}
           >
@@ -451,7 +375,6 @@ function ActiveOrderCard({
         </div>
       )}
 
-      {/* Aviso si aún no está listo */}
       {(order.status === "pending" || order.status === "in_kitchen") && (
         <div style={{ padding: "0 16px 12px" }}>
           <div style={{ padding: "8px 12px", borderRadius: 8, background: "#fef3c7", border: "1px solid #fcd34d", fontSize: 12, color: "#92400e", textAlign: "center" }}>
@@ -464,7 +387,7 @@ function ActiveOrderCard({
 }
 
 // ─── OrderModal ───────────────────────────────────────────────────
-function OrderModal({ table, onClose, onOrderCreated }: { table: Table; onClose: () => void; onOrderCreated: () => void; }) {
+function OrderModal({ table, onClose, onOrderCreated }: { table: Table; onClose: () => void; onOrderCreated: () => void }) {
   const [dishes, setDishes] = useState<Dish[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [selectedCat, setSelectedCat] = useState<string>("all");
@@ -481,9 +404,9 @@ function OrderModal({ table, onClose, onOrderCreated }: { table: Table; onClose:
       try {
         const [dishRes, catRes] = await Promise.all([fetch("/api/dishes"), fetch("/api/categories")]);
         const dishData = await dishRes.json();
-        const catData = await catRes.json();
+        const catData  = await catRes.json();
         if (dishData.ok) setDishes(dishData.data.filter((d: Dish) => d.isAvailable));
-        if (catData.ok) setCategories(catData.data);
+        if (catData.ok)  setCategories(catData.data);
       } catch { setError("Error al cargar el menú"); }
       finally { setLoading(false); }
     };
@@ -491,24 +414,36 @@ function OrderModal({ table, onClose, onOrderCreated }: { table: Table; onClose:
   }, []);
 
   const filteredDishes = selectedCat === "all" ? dishes : dishes.filter(d => d.category_id?._id === selectedCat);
-  const addToCart = (dish: Dish) => setCart(prev => { const ex = prev.find(i => i.dish._id === dish._id); if (ex) return prev.map(i => i.dish._id === dish._id ? { ...i, quantity: i.quantity + 1 } : i); return [...prev, { dish, quantity: 1, notes: "" }]; });
+  const addToCart    = (dish: Dish) => setCart(prev => { const ex = prev.find(i => i.dish._id === dish._id); if (ex) return prev.map(i => i.dish._id === dish._id ? { ...i, quantity: i.quantity + 1 } : i); return [...prev, { dish, quantity: 1, notes: "" }]; });
   const removeFromCart = (dishId: string) => setCart(prev => { const ex = prev.find(i => i.dish._id === dishId); if (!ex) return prev; if (ex.quantity <= 1) return prev.filter(i => i.dish._id !== dishId); return prev.map(i => i.dish._id === dishId ? { ...i, quantity: i.quantity - 1 } : i); });
   const getQty = (dishId: string) => cart.find(i => i.dish._id === dishId)?.quantity ?? 0;
   const total = cart.reduce((sum, i) => sum + i.dish.price * i.quantity, 0);
 
   const handleSubmit = async () => {
     if (cart.length === 0) { setError("Agrega al menos un platillo"); return; }
+
+    const token = localStorage.getItem("token");
+    if (!token) { setError("Sesión expirada. Vuelve a iniciar sesión."); return; }
+
     setSubmitting(true); setError("");
     try {
-      const token = localStorage.getItem("token");
+      const headers: Record<string, string> = {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      };
       const res = await fetch("/api/orders", {
         method: "POST",
-        headers: { "Content-Type": "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}) },
-        body: JSON.stringify({ table_id: table._id, service_type: "dine_in", items: cart.map(i => ({ dish_id: i.dish._id, quantity: i.quantity, unit_price: i.dish.price, notes: i.notes || undefined })) }),
+        headers,
+        body: JSON.stringify({
+          table_id: table._id,
+          service_type: "dine_in",
+          items: cart.map(i => ({ dish_id: i.dish._id, quantity: i.quantity, unit_price: i.dish.price, notes: i.notes || undefined })),
+        }),
       });
       const data = await res.json();
       if (!data.ok) { setError(data.message || "Error al crear la orden"); return; }
-      onOrderCreated(); onClose();
+      onOrderCreated();
+      onClose();
     } catch { setError("Error de conexión. Intenta de nuevo."); }
     finally { setSubmitting(false); }
   };
@@ -535,61 +470,48 @@ function OrderModal({ table, onClose, onOrderCreated }: { table: Table; onClose:
               ))}
             </div>
             <div style={{ flex: 1, overflowY: "auto", padding: "0 20px 16px", display: "flex", flexDirection: "column", gap: 10 }}>
-              {loading ? (<p style={{ color: "#9ca3af", fontSize: 13, textAlign: "center", padding: 32 }}>Cargando menú...</p>
-              ) : filteredDishes.length === 0 ? (<p style={{ color: "#9ca3af", fontSize: 13, textAlign: "center", padding: 32 }}>Sin platillos en esta categoría</p>
+              {loading ? (
+                <p style={{ color: "#9ca3af", fontSize: 13, textAlign: "center", padding: 32 }}>Cargando menú...</p>
+              ) : filteredDishes.length === 0 ? (
+                <p style={{ color: "#9ca3af", fontSize: 13, textAlign: "center", padding: 32 }}>Sin platillos en esta categoría</p>
               ) : filteredDishes.map(dish => {
-                    const qty = getQty(dish._id);
-                    const stockIssue = getStockIssue(dish, qty);   // ← qty se recalcula al rederizar
-                    const isBlocked = stockIssue !== null;
-                    return (
-                      <div key={dish._id} style={{
-                        display: "flex", alignItems: "center", gap: 12, padding: "12px",
-                        borderRadius: 12,
-                        border: isBlocked ? "1.5px solid #fecaca" : "1.5px solid #f3f4f6",
-                        background: isBlocked ? "#fff5f5" : qty > 0 ? "#f0fdf4" : "#fff",
-                        transition: "background 0.15s",
-                        opacity: isBlocked ? 0.75 : 1,
-                      }}>
-                        {/* imagen igual que antes */}
-                        <div style={{ width: 64, height: 64, borderRadius: 10, flexShrink: 0, background: dish.image_url ? "transparent" : "#f3f4f6", overflow: "hidden", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                          {dish.image_url ? <img src={dish.image_url} alt={dish.name} style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : <span style={{ fontSize: 24 }}>🍽</span>}
-                        </div>
-
-                        <div style={{ flex: 1, minWidth: 0 }}>
-                          <p style={{ margin: 0, fontSize: 14, fontWeight: 700, color: "#111" }}>{dish.name}</p>
-                          {dish.description && <p style={{ margin: "2px 0 0", fontSize: 11, color: "#9ca3af", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{dish.description}</p>}
-                          <p style={{ margin: "4px 0 0", fontSize: 14, fontWeight: 700, color: "#ea580c" }}>{formatBOB(dish.price)}</p>
-                          
-                          {/* Badge dinámico con la razón específica */}
-                          {isBlocked && (
-                            <p style={{ margin: "4px 0 0", fontSize: 11, fontWeight: 700, color: "#dc2626", background: "#fee2e2", border: "1px solid #fecaca", borderRadius: 6, padding: "2px 8px", display: "inline-block" }}>
-                              {stockIssue!.reason}
-                            </p>
-                          )}
-                        </div>
-
-                        {/* Botones: bloqueados si no hay stock */}
-                        {isBlocked ? (
-                          <div style={{
-                            width: 32, height: 32, borderRadius: "50%",
-                            border: "2px solid #fecaca", background: "#fee2e2",
-                            display: "flex", alignItems: "center", justifyContent: "center",
-                            fontSize: 14, flexShrink: 0,
-                          }}>
-                            🚫
-                          </div>
-                        ) : qty === 0 ? (
-                          <button onClick={() => addToCart(dish)} style={{ width: 32, height: 32, borderRadius: "50%", border: "none", background: "#ea580c", color: "#fff", fontSize: 20, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>+</button>
-                        ) : (
-                          <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
-                            <button onClick={() => removeFromCart(dish._id)} style={{ width: 28, height: 28, borderRadius: "50%", border: "1.5px solid #e5e7eb", background: "#fff", cursor: "pointer", fontSize: 16, display: "flex", alignItems: "center", justifyContent: "center" }}>−</button>
-                            <span style={{ fontSize: 14, fontWeight: 700, minWidth: 20, textAlign: "center" }}>{qty}</span>
-                            <button onClick={() => addToCart(dish)} style={{ width: 28, height: 28, borderRadius: "50%", border: "none", background: "#ea580c", color: "#fff", cursor: "pointer", fontSize: 16, display: "flex", alignItems: "center", justifyContent: "center" }}>+</button>
-                          </div>
-                        )}
+                const qty = getQty(dish._id);
+                const stockIssue = getStockIssue(dish, qty);
+                const isBlocked  = stockIssue !== null;
+                return (
+                  <div key={dish._id} style={{
+                    display: "flex", alignItems: "center", gap: 12, padding: "12px", borderRadius: 12,
+                    border: isBlocked ? "1.5px solid #fecaca" : "1.5px solid #f3f4f6",
+                    background: isBlocked ? "#fff5f5" : qty > 0 ? "#f0fdf4" : "#fff",
+                    transition: "background 0.15s", opacity: isBlocked ? 0.75 : 1,
+                  }}>
+                    <div style={{ width: 64, height: 64, borderRadius: 10, flexShrink: 0, background: dish.image_url ? "transparent" : "#f3f4f6", overflow: "hidden", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                      {dish.image_url ? <img src={dish.image_url} alt={dish.name} style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : <span style={{ fontSize: 24 }}>🍽</span>}
+                    </div>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <p style={{ margin: 0, fontSize: 14, fontWeight: 700, color: "#111" }}>{dish.name}</p>
+                      {dish.description && <p style={{ margin: "2px 0 0", fontSize: 11, color: "#9ca3af", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{dish.description}</p>}
+                      <p style={{ margin: "4px 0 0", fontSize: 14, fontWeight: 700, color: "#ea580c" }}>{formatBOB(dish.price)}</p>
+                      {isBlocked && (
+                        <p style={{ margin: "4px 0 0", fontSize: 11, fontWeight: 700, color: "#dc2626", background: "#fee2e2", border: "1px solid #fecaca", borderRadius: 6, padding: "2px 8px", display: "inline-block" }}>
+                          {stockIssue!.reason}
+                        </p>
+                      )}
+                    </div>
+                    {isBlocked ? (
+                      <div style={{ width: 32, height: 32, borderRadius: "50%", border: "2px solid #fecaca", background: "#fee2e2", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 14, flexShrink: 0 }}>🚫</div>
+                    ) : qty === 0 ? (
+                      <button onClick={() => addToCart(dish)} style={{ width: 32, height: 32, borderRadius: "50%", border: "none", background: "#ea580c", color: "#fff", fontSize: 20, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>+</button>
+                    ) : (
+                      <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
+                        <button onClick={() => removeFromCart(dish._id)} style={{ width: 28, height: 28, borderRadius: "50%", border: "1.5px solid #e5e7eb", background: "#fff", cursor: "pointer", fontSize: 16, display: "flex", alignItems: "center", justifyContent: "center" }}>−</button>
+                        <span style={{ fontSize: 14, fontWeight: 700, minWidth: 20, textAlign: "center" }}>{qty}</span>
+                        <button onClick={() => addToCart(dish)} style={{ width: 28, height: 28, borderRadius: "50%", border: "none", background: "#ea580c", color: "#fff", cursor: "pointer", fontSize: 16, display: "flex", alignItems: "center", justifyContent: "center" }}>+</button>
                       </div>
-                    );
-                  })}
+                    )}
+                  </div>
+                );
+              })}
             </div>
           </div>
 
@@ -613,7 +535,10 @@ function OrderModal({ table, onClose, onOrderCreated }: { table: Table; onClose:
                         </div>
                         <button onClick={() => setCart(prev => prev.filter(i => i.dish._id !== item.dish._id))} style={{ border: "none", background: "none", cursor: "pointer", color: "#9ca3af", fontSize: 14, padding: "0 0 0 8px" }}>✕</button>
                       </div>
-                      <input type="text" placeholder="Notas (opcional)..." value={item.notes}
+                      <input
+                        type="text"
+                        placeholder="Notas (opcional)..."
+                        value={item.notes}
                         onChange={e => setCart(prev => prev.map(i => i.dish._id === item.dish._id ? { ...i, notes: e.target.value } : i))}
                         style={{ marginTop: 6, width: "100%", padding: "5px 8px", fontSize: 11, border: "1px solid #e5e7eb", borderRadius: 6, outline: "none", color: "#374151", boxSizing: "border-box" }}
                       />
@@ -630,7 +555,9 @@ function OrderModal({ table, onClose, onOrderCreated }: { table: Table; onClose:
                   <span style={{ fontSize: 16, fontWeight: 800, color: "#111" }}>{formatBOB(total)}</span>
                 </div>
               )}
-              <button onClick={handleSubmit} disabled={submitting || cart.length === 0}
+              <button
+                onClick={handleSubmit}
+                disabled={submitting || cart.length === 0}
                 style={{ width: "100%", padding: "13px", borderRadius: 12, border: "none", background: cart.length === 0 ? "#e5e7eb" : submitting ? "#94a3b8" : "#ea580c", color: cart.length === 0 ? "#9ca3af" : "#fff", fontSize: 14, fontWeight: 700, cursor: cart.length === 0 || submitting ? "not-allowed" : "pointer" }}
               >
                 {submitting ? "Enviando..." : "Enviar a Cocina"}
@@ -648,43 +575,60 @@ export default function MeseroPage() {
   const router = useRouter();
   const { user, loading: userLoading, logout } = useAuth(ALLOWED_ROLES);
 
-  const [tables, setTables] = useState<Table[]>([]);
-  const [activeOrders, setActiveOrders] = useState<ActiveOrder[]>([]);
-  const [loadingData, setLoadingData] = useState(true);
+  const [tables, setTables]               = useState<Table[]>([]);
+  const [activeOrders, setActiveOrders]   = useState<ActiveOrder[]>([]);
+
+  // Estado global de mesas: qué puede hacer cada mesa sin importar qué mesero tomó la orden
+  const [tableOrderStates, setTableOrderStates] = useState<Record<string, TableOrderState>>({});
+
+  const [loadingData, setLoadingData]     = useState(true);
   const [actionLoading, setActionLoading] = useState(false);
   const [selectedTable, setSelectedTable] = useState<Table | null>(null);
-  const [toast, setToast] = useState("");
-  const [refreshKey, setRefreshKey] = useState(0);
-  const [comandaOrderId, setComandaOrderId] = useState<string | null>(null);
+  const [toast, setToast]                 = useState("");
+  const [refreshKey, setRefreshKey]       = useState(0);
+  const [comandaOrderId, setComandaOrderId]         = useState<string | null>(null);
   const [comandaTableNumber, setComandaTableNumber] = useState<number | null>(null);
-
-  // ── Estado para alertas de inventario ────────────────────────────
-  const [inventoryAlertas, setInventoryAlertas] = useState<InventoryAlerta[] | null>(null);
+  const [inventoryAlertas, setInventoryAlertas]     = useState<InventoryAlerta[] | null>(null);
 
   const showToast = useCallback((msg: string) => {
     setToast(msg);
     setTimeout(() => setToast(""), 3000);
   }, []);
 
+  // tokenRef siempre tiene el token actual sin que fetchData deba recrearse
+  const tokenRef = useRef<string | null>(null);
+  useEffect(() => {
+    tokenRef.current = localStorage.getItem("token");
+  }, [user]); // se actualiza cuando cambia el usuario autenticado
+
   const fetchData = useCallback(async () => {
-    const token = localStorage.getItem("token");
+    // Leer el token en el momento de la llamada para evitar closures obsoletos
+    const token = tokenRef.current ?? localStorage.getItem("token");
+    const headers: Record<string, string> = token ? { Authorization: `Bearer ${token}` } : {};
     try {
-      const [tablesRes, ordersRes] = await Promise.all([
+      const [tablesRes, ordersRes, tableStatesRes] = await Promise.all([
         fetch("/api/tables"),
-        fetch("/api/orders/active", {
-          headers: token ? { Authorization: `Bearer ${token}` } : {},
-        }),
+        fetch("/api/orders/active",   { headers }),
+        fetch("/api/orders/by-table", { headers }),
       ]);
-      const tablesRaw = await tablesRes.json();
-      const ordersData = await ordersRes.json();
+
+      const tablesRaw      = await tablesRes.json();
+      const ordersData     = await ordersRes.json();
+      const tableStatesRaw = await tableStatesRes.json();
+
       setTables(Array.isArray(tablesRaw) ? tablesRaw : []);
+
       if (ordersData.ok) {
         setActiveOrders(ordersData.data);
         setRefreshKey(k => k + 1);
       }
+
+      if (tableStatesRaw.ok) {
+        setTableOrderStates(tableStatesRaw.data);
+      }
     } catch { /* silencioso */ }
     finally { setLoadingData(false); }
-  }, []);
+  }, []); // sin dependencias — lee token desde ref en cada llamada
 
   const fetchDataRef = useRef(fetchData);
   useEffect(() => { fetchDataRef.current = fetchData; }, [fetchData]);
@@ -696,7 +640,6 @@ export default function MeseroPage() {
     let mounted = true;
 
     const setup = async () => {
-      // FIX: usar pusher-js/with-encryption igual que pusherClient.ts
       const { default: Pusher } = await import("pusher-js/with-encryption");
       if (!mounted) return;
       pusherInstance = new Pusher(process.env.NEXT_PUBLIC_PUSHER_KEY!, {
@@ -704,16 +647,14 @@ export default function MeseroPage() {
         forceTLS: true,
       });
       const channel = pusherInstance.subscribe("restaurant");
-      channel.bind("order:new", () => { if (mounted) fetchDataRef.current(); });
+      channel.bind("order:new",     () => { if (mounted) fetchDataRef.current(); });
       channel.bind("order:updated", (data: { newStatus: string }) => {
         if (!mounted) return;
         fetchDataRef.current();
         if (data.newStatus === "ready") showToast("🔔 ¡Una orden está lista para servir!");
       });
-      channel.bind("table:updated", () => { if (mounted) fetchDataRef.current(); });
+      channel.bind("table:updated",        () => { if (mounted) fetchDataRef.current(); });
       channel.bind("table:bill_requested", () => { if (mounted) fetchDataRef.current(); });
-
-      // ── Alerta de inventario ────────────────────────────────────
       channel.bind("inventory:alert", (data: { alertas: InventoryAlerta[] }) => {
         if (!mounted) return;
         if (data.alertas?.length > 0) {
@@ -731,12 +672,8 @@ export default function MeseroPage() {
     };
   }, [userLoading, user, fetchData, showToast]);
 
-  // Marcar como servido — actualización optimista inmediata
   const handleMarkServed = async (orderId: string) => {
     setActionLoading(true);
-    setActiveOrders(prev =>
-      prev.map(o => o._id === orderId ? { ...o, status: "delivered" as OrderStatus } : o)
-    );
     try {
       const res = await fetch("/api/Kitchen", {
         method: "PATCH",
@@ -746,14 +683,12 @@ export default function MeseroPage() {
       const data = await res.json();
       if (!data.ok) {
         showToast("❌ " + data.message);
-        await fetchData(); // revertir
         return;
       }
       showToast("✓ Orden marcada como entregada");
       await fetchData();
     } catch {
       showToast("❌ Error al actualizar");
-      await fetchData();
     } finally {
       setActionLoading(false);
     }
@@ -786,34 +721,30 @@ export default function MeseroPage() {
     }
   };
 
+  // Ver comanda: usa el activeOrderId del estado global de mesas,
+  // así funciona aunque sea la orden de otro mesero.
   const handleViewComanda = (tableId: string) => {
-    const order = activeOrders.find(o => o.table_id === tableId && !["paid", "cancelled"].includes(o.status));
-    if (!order) { showToast("❌ No hay orden activa para esta mesa"); return; }
+    const tableState = tableOrderStates[tableId];
+    if (!tableState?.activeOrderId) {
+      showToast("❌ No hay orden activa para esta mesa");
+      return;
+    }
     const table = tables.find(t => t._id === tableId);
-    setComandaOrderId(order._id);
+    setComandaOrderId(tableState.activeOrderId);
     setComandaTableNumber(table?.number ?? null);
   };
 
-  // Una mesa puede pedir cuenta solo si tiene alguna orden en estado "delivered"
-  // y ninguna orden pendiente/en cocina/lista
-  const isTableDelivered = (tableId: string) => {
-    const tableOrders = activeOrders.filter(o => o.table_id === tableId);
-    const hasActiveOrder = tableOrders.some(o =>
-      ["pending", "in_kitchen", "ready"].includes(o.status)
-    );
-    const hasDelivered = tableOrders.some(o => o.status === "delivered");
-    return hasDelivered && !hasActiveOrder;
-  };
-
-  // Órdenes visibles en la sección "Órdenes Activas":
-  // se muestran TODAS excepto paid y cancelled — incluye delivered
-  const visibleOrders = activeOrders.filter(o => !["paid", "cancelled", "delivered"].includes(o.status));
+  // Órdenes visibles en "Órdenes Activas":
+  // Solo las del mesero autenticado (ya filtradas por el API),
+  // excluyendo paid y cancelled. Se muestran TODAS incluyendo "delivered"
+  // para que el mesero pueda pedir la cuenta desde su propia sección.
+  const visibleOrders = activeOrders.filter(o => !["paid", "cancelled"].includes(o.status));
 
   const occupiedCount  = tables.filter(t => ["Ocupada", "Cuenta solicitada"].includes(t.status)).length;
   const reservedCount  = tables.filter(t => t.status === "Reservada").length;
   const availableCount = tables.filter(t => ["Libre", "Activa"].includes(t.status)).length;
   const activeOrdersCount = activeOrders.filter(o => ["pending", "in_kitchen"].includes(o.status)).length;
-  const readyCount = activeOrders.filter(o => o.status === "ready").length;
+  const readyCount     = activeOrders.filter(o => o.status === "ready").length;
 
   if (userLoading) return (
     <div style={{ minHeight: "100vh", background: "#f9fafb", display: "flex", alignItems: "center", justifyContent: "center" }}>
@@ -846,10 +777,7 @@ export default function MeseroPage() {
 
       {/* Banner alerta inventario */}
       {inventoryAlertas && inventoryAlertas.length > 0 && (
-        <InventoryAlertBanner
-          alertas={inventoryAlertas}
-          onClose={() => setInventoryAlertas(null)}
-        />
+        <InventoryAlertBanner alertas={inventoryAlertas} onClose={() => setInventoryAlertas(null)} />
       )}
 
       {/* Toast */}
@@ -873,35 +801,28 @@ export default function MeseroPage() {
                   <TableCard
                     key={table._id}
                     table={table}
+                    tableOrderState={tableOrderStates[table._id]}
                     onClick={() => setSelectedTable(table)}
                     onRequestBill={handleRequestBill}
                     onViewComanda={handleViewComanda}
-                    canRequestBill={isTableDelivered(table._id)}
                   />
                 ))}
               </div>
             )}
           </div>
 
-          {/* Órdenes activas — siempre visible, con estado vacío si no hay */}
+          {/* Órdenes activas — solo del mesero autenticado */}
           <div style={{ background: "#fff", borderRadius: 20, border: "1.5px solid #f3f4f6", padding: "24px" }}>
-            <h2 style={{ margin: "0 0 4px", fontSize: 16, fontWeight: 800, color: "#111" }}>Órdenes Activas</h2>
-            <p style={{ margin: "0 0 20px", fontSize: 13, color: "#9ca3af" }}>Seguimiento de órdenes en proceso</p>
+            <h2 style={{ margin: "0 0 4px", fontSize: 16, fontWeight: 800, color: "#111" }}>Mis Órdenes</h2>
+            <p style={{ margin: "0 0 20px", fontSize: 13, color: "#9ca3af" }}>Órdenes que tomaste en este turno</p>
 
             {loadingData ? (
               <p style={{ color: "#9ca3af", fontSize: 13, textAlign: "center", padding: 32 }}>Cargando órdenes...</p>
             ) : visibleOrders.length === 0 ? (
-              <div style={{
-                textAlign: "center", padding: "40px 16px",
-                border: "2px dashed #e5e7eb", borderRadius: 14,
-              }}>
+              <div style={{ textAlign: "center", padding: "40px 16px", border: "2px dashed #e5e7eb", borderRadius: 14 }}>
                 <div style={{ fontSize: 36, marginBottom: 10 }}>📋</div>
-                <p style={{ margin: 0, fontSize: 14, fontWeight: 600, color: "#6b7280" }}>
-                  No hay órdenes activas
-                </p>
-                <p style={{ margin: "6px 0 0", fontSize: 12, color: "#9ca3af" }}>
-                  Las nuevas órdenes aparecerán aquí automáticamente
-                </p>
+                <p style={{ margin: 0, fontSize: 14, fontWeight: 600, color: "#6b7280" }}>No tienes órdenes activas</p>
+                <p style={{ margin: "6px 0 0", fontSize: 12, color: "#9ca3af" }}>Las nuevas órdenes aparecerán aquí automáticamente</p>
               </div>
             ) : (
               <div key={refreshKey} style={{ display: "flex", flexDirection: "column", gap: 12 }}>
@@ -924,9 +845,9 @@ export default function MeseroPage() {
           <div style={{ background: "#fff", borderRadius: 20, border: "1.5px solid #f3f4f6", padding: "20px 24px" }}>
             <h3 style={{ margin: "0 0 16px", fontSize: 15, fontWeight: 800, color: "#111" }}>Resumen del Turno</h3>
             {[
-              { label: "Mesas Ocupadas", value: `${occupiedCount}/${tables.length}`, color: "#111" },
-              { label: "Órdenes Activas", value: activeOrdersCount, color: "#111" },
-              { label: "Listas para Servir", value: readyCount, color: readyCount > 0 ? "#16a34a" : "#111" },
+              { label: "Mesas Ocupadas",      value: `${occupiedCount}/${tables.length}`, color: "#111" },
+              { label: "Mis Órdenes Activas", value: activeOrdersCount,                  color: "#111" },
+              { label: "Listas para Servir",  value: readyCount, color: readyCount > 0 ? "#16a34a" : "#111" },
             ].map(item => (
               <div key={item.label} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "10px 0", borderBottom: "1px solid #f9fafb" }}>
                 <span style={{ fontSize: 13, color: "#6b7280" }}>{item.label}</span>
@@ -939,8 +860,8 @@ export default function MeseroPage() {
             <h3 style={{ margin: "0 0 16px", fontSize: 15, fontWeight: 800, color: "#111" }}>Estado de Mesas</h3>
             {[
               { label: `Disponible (${availableCount})`, dot: "#22c55e" },
-              { label: `Ocupada (${occupiedCount})`, dot: "#f97316" },
-              { label: `Reservada (${reservedCount})`, dot: "#3b82f6" },
+              { label: `Ocupada (${occupiedCount})`,     dot: "#f97316" },
+              { label: `Reservada (${reservedCount})`,   dot: "#3b82f6" },
             ].map(item => (
               <div key={item.label} style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 10 }}>
                 <div style={{ width: 12, height: 12, borderRadius: "50%", background: item.dot, flexShrink: 0 }} />
@@ -956,11 +877,19 @@ export default function MeseroPage() {
       </div>
 
       {selectedTable && (
-        <OrderModal table={selectedTable} onClose={() => setSelectedTable(null)} onOrderCreated={() => { showToast("✓ Orden enviada a cocina"); fetchData(); }} />
+        <OrderModal
+          table={selectedTable}
+          onClose={() => setSelectedTable(null)}
+          onOrderCreated={() => { showToast("✓ Orden enviada a cocina"); fetchData(); }}
+        />
       )}
 
       {comandaOrderId && (
-        <ComandaMeseroModal orderId={comandaOrderId} tableNumber={comandaTableNumber} onClose={() => { setComandaOrderId(null); setComandaTableNumber(null); }} />
+        <ComandaMeseroModal
+          orderId={comandaOrderId}
+          tableNumber={comandaTableNumber}
+          onClose={() => { setComandaOrderId(null); setComandaTableNumber(null); }}
+        />
       )}
     </div>
   );

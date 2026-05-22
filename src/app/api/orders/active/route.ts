@@ -1,3 +1,5 @@
+// src/app/api/orders/active/route.ts
+
 import { NextRequest, NextResponse } from "next/server";
 import { connectDB } from "@/lib/db";
 import Order from "@/models/Order";
@@ -25,13 +27,22 @@ export async function GET(req: NextRequest) {
     const userId  = payload.userId;
     const userRol = payload.rol;
 
-    // Admin ve todas las órdenes activas, mesero solo las suyas
-    // Se incluye "delivered" para que el mesero pueda pedir la cuenta
-    const filter: Record<string, unknown> = {
-      status: { $in: ["pending", "in_kitchen", "ready", "delivered"] },
-    };
-    if (userRol !== "admin") {
-      filter.mesero_id = userId;
+    const activeStatuses = ["pending", "in_kitchen", "ready", "delivered"];
+
+    let filter: Record<string, unknown>;
+
+    if (userRol === "admin" || userRol === "cajero") {
+      // Admin y cajero ven todas las órdenes activas sin excepción
+      filter = { status: { $in: activeStatuses } };
+    } else {
+      // Mesero solo ve sus propias órdenes.
+      // Las órdenes huérfanas (mesero_id "unknown"/null/ausente) NO se
+      // muestran a ningún mesero específico para evitar que aparezcan
+      // en el panel del último mesero que hizo un fetch.
+      filter = {
+        status: { $in: activeStatuses },
+        mesero_id: userId,
+      };
     }
 
     const orders = await Order.find(filter).sort({ createdAt: -1 }).lean();
@@ -54,14 +65,22 @@ export async function GET(req: NextRequest) {
 
     const result = orders.map((order) => ({
       ...order,
-      table_number: order.table_id ? tableMap.get(String(order.table_id))?.number ?? null : null,
+      table_number: order.table_id
+        ? tableMap.get(String(order.table_id))?.number ?? null
+        : null,
       items: itemsByOrder[String(order._id)] ?? [],
+      // Flag para identificar órdenes sin mesero asignado
+      isOrphan: !order.mesero_id || order.mesero_id === "unknown",
     }));
 
     return NextResponse.json({ ok: true, data: result });
   } catch (error) {
     return NextResponse.json(
-      { ok: false, message: "Error al obtener órdenes", error: error instanceof Error ? error.message : String(error) },
+      {
+        ok: false,
+        message: "Error al obtener órdenes",
+        error: error instanceof Error ? error.message : String(error),
+      },
       { status: 500 }
     );
   }
