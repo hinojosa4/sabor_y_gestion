@@ -1,11 +1,12 @@
 // models/Payment.ts
-import mongoose, { Document, Schema } from 'mongoose';
+import mongoose, { Document, Schema, Types } from 'mongoose';
 
 export interface IPayment extends Document {
   order_id: string;
   amount: number;
   method: 'cash' | 'card' | 'qr';
   status: 'pending' | 'completed';
+  customer_id?: Types.ObjectId | null;
   customer_email?: string;
   timestamp: Date;
 }
@@ -15,6 +16,7 @@ const PaymentSchema = new Schema<IPayment>({
   amount: { type: Number, required: true },
   method: { type: String, enum: ['cash', 'card', 'qr'], required: true },
   status: { type: String, enum: ['pending', 'completed'], default: 'pending' },
+  customer_id: { type: Schema.Types.ObjectId, ref: 'User', default: null, index: true },
   customer_email: { type: String, trim: true, default: null },
   timestamp: { type: Date, default: Date.now },
 });

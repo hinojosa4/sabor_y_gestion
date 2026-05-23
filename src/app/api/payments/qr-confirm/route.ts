@@ -8,6 +8,7 @@ import Table from '@/models/Table';
 import Payment from '@/models/Payment';
 import { sendPaymentEmail } from '@/lib/email';
 import { pusherServer } from '@/lib/pusher';
+import { findRegisteredCustomerByEmail } from '@/lib/customerLookup';
 import '@/models/Dish';
 
 type LeanOrderItem = {
@@ -27,8 +28,9 @@ export async function POST(req: NextRequest) {
     await connectDB();
 
     const { orderId, email } = await req.json();
+    const { email: normalizedEmail, customer } = await findRegisteredCustomerByEmail(email);
 
-    if (!email || !email.includes('@')) {
+    if (!normalizedEmail) {
       return NextResponse.json(
         { error: 'El correo electrÃ³nico es obligatorio' },
         { status: 400 }
@@ -92,12 +94,16 @@ export async function POST(req: NextRequest) {
       amount: totalAmount,
       method: 'qr',
       status: 'completed',
-      customer_email: email,
+      customer_id: customer?._id ?? null,
+      customer_email: normalizedEmail,
       timestamp: new Date(),
     });
 
     order.status = 'paid';
     order.total_amount = totalAmount;
+    if (customer && !order.customer_id) {
+      order.customer_id = customer._id;
+    }
     await order.save();
 
     if (order.service_type === 'dine_in' && order.table_id) {
@@ -115,10 +121,23 @@ export async function POST(req: NextRequest) {
       method: 'qr',
       amount: totalAmount,
       tableId: order.table_id,
+      customer: customer
+        ? {
+            id: customer._id.toString(),
+            name: customer.name,
+            email: customer.email,
+            type: 'registered',
+          }
+        : {
+            id: null,
+            name: null,
+            email: normalizedEmail,
+            type: 'guest',
+          },
     });
 
     await sendPaymentEmail({
-      to: email,
+      to: normalizedEmail,
       orderId: order._id.toString(),
       amount: totalAmount,
       method: 'qr',
