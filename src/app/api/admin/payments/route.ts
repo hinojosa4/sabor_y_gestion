@@ -315,10 +315,12 @@ export async function GET(req: NextRequest) {
 
     const summary = rows.reduce(
       (acc, row) => {
-        acc.total += row.amount;
         acc.count += 1;
-        if (row.method === "cash") acc.cash += row.amount;
-        if (row.method === "qr") acc.qr += row.amount;
+        if (row.paymentStatus === "completed") {
+          acc.total += row.amount;
+          if (row.method === "cash") acc.cash += row.amount;
+          if (row.method === "qr") acc.qr += row.amount;
+        }
         if (row.paymentStatus === "pending") acc.pending += 1;
         return acc;
       },

@@ -219,16 +219,15 @@ export default function DashboardPage() {
     { label: "Categorías",   value: loading ? "—" : stats.totalCategories, sub: loading ? "" : `${stats.activeCategories} activas`,    subColor: "#27ae60", icon: "🏷️", iconBg: "#f0f6ff" },
     { label: "Usuarios",     value: loading ? "—" : stats.totalUsers,      sub: loading ? "" : `${stats.activeUsers} activos`,         subColor: "#27ae60", icon: "👥",  iconBg: "#f0fdf4" },
     { label: "Mesas",        value: loading ? "—" : stats.totalTables,     sub: loading ? "" : `${stats.availableTables} libres`,      subColor: "#7c3aed", icon: "🪑",  iconBg: "#f5f3ff" },
-    { label: "Ingresos",     value: revenueLoading ? "—" : formatCurrency(revenue.salesTotal), sub: revenueLoading ? "" : `Efectivo ${formatCurrency(revenue.cashTotal)} · QR ${formatCurrency(revenue.qrTotal)}`, subColor: "#e85d26", icon: "Bs", iconBg: "#fff8f5" },
   ];
 
   const quickActions = [
-    { icon: "Bs", title: "Control de Cobros", desc: "Consulta pagos, clientes y estados en tiempo real", route: "/dashboard/cobros", color: "#1a1a1a", bg: "#fff8f5", border: "#ffd4bc", stats: revenueLoading ? "—" : `Hoy ${formatCurrency(revenue.salesTotal)} · QR ${formatCurrency(revenue.qrTotal)}` },
     { icon: "🏷️", title: "Gestión de Categorías", desc: "Organiza y administra las categorías del menú", route: "/categories",      color: "#e85d26", bg: "#fff8f5", border: "#ffd4bc", stats: loading ? "—" : `${stats.totalCategories} categorías · ${stats.activeCategories} activas` },
     { icon: "🍴",  title: "Gestión de Platos",     desc: "Administra platos, precios e ingredientes",     route: "/dishes",           color: "#2563eb", bg: "#f0f6ff", border: "#bfdbfe", stats: loading ? "—" : `${stats.totalDishes} platos · ${stats.availableDishes} disponibles` },
     { icon: "👥",  title: "Gestión de Usuarios",   desc: "Administra el personal y sus permisos",         route: "/staff-management", color: "#059669", bg: "#f0fdf4", border: "#a7f3d0", stats: loading ? "—" : `${stats.totalUsers} usuarios · ${stats.activeUsers} activos` },
     { icon: "🪑",  title: "Gestión de Mesas",      desc: "Administra mesas, estados y disponibilidad",    route: "/tableManage",      color: "#7c3aed", bg: "#f5f3ff", border: "#ddd6fe", stats: loading ? "—" : `${stats.totalTables} mesas · ${stats.availableTables} libres` },
     { icon: "📦",  title: "Control de Inventario", desc: "Gestiona stock de ingredientes y alertas",      route: "/inventario",       color: "#059669", bg: "#f0fdf4", border: "#a7f3d0", stats: "Ingredientes y suministros" },
+    { icon: "Bs", title: "Control de Cobros", desc: "Consulta pagos, clientes y estados en tiempo real", route: "/dashboard/cobros", color: "#1a1a1a", bg: "#fff8f5", border: "#ffd4bc", stats: revenueLoading ? "—" : `Hoy ${formatCurrency(revenue.salesTotal)} · QR ${formatCurrency(revenue.qrTotal)}` },
   ];
 
   const roles = [

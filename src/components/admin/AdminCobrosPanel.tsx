@@ -80,7 +80,7 @@ const orderStatusLabel: Record<string, string> = {
 const customerTypeLabel: Record<CustomerType, string> = {
   registered: "Cliente registrado",
   guest: "Cliente invitado",
-  none: "Mesa sin cliente",
+  none: "Cliente no registrado",
 };
 
 const serviceTypeLabel: Record<string, string> = {
