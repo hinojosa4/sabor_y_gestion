@@ -152,6 +152,7 @@ export default function DashboardPage() {
     { icon: "👥",  title: "Gestión de Usuarios",   desc: "Administra el personal y sus permisos",         route: "/staff-management", color: "#059669", bg: "#f0fdf4", border: "#a7f3d0", stats: loading ? "—" : `${stats.totalUsers} usuarios · ${stats.activeUsers} activos` },
     { icon: "🪑",  title: "Gestión de Mesas",      desc: "Administra mesas, estados y disponibilidad",    route: "/tableManage",      color: "#7c3aed", bg: "#f5f3ff", border: "#ddd6fe", stats: loading ? "—" : `${stats.totalTables} mesas · ${stats.availableTables} libres` },
     { icon: "📦",  title: "Control de Inventario", desc: "Gestiona stock de ingredientes y alertas",      route: "/inventario",       color: "#059669", bg: "#f0fdf4", border: "#a7f3d0", stats: "Ingredientes y suministros" },
+    { icon: "📊", title: "Reportes y Estadísticas", desc: "Visualiza datos clave de rendimiento", route: "/dashboard/reportes", color: "#2563eb", bg: "#f0f6ff", border: "#bfdbfe", stats: "Análisis de ventas y rendimiento" }
   ];
 
   const roles = [
