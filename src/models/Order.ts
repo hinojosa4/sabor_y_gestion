@@ -1,10 +1,10 @@
 // src/models/Order.ts
-import mongoose, { Document, Schema } from 'mongoose';
+import mongoose, { Document, Schema, Types } from 'mongoose';
 
 export interface IOrder extends Document {
   restaurantId: string;
   table_id?: string;
-  customer_id?: string;
+  customer_id?: Types.ObjectId | null;
   mesero_id: string;
   driver_id?: string;
   service_type: 'dine_in' | 'delivery' | 'pick_up';
@@ -25,7 +25,12 @@ export interface IOrder extends Document {
 const OrderSchema = new Schema<IOrder>({
   restaurantId: { type: String, required: true },
   table_id:     { type: String },
-  customer_id:  { type: String },
+  customer_id:  {
+    type: Schema.Types.ObjectId,
+    ref: 'User',
+    default: null,
+    index: true,
+  },
   mesero_id:    { type: String, required: true },
   driver_id:    { type: String },
   service_type: {

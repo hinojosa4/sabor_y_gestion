@@ -5,6 +5,7 @@ import Order from '@/models/Order';
 import OrderItem from '@/models/OrderItem';
 import Table from '@/models/Table';
 import { pusherServer } from "@/lib/pusher";
+import { findRegisteredCustomerByEmail } from '@/lib/customerLookup';
 //const RESTAURANT_ID = "69e170e941daf8c2b2f76677"; // para obtener el nombre del restaurante
 
 export async function POST(req: Request) {
@@ -33,18 +34,24 @@ export async function POST(req: Request) {
     }, 0);
     const amount = subtotal;
 
+    const { email: normalizedEmail, customer } = await findRegisteredCustomerByEmail(customerEmail);
+
     // Crear pago
     const payment = await Payment.create({
       order_id: orderId,
       amount,
       method,
       status: 'completed',
-      customer_email: customerEmail || null,
+      customer_id: customer?._id ?? null,
+      customer_email: normalizedEmail,
       timestamp: new Date(),
     });
 
     // Actualizar orden
     order.status = 'paid';
+    if (customer && !order.customer_id) {
+      order.customer_id = customer._id;
+    }
     await order.save();
 
     // Liberar mesa si es dine_in
@@ -62,6 +69,21 @@ export async function POST(req: Request) {
       method,
       amount,
       tableId,
+      customer: customer
+        ? {
+            id: customer._id.toString(),
+            name: customer.name,
+            email: customer.email,
+            type: 'registered',
+          }
+        : normalizedEmail
+          ? {
+              id: null,
+              name: null,
+              email: normalizedEmail,
+              type: 'guest',
+            }
+          : null,
     });
 
     return NextResponse.json(payment, { status: 201 });

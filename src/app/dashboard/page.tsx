@@ -219,7 +219,6 @@ export default function DashboardPage() {
     { label: "Categorías",   value: loading ? "—" : stats.totalCategories, sub: loading ? "" : `${stats.activeCategories} activas`,    subColor: "#27ae60", icon: "🏷️", iconBg: "#f0f6ff" },
     { label: "Usuarios",     value: loading ? "—" : stats.totalUsers,      sub: loading ? "" : `${stats.activeUsers} activos`,         subColor: "#27ae60", icon: "👥",  iconBg: "#f0fdf4" },
     { label: "Mesas",        value: loading ? "—" : stats.totalTables,     sub: loading ? "" : `${stats.availableTables} libres`,      subColor: "#7c3aed", icon: "🪑",  iconBg: "#f5f3ff" },
-    { label: "Ingresos",     value: revenueLoading ? "—" : formatCurrency(revenue.salesTotal), sub: revenueLoading ? "" : `Efectivo ${formatCurrency(revenue.cashTotal)} · QR ${formatCurrency(revenue.qrTotal)}`, subColor: "#e85d26", icon: "Bs", iconBg: "#fff8f5" },
   ];
 
   const quickActions = [
@@ -228,6 +227,7 @@ export default function DashboardPage() {
     { icon: "👥",  title: "Gestión de Usuarios",   desc: "Administra el personal y sus permisos",         route: "/staff-management", color: "#059669", bg: "#f0fdf4", border: "#a7f3d0", stats: loading ? "—" : `${stats.totalUsers} usuarios · ${stats.activeUsers} activos` },
     { icon: "🪑",  title: "Gestión de Mesas",      desc: "Administra mesas, estados y disponibilidad",    route: "/tableManage",      color: "#7c3aed", bg: "#f5f3ff", border: "#ddd6fe", stats: loading ? "—" : `${stats.totalTables} mesas · ${stats.availableTables} libres` },
     { icon: "📦",  title: "Control de Inventario", desc: "Gestiona stock de ingredientes y alertas",      route: "/inventario",       color: "#059669", bg: "#f0fdf4", border: "#a7f3d0", stats: "Ingredientes y suministros" },
+    { icon: "Bs", title: "Control de Cobros", desc: "Consulta pagos, clientes y estados en tiempo real", route: "/dashboard/cobros", color: "#1a1a1a", bg: "#fff8f5", border: "#ffd4bc", stats: revenueLoading ? "—" : `Hoy ${formatCurrency(revenue.salesTotal)} · QR ${formatCurrency(revenue.qrTotal)}` },
   ];
 
   const roles = [
@@ -243,6 +243,14 @@ export default function DashboardPage() {
     { label: "Ocupadas",   count: stats.occupiedTables,  color: "#e85d26", icon: "🔴" },
     { label: "Reservadas", count: stats.reservedTables,  color: "#2563eb", icon: "🔵" },
   ];
+
+  const handleQuickAction = (route: string) => {
+    if (route.startsWith("#")) {
+      document.querySelector(route)?.scrollIntoView({ behavior: "smooth", block: "start" });
+      return;
+    }
+    router.push(route);
+  };
 
   return (
     <div style={{ minHeight: "100vh", background: "#f8f7f4", fontFamily: "'Georgia', serif" }}>
@@ -441,7 +449,7 @@ export default function DashboardPage() {
             {quickActions.map((action) => (
               <button
                 key={action.route}
-                onClick={() => router.push(action.route)}
+                onClick={() => handleQuickAction(action.route)}
                 style={{
                   background: "#fff",
                   border: `1.5px solid ${action.border}`,
