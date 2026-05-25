@@ -15,10 +15,10 @@ interface IIngredient {
   _id: string;
   name: string;
   currentStock: number;
-  minStock: number;       // 🔴 crítico
-  warningStock: number;   // 🟡 bajo
-  reorderPoint: number;   // 📋 punto de reorden (gestión)
-  maxStock: number;       // 📦 capacidad máxima
+  minStock: number;
+  warningStock: number;
+  reorderPoint: number;
+  maxStock: number;
   unit: string;
   supplier?: string;
   category_id: IIngredientCategory | null;
@@ -72,6 +72,31 @@ const BAR_COLOR = {
   ok:       "#16a34a",
   low:      "#d97706",
   critical: "#e85d26",
+};
+
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+
+// Muestra hasta 1 decimal, sin ceros innecesarios: 1.50 → "1.5", 1.00 → "1"
+// Maneja undefined / null / NaN de forma segura
+const fmt = (n: number | undefined | null): string => {
+  if (n == null || isNaN(Number(n))) return "—";
+  const num = Number(n);
+  const rounded = Math.round(num * 10) / 10; // 1 decimal máximo
+  return rounded % 1 === 0 ? String(Math.round(rounded)) : rounded.toFixed(1);
+};
+
+// Convierte string a número seguro (devuelve 0 si no es válido)
+const safeNum = (v: string | number | undefined | null): number => {
+  const n = Number(v);
+  return isNaN(n) ? 0 : n;
+};
+
+// Bloquea valores negativos en inputs: si el usuario escribe "-5" lo convierte a "0"
+const clampPositive = (value: string): string => {
+  if (value === "") return "";
+  const n = Number(value);
+  if (isNaN(n)) return "";
+  return n < 0 ? "0" : value;
 };
 
 // ─── Hooks ────────────────────────────────────────────────────────────────────
@@ -183,11 +208,6 @@ function Modal({ title, children, onClose, isMobile = false }: {
   );
 }
 
-// Muestra hasta 2 decimales, sin ceros innecesarios: 1.50 → "1.5", 1.00 → "1"
-const fmt = (n: number) => +n.toFixed(2) !== Math.round(n) 
-  ? n.toFixed(2).replace(/\.?0+$/, "") 
-  : String(Math.round(n));
-
 // ─── Formulario de ingrediente ────────────────────────────────────────────────
 function IngredientForm({ initial, categories, onSubmit, onCancel, error, submitLabel, isMobile, isCocinero }: {
   initial: IngredientFormData;
@@ -204,19 +224,17 @@ function IngredientForm({ initial, categories, onSubmit, onCancel, error, submit
   const set = (k: keyof IngredientFormData, v: string | boolean) =>
     setForm((f) => ({ ...f, [k]: v }));
 
-  // Validación visual de jerarquía en tiempo real
-  const min = Number(form.minStock);
-  const warn = Number(form.warningStock);
-  const reorder = Number(form.reorderPoint);
-  const max = Number(form.maxStock);
+  const min     = safeNum(form.minStock);
+  const warn    = safeNum(form.warningStock);
+  const reorder = safeNum(form.reorderPoint);
+  const max     = safeNum(form.maxStock);
   const hierarchyOk = warn > min && reorder > warn && max > reorder;
-  const showHierarchy = !isCocinero && form.minStock && form.warningStock && form.reorderPoint && form.maxStock;
+  const showHierarchy = !isCocinero && form.minStock !== "" && form.warningStock !== "" && form.reorderPoint !== "" && form.maxStock !== "";
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
       {error && <ErrorBox msg={error} />}
 
-      {/* ── Nombre + Unidad ── */}
       <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "2fr 1fr", gap: 12 }}>
         <Field label="Nombre *">
           <input
@@ -240,19 +258,17 @@ function IngredientForm({ initial, categories, onSubmit, onCancel, error, submit
         </Field>
       </div>
 
-      {/* ── Stock actual (ambos roles) ── */}
       <Field label="Stock Actual *" hint="Cantidad física en el almacén ahora mismo">
         <input
-          type="number" step="0.001"
+          type="number" min={0} step="0.1"
           value={form.currentStock}
-          onChange={(e) => set("currentStock", e.target.value)}
+          onChange={(e) => set("currentStock", clampPositive(e.target.value))}
           placeholder="0"
           style={inputStyle}
           inputMode="decimal"
         />
       </Field>
 
-      {/* ── Umbrales (solo admin) ── */}
       {!isCocinero && (
         <>
           <div style={{
@@ -270,9 +286,9 @@ function IngredientForm({ initial, categories, onSubmit, onCancel, error, submit
           <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr 1fr" : "repeat(4, 1fr)", gap: 12 }}>
             <Field label="🔴 Mínimo *" hint="Stock crítico">
               <input
-                type="number" min={0} step="0.001"
+                type="number" min={0} step="0.1"
                 value={form.minStock}
-                onChange={(e) => set("minStock", e.target.value)}
+                onChange={(e) => set("minStock", clampPositive(e.target.value))}
                 placeholder="0"
                 style={{ ...inputStyle, borderColor: "#fecaca" }}
                 inputMode="decimal"
@@ -280,9 +296,9 @@ function IngredientForm({ initial, categories, onSubmit, onCancel, error, submit
             </Field>
             <Field label="🟡 Advertencia *" hint="Comprar pronto">
               <input
-                type="number" min={0} step="0.001"
+                type="number" min={0} step="0.1"
                 value={form.warningStock}
-                onChange={(e) => set("warningStock", e.target.value)}
+                onChange={(e) => set("warningStock", clampPositive(e.target.value))}
                 placeholder="0"
                 style={{ ...inputStyle, borderColor: "#fde68a" }}
                 inputMode="decimal"
@@ -290,9 +306,9 @@ function IngredientForm({ initial, categories, onSubmit, onCancel, error, submit
             </Field>
             <Field label="📋 Reorden *" hint="Llamar al proveedor">
               <input
-                type="number" min={0} step="0.001"
+                type="number" min={0} step="0.1"
                 value={form.reorderPoint}
-                onChange={(e) => set("reorderPoint", e.target.value)}
+                onChange={(e) => set("reorderPoint", clampPositive(e.target.value))}
                 placeholder="0"
                 style={{ ...inputStyle, borderColor: "#bfdbfe" }}
                 inputMode="decimal"
@@ -300,9 +316,9 @@ function IngredientForm({ initial, categories, onSubmit, onCancel, error, submit
             </Field>
             <Field label="📦 Máximo *" hint="Capacidad almacén">
               <input
-                type="number" min={0} step="0.001"
+                type="number" min={0} step="0.1"
                 value={form.maxStock}
-                onChange={(e) => set("maxStock", e.target.value)}
+                onChange={(e) => set("maxStock", clampPositive(e.target.value))}
                 placeholder="0"
                 style={inputStyle}
                 inputMode="decimal"
@@ -310,7 +326,6 @@ function IngredientForm({ initial, categories, onSubmit, onCancel, error, submit
             </Field>
           </div>
 
-          {/* Indicador visual de jerarquía en tiempo real */}
           {showHierarchy && (
             <div style={{
               display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap",
@@ -394,7 +409,7 @@ function IngredientForm({ initial, categories, onSubmit, onCancel, error, submit
   );
 }
 
-// ─── Formulario de categoría (sin cambios) ────────────────────────────────────
+// ─── Formulario de categoría ──────────────────────────────────────────────────
 function CategoryForm({ initial, onSubmit, onCancel, error, submitLabel }: {
   initial: CategoryFormData;
   onSubmit: (data: CategoryFormData) => void;
@@ -432,13 +447,17 @@ function CategoryForm({ initial, onSubmit, onCancel, error, submitLabel }: {
 function IngredientRow({ ing, onEdit, onDelete, isCocinero, isAdmin }: {
   ing: IIngredient; onEdit: () => void; onDelete: () => void; isCocinero: boolean; isAdmin: boolean;
 }) {
-  const pct = ing.maxStock > 0
-    ? Math.min(100, Math.round((ing.currentStock / ing.maxStock) * 100))
+  const maxStock = safeNum(ing.maxStock);
+  const currentStock = safeNum(ing.currentStock);
+  const reorderPoint = safeNum(ing.reorderPoint);
+
+  const pct = maxStock > 0
+    ? Math.min(100, Math.round((currentStock / maxStock) * 100))
     : 0;
-  const status = STATUS_CONFIG[ing.stockStatus];
+
+  const status = STATUS_CONFIG[ing.stockStatus] ?? STATUS_CONFIG.ok;
   const catName = ing.category_id?.name ?? "—";
-  // Badge de reorden: solo cuando es "ok" pero ya cruzó el punto de reorden
-  const needsReorder = ing.stockStatus === "ok" && ing.currentStock <= ing.reorderPoint;
+  const needsReorder = ing.stockStatus === "ok" && reorderPoint > 0 && currentStock <= reorderPoint;
 
   return (
     <tr
@@ -465,10 +484,9 @@ function IngredientRow({ ing, onEdit, onDelete, isCocinero, isAdmin }: {
           {fmt(ing.currentStock)} {ing.unit}
         </p>
         <div style={{ height: 6, background: "#f0f0f0", borderRadius: 3, overflow: "hidden", width: 120 }}>
-          <div style={{ height: "100%", borderRadius: 3, background: BAR_COLOR[ing.stockStatus], width: `${pct}%`, transition: "width 0.4s ease" }} />
+          <div style={{ height: "100%", borderRadius: 3, background: BAR_COLOR[ing.stockStatus] ?? BAR_COLOR.ok, width: `${pct}%`, transition: "width 0.4s ease" }} />
         </div>
       </td>
-      {/* Columna umbrales con los 4 valores y colores */}
       <td style={{ padding: "14px 16px", fontSize: 12, lineHeight: 2 }}>
         <span style={{ color: "#e85d26" }}>🔴 {fmt(ing.minStock)}</span><br />
         <span style={{ color: "#d97706" }}>🟡 {fmt(ing.warningStock)}</span><br />
@@ -496,7 +514,7 @@ function IngredientRow({ ing, onEdit, onDelete, isCocinero, isAdmin }: {
   );
 }
 
-// ─── Modal de gestión de categorías (sin cambios estructurales) ───────────────
+// ─── Modal de gestión de categorías ──────────────────────────────────────────
 function CategoriesModal({ categories, onClose, isMobile, onRefresh }: {
   categories: IIngredientCategory[]; onClose: () => void; isMobile: boolean; onRefresh: () => void;
 }) {
@@ -628,46 +646,40 @@ export default function InventoryPage() {
   }, []);
 
   const fetchDataRef = useRef(fetchData);
-    useEffect(() => { fetchDataRef.current = fetchData; }, [fetchData]);
+  useEffect(() => { fetchDataRef.current = fetchData; }, [fetchData]);
 
-    useEffect(() => {
-      if (userLoading || !user) return;
-      fetchData();
+  useEffect(() => {
+    if (userLoading || !user) return;
+    fetchData();
 
-      let pusherInstance: InstanceType<typeof import("pusher-js")["default"]> | null = null;
-      let mounted = true;
+    let pusherInstance: InstanceType<typeof import("pusher-js")["default"]> | null = null;
+    let mounted = true;
 
-      const setup = async () => {
-        const { default: Pusher } = await import("pusher-js/with-encryption");
-        if (!mounted) return;
+    const setup = async () => {
+      const { default: Pusher } = await import("pusher-js/with-encryption");
+      if (!mounted) return;
 
-        pusherInstance = new Pusher(process.env.NEXT_PUBLIC_PUSHER_KEY!, {
-          cluster: process.env.NEXT_PUBLIC_PUSHER_CLUSTER!,
-          forceTLS: true,
-        });
+      pusherInstance = new Pusher(process.env.NEXT_PUBLIC_PUSHER_KEY!, {
+        cluster: process.env.NEXT_PUBLIC_PUSHER_CLUSTER!,
+        forceTLS: true,
+      });
 
-        const channel = pusherInstance.subscribe("restaurant");
+      const channel = pusherInstance.subscribe("restaurant");
+      channel.bind("ingredient:created",  () => { if (mounted) fetchDataRef.current(); });
+      channel.bind("ingredient:updated",  () => { if (mounted) fetchDataRef.current(); });
+      channel.bind("ingredient:deleted",  () => { if (mounted) fetchDataRef.current(); });
+      channel.bind("order:updated",       () => { if (mounted) fetchDataRef.current(); });
+      channel.bind("inventory:alert",     () => { if (mounted) fetchDataRef.current(); });
+    };
 
-        // Ingrediente creado, editado o eliminado
-        channel.bind("ingredient:created",  () => { if (mounted) fetchDataRef.current(); });
-        channel.bind("ingredient:updated",  () => { if (mounted) fetchDataRef.current(); });
-        channel.bind("ingredient:deleted",  () => { if (mounted) fetchDataRef.current(); });
+    setup();
 
-        // El stock se descuenta cuando cocina acepta una orden (in_kitchen)
-        channel.bind("order:updated", () => { if (mounted) fetchDataRef.current(); });
-
-        // Alerta de inventario — refresca para que los badges y barras reflejen el nuevo estado
-        channel.bind("inventory:alert", () => { if (mounted) fetchDataRef.current(); });
-      };
-
-      setup();
-
-      return () => {
-        mounted = false;
-        pusherInstance?.unsubscribe("restaurant");
-        pusherInstance?.disconnect();
-      };
-    }, [userLoading, user, fetchData]);
+    return () => {
+      mounted = false;
+      pusherInstance?.unsubscribe("restaurant");
+      pusherInstance?.disconnect();
+    };
+  }, [userLoading, user, fetchData]);
 
   const showSuccess = (msg: string) => {
     setSuccessMsg(msg);
@@ -693,8 +705,11 @@ export default function InventoryPage() {
   const totalOk       = ingredients.filter((i) => i.stockStatus === "ok").length;
   const totalLow      = ingredients.filter((i) => i.stockStatus === "low").length;
   const totalCritical = ingredients.filter((i) => i.stockStatus === "critical").length;
-  // Cuántos en punto de reorden pero todavía "ok" (gestión de compras)
-  const totalReorder  = ingredients.filter((i) => i.stockStatus === "ok" && i.currentStock <= i.reorderPoint).length;
+  const totalReorder  = ingredients.filter((i) =>
+    i.stockStatus === "ok" &&
+    safeNum(i.reorderPoint) > 0 &&
+    safeNum(i.currentStock) <= safeNum(i.reorderPoint)
+  ).length;
 
   // ── CRUD ingredientes ──────────────────────────────────────────────────────
   const emptyForm: IngredientFormData = {
@@ -702,16 +717,16 @@ export default function InventoryPage() {
     reorderPoint: "", maxStock: "", unit: "", supplier: "", category_id: "", isActive: true,
   };
 
-  // Validación centralizada para crear y editar
   const validateForm = (form: IngredientFormData, cocinero: boolean): string | null => {
     if (!form.name.trim()) return "El nombre es obligatorio";
     if (!form.unit) return "La unidad es obligatoria";
-    // ANTES: if (form.currentStock === "" || Number(form.currentStock) < 0)
-    // DESPUÉS: solo valida que sea un número válido, permite negativos
     if (form.currentStock === "" || isNaN(Number(form.currentStock)))
       return "El stock actual es obligatorio";
+    if (Number(form.currentStock) < 0)
+      return "El stock actual no puede ser negativo";
     if (cocinero) return null;
-    if (form.minStock === "" || Number(form.minStock) < 0) return "El stock mínimo es obligatorio";
+    if (form.minStock === "" || isNaN(Number(form.minStock)) || Number(form.minStock) < 0)
+      return "El stock mínimo es obligatorio y debe ser 0 o mayor";
     if (form.warningStock === "" || Number(form.warningStock) <= Number(form.minStock))
       return "El stock de advertencia (🟡) debe ser mayor al mínimo (🔴)";
     if (form.reorderPoint === "" || Number(form.reorderPoint) <= Number(form.warningStock))
@@ -761,13 +776,12 @@ export default function InventoryPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(isCocinero
           ? {
-              // Cocinero solo puede tocar currentStock, el resto viene del ingrediente original
               name: editIngredient.name,
               currentStock: Number(form.currentStock),
-              minStock: editIngredient.minStock,
-              warningStock: editIngredient.warningStock,
-              reorderPoint: editIngredient.reorderPoint,
-              maxStock: editIngredient.maxStock,
+              minStock: safeNum(editIngredient.minStock),
+              warningStock: safeNum(editIngredient.warningStock),
+              reorderPoint: safeNum(editIngredient.reorderPoint),
+              maxStock: safeNum(editIngredient.maxStock),
               unit: editIngredient.unit,
               supplier: editIngredient.supplier || "",
               category_id: editIngredient.category_id?._id ?? null,
@@ -877,7 +891,6 @@ export default function InventoryPage() {
 
       {/* ── Stats cards ── */}
       <div style={{ padding: `24px ${px} 0`, display: "flex", flexDirection: isMobile ? "column" : "row", gap: isMobile ? 10 : 16 }}>
-        {/* Card total */}
         <div style={{ background: "#fff", border: "1.5px solid #e8e8e8", borderRadius: isMobile ? 12 : 16, padding: isMobile ? "14px 16px" : "20px 24px", display: "flex", alignItems: "center", gap: isMobile ? 10 : 16, boxShadow: "0 2px 8px rgba(0,0,0,0.03)", flex: isMobile ? undefined : 1 }}>
           <div style={{ width: isMobile ? 36 : 44, height: isMobile ? 36 : 44, borderRadius: 10, background: "#f5f5f5", display: "flex", alignItems: "center", justifyContent: "center", fontSize: isMobile ? 16 : 20, flexShrink: 0 }}>📦</div>
           <div>
@@ -886,13 +899,12 @@ export default function InventoryPage() {
           </div>
         </div>
 
-        {/* Grid de estados: 2x2 en mobile, 1x4 en desktop */}
         <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr 1fr" : "repeat(4, 1fr)", gap: isMobile ? 10 : 16, flex: isMobile ? undefined : 4 }}>
           {[
             { label: "Normal",  value: totalOk,       color: "#16a34a", icon: "🟢", bg: "#f0fdf4" },
-            { label: "Bajo",    value: totalLow,      color: "#d97706", icon: "🟡", bg: "#fffbeb" },
-            { label: "Crítico", value: totalCritical, color: "#e85d26", icon: "🔴", bg: "#fff0ee" },
-            { label: "Pedir",   value: totalReorder,  color: "#3b82f6", icon: "📋", bg: "#eff6ff" },
+            { label: "Bajo",    value: totalLow,       color: "#d97706", icon: "🟡", bg: "#fffbeb" },
+            { label: "Crítico", value: totalCritical,  color: "#e85d26", icon: "🔴", bg: "#fff0ee" },
+            { label: "Pedir",   value: totalReorder,   color: "#3b82f6", icon: "📋", bg: "#eff6ff" },
           ].map((s) => (
             <div key={s.label} style={{ background: "#fff", border: "1.5px solid #e8e8e8", borderRadius: isMobile ? 12 : 16, padding: isMobile ? "12px" : "20px 24px", display: "flex", alignItems: "center", gap: isMobile ? 8 : 16, boxShadow: "0 2px 8px rgba(0,0,0,0.03)" }}>
               <div style={{ width: isMobile ? 32 : 44, height: isMobile ? 32 : 44, borderRadius: 10, background: s.bg, display: "flex", alignItems: "center", justifyContent: "center", fontSize: isMobile ? 14 : 20, flexShrink: 0 }}>{s.icon}</div>
@@ -918,7 +930,7 @@ export default function InventoryPage() {
         </div>
       )}
 
-      {/* ── Alerta de reorden (solo admin, discreta) ── */}
+      {/* ── Alerta de reorden (solo admin) ── */}
       {totalReorder > 0 && isAdmin && (
         <div style={{ margin: `10px ${px} 0`, background: "#eff6ff", border: "1.5px solid #bfdbfe", borderRadius: 12, padding: "12px 18px", display: "flex", alignItems: "center", gap: 12 }}>
           <span style={{ fontSize: 18 }}>📋</span>
@@ -974,15 +986,18 @@ export default function InventoryPage() {
               )}
             </div>
           ) : isMobile ? (
-            // ── Cards móvil ──────────────────────────────────────────────────
+            // ── Cards móvil ─────────────────────────────────────────────────
             <div style={{ display: "flex", flexDirection: "column", gap: 0 }}>
               {filtered.map((ing) => {
-                const pct = ing.maxStock > 0 ? Math.min(100, Math.round((ing.currentStock / ing.maxStock) * 100)) : 0;
-                const status = STATUS_CONFIG[ing.stockStatus];
-                const needsReorder = ing.stockStatus === "ok" && ing.currentStock <= ing.reorderPoint;
+                const maxStock     = safeNum(ing.maxStock);
+                const currentStock = safeNum(ing.currentStock);
+                const reorderPoint = safeNum(ing.reorderPoint);
+                const pct = maxStock > 0 ? Math.min(100, Math.round((currentStock / maxStock) * 100)) : 0;
+                const status = STATUS_CONFIG[ing.stockStatus] ?? STATUS_CONFIG.ok;
+                const needsReorder = ing.stockStatus === "ok" && reorderPoint > 0 && currentStock <= reorderPoint;
+
                 return (
                   <div key={ing._id} style={{ padding: "16px", borderBottom: "1px solid #f0f0f0" }}>
-                    {/* Header */}
                     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 10 }}>
                       <div style={{ minWidth: 0, flex: 1 }}>
                         <p style={{ margin: 0, fontSize: 15, fontWeight: 700, color: "#1a1a1a", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
@@ -994,7 +1009,6 @@ export default function InventoryPage() {
                           {ing.supplier ? ` · ${ing.supplier}` : ""}
                         </p>
                       </div>
-                      {/* Badges: estado + reorden */}
                       <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 4, flexShrink: 0, marginLeft: 8 }}>
                         <span style={{ fontSize: 11, fontWeight: 700, padding: "3px 10px", borderRadius: 20, background: status.bg, color: status.color, border: `1px solid ${status.border}` }}>
                           {status.label}
@@ -1007,17 +1021,15 @@ export default function InventoryPage() {
                       </div>
                     </div>
 
-                    {/* Barra de progreso */}
                     <div style={{ marginBottom: 10 }}>
                       <p style={{ margin: "0 0 4px", fontSize: 16, fontWeight: 700, color: "#1a1a1a" }}>
                         {fmt(ing.currentStock)} {ing.unit}
                       </p>
                       <div style={{ height: 8, background: "#f0f0f0", borderRadius: 4, overflow: "hidden" }}>
-                        <div style={{ height: "100%", borderRadius: 4, background: BAR_COLOR[ing.stockStatus], width: `${pct}%`, transition: "width 0.4s ease" }} />
+                        <div style={{ height: "100%", borderRadius: 4, background: BAR_COLOR[ing.stockStatus] ?? BAR_COLOR.ok, width: `${pct}%`, transition: "width 0.4s ease" }} />
                       </div>
                     </div>
 
-                    {/* Umbrales en mobile: badges de colores compactos */}
                     <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 12 }}>
                       <span style={{ fontSize: 11, color: "#e85d26", background: "#fff0ee", border: "1px solid #fecaca", borderRadius: 6, padding: "2px 7px" }}>🔴 {fmt(ing.minStock)}</span>
                       <span style={{ fontSize: 11, color: "#d97706", background: "#fffbeb", border: "1px solid #fde68a", borderRadius: 6, padding: "2px 7px" }}>🟡 {fmt(ing.warningStock)}</span>
@@ -1026,7 +1038,6 @@ export default function InventoryPage() {
                       <span style={{ fontSize: 11, color: "#aaa" }}>{ing.unit}</span>
                     </div>
 
-                    {/* Botones */}
                     <div style={{ display: "flex", gap: 8 }}>
                       <button
                         onClick={() => { setFormError(""); setEditIngredient(ing); }}
@@ -1098,11 +1109,11 @@ export default function InventoryPage() {
           <IngredientForm
             initial={{
               name: editIngredient.name,
-              currentStock: String(editIngredient.currentStock),
-              minStock: String(editIngredient.minStock),
-              warningStock: String(editIngredient.warningStock),
-              reorderPoint: String(editIngredient.reorderPoint),
-              maxStock: String(editIngredient.maxStock),
+              currentStock: String(safeNum(editIngredient.currentStock)),
+              minStock: String(safeNum(editIngredient.minStock)),
+              warningStock: String(safeNum(editIngredient.warningStock)),
+              reorderPoint: String(safeNum(editIngredient.reorderPoint)),
+              maxStock: String(safeNum(editIngredient.maxStock)),
               unit: editIngredient.unit,
               supplier: editIngredient.supplier || "",
               category_id: editIngredient.category_id?._id || "",
