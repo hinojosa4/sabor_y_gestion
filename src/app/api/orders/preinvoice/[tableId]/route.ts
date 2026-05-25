@@ -30,7 +30,7 @@ export async function GET(
     await connectDB();
     const { tableId } = await params;
 
-    // Use the latest open order for this table; older open test orders should not leak into the bill.
+    // orden asignada a esta tabla
     const order = await Order.findOne({
       table_id: tableId,
       status: { $nin: ['paid', 'cancelled'] },
