@@ -300,8 +300,8 @@ export function AdminCobrosPanel({ isMobile, compactHeader = false }: Props) {
           <table style={{ width: "100%", borderCollapse: "collapse", minWidth: 920 }}>
             <thead>
               <tr style={{ background: "#fafafa" }}>
-                {["Pedido", "Cliente", "Método", "Total", "Cobro", "Preparación", "Fecha", ""].map((head) => (
-                  <th key={head} style={{ textAlign: "left", padding: "12px 14px", fontSize: 11, color: "#777", fontWeight: 800, borderBottom: "1px solid #eee", whiteSpace: "nowrap" }}>{head}</th>
+                {["Pedido", "Cliente", "Método", "Total", "Cobro", "Preparación", "Fecha", "Detalle"].map((head) => (
+                  <th key={head} style={{ textAlign: head === "Detalle" ? "center" : "left", padding: "12px 14px", fontSize: 11, color: "#777", fontWeight: 800, borderBottom: "1px solid #eee", whiteSpace: "nowrap" }}>{head}</th>
                 ))}
               </tr>
             </thead>
@@ -326,7 +326,7 @@ export function AdminCobrosPanel({ isMobile, compactHeader = false }: Props) {
                     <td style={cellStyle}><StatusBadge label={paymentStatusLabel[row.paymentStatus] ?? row.paymentStatus} color={statusColor(row.paymentStatus)} /></td>
                     <td style={cellStyle}><StatusBadge label={orderStatusLabel[row.orderStatus] ?? row.orderStatus} color={statusColor(row.orderStatus)} /></td>
                     <td style={cellStyle}>{formatRowDate(row)}</td>
-                    <td style={cellStyle}>
+                    <td style={{ ...cellStyle, textAlign: "center" }}>
                       <button onClick={() => setSelected(row)} title="Ver detalle" style={{ width: 34, height: 34, display: "inline-flex", alignItems: "center", justifyContent: "center", border: "1.5px solid #e0e0e0", background: "#fff", borderRadius: 8, cursor: "pointer" }}>
                         <Eye size={16} />
                       </button>

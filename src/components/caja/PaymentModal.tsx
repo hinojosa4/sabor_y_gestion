@@ -133,10 +133,6 @@ export function PaymentModal({ isOpen, onClose, orderId, tableId, tableNumber, t
     const change = hasCashValue ? cashReceived - totalAmount : 0;
     const isValid = hasCashValue && cashReceived >= totalAmount;
 
-    const handleAmountClick = (amount: number) => {
-        setCashReceivedInput(String(amount));
-    };
-
     const handleCashReceivedChange = (value: string) => {
         const normalized = value
             .replace(',', '.')
@@ -213,29 +209,11 @@ export function PaymentModal({ isOpen, onClose, orderId, tableId, tableNumber, t
                         Total: {formatCurrency(totalAmount)}
                     </p>
 
-                    {/* Mejora 5: Botones numéricos rápidos */}
+                    {/* Monto recibido */}
                     <div style={{ marginBottom: "1rem" }}>
                         <label style={{ display: "block", marginBottom: "0.5rem", fontWeight: "bold" }}>
                             Monto recibido (Bs)
                         </label>
-                        <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap", marginBottom: "0.5rem" }}>
-                            {[100, 200, 500, 1000].map(amount => (
-                                <button
-                                    key={amount}
-                                    onClick={() => handleAmountClick(amount)}
-                                    style={{
-                                        padding: "0.5rem 1rem",
-                                        backgroundColor: "var(--secondary)",
-                                        border: `1px solid var(--border)`,
-                                        borderRadius: "var(--radius-md)",
-                                        cursor: "pointer",
-                                        fontSize: "0.875rem",
-                                    }}
-                                >
-                                    {amount} Bs
-                                </button>
-                            ))}
-                        </div>
                         <input
                             type="text"
                             inputMode="decimal"

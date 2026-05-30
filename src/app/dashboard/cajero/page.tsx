@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useAuth } from '@/lib/useAuth';
 import { CAJERO } from '@/lib/roles';
-import { Search, DollarSign, Receipt, Clock } from 'lucide-react';
+import { Search, DollarSign, Receipt, Clock, CheckCircle, X } from 'lucide-react';
 import Link from 'next/link';
 import { useTableData } from '@/hooks/useTableData';
 import { PreinvoiceModal } from '@/components/caja/PreinvoiceModal';
@@ -214,6 +214,7 @@ export default function CajeroDashboard() {
     const [currentTotal, setCurrentTotal] = useState(0);
     const [currentTableId, setCurrentTableId] = useState('');
     const [orderIdsByTable, setOrderIdsByTable] = useState<Record<string, string>>({});
+    const [successToast, setSuccessToast] = useState('');
 
     const { tables, loading, refreshTables } = useTableData(restaurantId);
 
@@ -329,6 +330,13 @@ export default function CajeroDashboard() {
     useEffect(() => {
         fetchActiveOrders();
     }, [fetchActiveOrders]);
+
+    useEffect(() => {
+        if (!successToast) return;
+
+        const timeoutId = window.setTimeout(() => setSuccessToast(''), 4200);
+        return () => window.clearTimeout(timeoutId);
+    }, [successToast]);
 
     useEffect(() => {
     let pusherInstance: InstanceType<typeof import("pusher-js")["default"]> | null = null;
@@ -512,6 +520,74 @@ export default function CajeroDashboard() {
             </header>
 
             <main style={mainStyle}>
+                {successToast && (
+                    <div
+                        role="status"
+                        aria-live="polite"
+                        style={{
+                            position: "fixed",
+                            top: isMobile ? 86 : 92,
+                            right: isMobile ? 12 : 24,
+                            left: isMobile ? 12 : "auto",
+                            zIndex: 80,
+                            display: "flex",
+                            alignItems: "center",
+                            gap: 12,
+                            maxWidth: isMobile ? "none" : 420,
+                            padding: "0.9rem 1rem",
+                            backgroundColor: "var(--card)",
+                            color: "var(--foreground)",
+                            border: "1px solid #fed7aa",
+                            borderLeft: "5px solid #ea580c",
+                            borderRadius: "var(--radius-lg)",
+                            boxShadow: "0 20px 45px rgba(3, 2, 19, 0.16)",
+                        }}
+                    >
+                        <span
+                            style={{
+                                width: 38,
+                                height: 38,
+                                flex: "0 0 38px",
+                                borderRadius: "9999px",
+                                backgroundColor: "var(--primary)",
+                                color: "var(--primary-foreground)",
+                                display: "inline-flex",
+                                alignItems: "center",
+                                justifyContent: "center",
+                            }}
+                        >
+                            <CheckCircle size={20} />
+                        </span>
+                        <div style={{ minWidth: 0, flex: 1 }}>
+                            <p style={{ margin: 0, fontSize: "0.95rem", fontWeight: 700 }}>
+                                Pago registrado
+                            </p>
+                            <p style={{ margin: "0.15rem 0 0", fontSize: "0.82rem", color: "var(--muted-foreground)" }}>
+                                {successToast}
+                            </p>
+                        </div>
+                        <button
+                            type="button"
+                            aria-label="Cerrar notificación"
+                            onClick={() => setSuccessToast('')}
+                            style={{
+                                width: 32,
+                                height: 32,
+                                border: "none",
+                                borderRadius: "var(--radius-md)",
+                                backgroundColor: "#fff7ed",
+                                color: "#ea580c",
+                                cursor: "pointer",
+                                display: "inline-flex",
+                                alignItems: "center",
+                                justifyContent: "center",
+                            }}
+                        >
+                            <X size={17} />
+                        </button>
+                    </div>
+                )}
+
                 <div style={searchContainerStyle}>
                     <Search size={16} style={searchIconStyle} />
                     <input
@@ -680,7 +756,7 @@ export default function CajeroDashboard() {
                     setIsPaymentModalOpen(false);
                     refreshTables();
                     fetchActiveOrders();
-                    alert('Pago registrado exitosamente');
+                    setSuccessToast('El cobro en efectivo se guardó correctamente.');
                 }}
             />
 
