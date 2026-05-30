@@ -9,6 +9,7 @@ import Payment from '@/models/Payment';
 import { sendPaymentEmail } from '@/lib/email';
 import { pusherServer } from '@/lib/pusher';
 import { findRegisteredCustomerByEmail } from '@/lib/customerLookup';
+import { getOpenOperationalCashShift } from '@/lib/cashRegister';
 import '@/models/Dish';
 
 type LeanOrderItem = {
@@ -28,6 +29,15 @@ export async function POST(req: NextRequest) {
     await connectDB();
 
     const { orderId, email } = await req.json();
+
+    const cashShift = await getOpenOperationalCashShift();
+    if (!cashShift.ok) {
+      return NextResponse.json(
+        { error: cashShift.error },
+        { status: 403 }
+      );
+    }
+
     const { email: normalizedEmail, customer } = await findRegisteredCustomerByEmail(email);
 
     if (!normalizedEmail) {

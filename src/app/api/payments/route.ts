@@ -1,4 +1,4 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { connectDB } from '@/lib/db';
 import Payment from '@/models/Payment';
 import Order from '@/models/Order';
@@ -6,12 +6,37 @@ import OrderItem from '@/models/OrderItem';
 import Table from '@/models/Table';
 import { pusherServer } from "@/lib/pusher";
 import { findRegisteredCustomerByEmail } from '@/lib/customerLookup';
+import { verifyToken } from '@/lib/jwt';
+import { getOpenCashShiftForUser, getOpenOperationalCashShift } from '@/lib/cashRegister';
 //const RESTAURANT_ID = "69e170e941daf8c2b2f76677"; // para obtener el nombre del restaurante
 
-export async function POST(req: Request) {
+function getUserIdFromRequest(req: NextRequest) {
+  const authHeader = req.headers.get('authorization');
+  if (!authHeader?.startsWith('Bearer ')) return null;
+
+  try {
+    return verifyToken(authHeader.split(' ')[1]).userId;
+  } catch {
+    return null;
+  }
+}
+
+export async function POST(req: NextRequest) {
   try {
     await connectDB();
     const { orderId, method, tableId, customerEmail } = await req.json();
+
+    const userId = getUserIdFromRequest(req);
+    const cashShift = userId
+      ? await getOpenCashShiftForUser(userId)
+      : await getOpenOperationalCashShift();
+
+    if (!cashShift.ok) {
+      return NextResponse.json(
+        { error: cashShift.error },
+        { status: 403 }
+      );
+    }
 
     const order = await Order.findById(orderId);
     if (!order) {

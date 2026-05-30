@@ -119,6 +119,23 @@ export default function StaffManagementPage() {
     })),
   ];
 
+  const scheduleRows = [
+    { shift: "Turno Mañana", hours: "08:00 - 16:00", description: "Caja habilitada durante la mañana" },
+    { shift: "Turno Tarde", hours: "16:00 - 21:00", description: "Caja habilitada durante la tarde" },
+    { shift: "Turno Completo", hours: "08:00 - 21:00", description: "Caja habilitada durante toda la jornada" },
+  ];
+
+  const cashiersByShift = scheduleRows.map((row) => ({
+    ...row,
+    cashiers: realEmployees.filter((employee) => {
+      const shift = employee.employmentDetails?.shift as string | undefined;
+      if (row.shift === "Turno Mañana") {
+        return shift === "Turno Mañana" || shift === "Turno MaÃ±ana";
+      }
+      return shift === row.shift;
+    }).filter((employee) => employee.rol === "cajero"),
+  }));
+
   // Estadísticas combinadas
   const total = allUsers.length;
   const active = allUsers.filter(u => u.isActive === true).length;
@@ -429,8 +446,57 @@ export default function StaffManagementPage() {
         )}
 
         {activeTab === "schedule" && (
-          <div style={{ textAlign: "center", padding: 48, color: "var(--muted-foreground)" }}>
-            Vista de horarios en desarrollo
+          <div style={{ display: "grid", gap: 16 }}>
+            {cashiersByShift.map((row) => (
+              <div key={row.shift} style={{ ...cardStyle, padding: 20 }}>
+                <div style={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "flex-start",
+                  gap: 16,
+                  marginBottom: 14,
+                }}>
+                  <div>
+                    <h2 style={{ margin: 0, fontSize: 18 }}>{row.shift}</h2>
+                    <p style={{ margin: "4px 0 0", color: "var(--muted-foreground)", fontSize: 13 }}>
+                      {row.description}
+                    </p>
+                  </div>
+                  <strong style={{
+                    borderRadius: "var(--radius-md)",
+                    backgroundColor: "var(--secondary)",
+                    padding: "6px 10px",
+                    fontSize: 13,
+                    whiteSpace: "nowrap",
+                  }}>
+                    {row.hours}
+                  </strong>
+                </div>
+
+                {row.cashiers.length > 0 ? (
+                  <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+                    {row.cashiers.map((cashier) => (
+                      <span
+                        key={cashier._id}
+                        style={{
+                          border: `1px solid var(--border)`,
+                          borderRadius: "var(--radius-md)",
+                          padding: "6px 10px",
+                          fontSize: 13,
+                          backgroundColor: "var(--background)",
+                        }}
+                      >
+                        {cashier.name}
+                      </span>
+                    ))}
+                  </div>
+                ) : (
+                  <p style={{ margin: 0, color: "var(--muted-foreground)", fontSize: 13 }}>
+                    Sin cajeros asignados
+                  </p>
+                )}
+              </div>
+            ))}
           </div>
         )}
       </main>

@@ -1,27 +1,74 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { connectDB } from '@/lib/db';
 import CashClose from '@/models/CashClose';
+import { verifyToken } from '@/lib/jwt';
+import {
+  getCashCloseForShift,
+  getCashRegisterSummaryForShift,
+  getCashierShiftByUserId,
+  isWithinShiftHours,
+  RESTAURANT_ID,
+} from '@/lib/cashRegister';
 
-const RESTAURANT_ID = "69e170e941daf8c2b2f76677";
+function getUserIdFromRequest(req: NextRequest) {
+  const authHeader = req.headers.get('authorization');
+  if (!authHeader?.startsWith('Bearer ')) return null;
 
-export async function POST(req: Request) {
+  try {
+    return verifyToken(authHeader.split(' ')[1]).userId;
+  } catch {
+    return null;
+  }
+}
+
+export async function POST(req: NextRequest) {
   try {
     await connectDB();
+
     const body = await req.json();
-    const todayStart = new Date();
-    todayStart.setHours(0, 0, 0, 0);
+    const userId = getUserIdFromRequest(req) ?? body.userId;
+    const shiftName = await getCashierShiftByUserId(userId);
+
+    if (!shiftName) {
+      return NextResponse.json(
+        { error: 'No se encontró un turno asignado para este cajero' },
+        { status: 403 }
+      );
+    }
+
+    if (!isWithinShiftHours(shiftName)) {
+      return NextResponse.json(
+        { error: `No puedes cerrar caja fuera de tu horario de ${shiftName}` },
+        { status: 403 }
+      );
+    }
+
+    const existingClose = await getCashCloseForShift(shiftName);
+    if (existingClose) {
+      return NextResponse.json(
+        { error: 'La caja de este turno ya fue cerrada' },
+        { status: 409 }
+      );
+    }
+
+    const summary = await getCashRegisterSummaryForShift(shiftName);
 
     const cashClose = await CashClose.create({
       restaurantId: RESTAURANT_ID,
-      openingDate: todayStart,
-      openingBalance: body.openingBalance || 0,
-      closingBalance: body.closingBalance,
-      salesTotal: body.salesTotal,
-      cashTotal: body.cashTotal,
-      qrTotal: body.qrTotal,
-      tablesServed: body.tablesServed,
-      ordersCount: body.ordersCount,
-      closedBy: body.userId || 'sistema', // puedes pasar el userId desde el front
+      openingDate: summary.openingDate,
+      closingDate: new Date(),
+      shiftName: summary.shiftName,
+      shiftDate: summary.shiftDate,
+      shiftStart: summary.shiftStart,
+      shiftEnd: summary.shiftEnd,
+      openingBalance: summary.openingBalance,
+      closingBalance: body.closingBalance ?? summary.salesTotal,
+      salesTotal: summary.salesTotal,
+      cashTotal: summary.cashTotal,
+      qrTotal: summary.qrTotal,
+      tablesServed: summary.tablesServed,
+      ordersCount: summary.ordersCount,
+      closedBy: userId || 'sistema',
     });
 
     return NextResponse.json(cashClose);
