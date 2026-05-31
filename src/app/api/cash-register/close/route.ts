@@ -4,6 +4,7 @@ import CashClose from '@/models/CashClose';
 import { verifyToken } from '@/lib/jwt';
 import {
   getCashCloseForShift,
+  getCashShiftContext,
   getCashRegisterSummaryForShift,
   getCashierShiftByUserId,
   isWithinShiftHours,
@@ -36,9 +37,10 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    if (!isWithinShiftHours(shiftName)) {
+    if (!(await isWithinShiftHours(shiftName))) {
+      const shift = await getCashShiftContext(shiftName);
       return NextResponse.json(
-        { error: `No puedes cerrar caja fuera de tu horario de ${shiftName}` },
+        { error: `No puedes cerrar caja fuera de tu horario de ${shiftName}: ${shift.shiftRange}` },
         { status: 403 }
       );
     }

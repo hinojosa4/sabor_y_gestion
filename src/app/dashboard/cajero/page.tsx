@@ -21,6 +21,8 @@ interface ActiveOrder {
 interface CashRegisterStatus {
     status: 'abierto' | 'cerrado';
     shiftName?: string;
+    shiftStart?: string;
+    shiftEnd?: string;
     message?: string;
 }
 
@@ -253,8 +255,8 @@ export default function CajeroDashboard() {
  
             const nextOrderIdsByTable: Record<string, string> = {};
  
-            if (!res.ok || !data.ok) {
-                console.error('Error al cargar ordenes activas:', data);
+            if (!res.ok || !data?.ok || !Array.isArray(data.data)) {
+                console.warn('No se pudieron cargar las ordenes activas:', data);
             } else {
                 (data.data as ActiveOrder[]).forEach((order) => {
                     if (!order.table_id || !order._id) return;
@@ -290,7 +292,7 @@ export default function CajeroDashboard() {
  
             setOrderIdsByTable(nextOrderIdsByTable);
         } catch (error) {
-            console.error('Error al cargar ordenes activas:', error);
+            console.warn('No se pudieron cargar las ordenes activas:', error);
             setOrderIdsByTable({});
         }
     }, [tables]);
@@ -335,6 +337,14 @@ export default function CajeroDashboard() {
     const freeTables = filteredTables.filter(t => t.status === 'Libre');
 
     const handleTableClick = (tableId: string, tableNumber: number, status: string) => {
+        if (cashRegisterStatus?.status === 'cerrado') {
+            setCashNotice(
+                cashRegisterStatus.message ||
+                `La caja${cashRegisterStatus.shiftName ? ` de ${cashRegisterStatus.shiftName}` : ''} está cerrada. No se pueden registrar pagos.`
+            );
+            return;
+        }
+
         if (status === 'Cuenta solicitada') {
             setSelectedTable({ id: tableId, number: tableNumber });
             setIsPreinvoiceOpen(true);
@@ -445,6 +455,15 @@ export default function CajeroDashboard() {
     }
 
     const isMobile = typeof window !== "undefined" ? window.innerWidth < 640 : false;
+    const formatShiftTime = (value?: string) =>
+        value
+            ? new Date(value).toLocaleTimeString('es-BO', {
+                hour: '2-digit',
+                minute: '2-digit',
+            })
+            : null;
+    const shiftStartTime = formatShiftTime(cashRegisterStatus?.shiftStart);
+    const shiftEndTime = formatShiftTime(cashRegisterStatus?.shiftEnd);
     const responsiveGrid: React.CSSProperties = {
         ...gridStyle,
         gridTemplateColumns: isMobile ? "1fr" : "repeat(auto-fill, minmax(300px, 1fr))",
@@ -517,6 +536,18 @@ export default function CajeroDashboard() {
                     <div>
                         <h1 style={{ margin: 0 }}>Panel de Cajero</h1>
                         <p style={{ margin: 0, fontSize: "0.75rem", color: "var(--muted-foreground)" }}>Gestiona pagos y facturación</p>
+                        {cashRegisterStatus?.shiftName && (
+                            <p style={{
+                                margin: "0.2rem 0 0",
+                                fontSize: "0.72rem",
+                                color: cashRegisterStatus.status === 'abierto' ? "#16a34a" : "#dc2626",
+                                fontWeight: 700,
+                            }}>
+                                {cashRegisterStatus.shiftName}
+                                {shiftStartTime && shiftEndTime ? ` · ${shiftStartTime} - ${shiftEndTime}` : ''}
+                                {cashRegisterStatus.status === 'cerrado' ? ' · Cerrado' : ' · Activo'}
+                            </p>
+                        )}
                     </div>
                 </div>
 
@@ -713,7 +744,7 @@ export default function CajeroDashboard() {
                                         )}
                                     </div>
                                     <button style={{ ...buttonFullStyle, backgroundColor: "#ea580c", marginTop: "0.75rem" }}>
-                                        Ver cuenta
+                                        {cashRegisterStatus?.status === 'cerrado' ? 'Caja cerrada' : 'Ver cuenta'}
                                     </button>
                                 </div>
                             ))}
@@ -811,6 +842,13 @@ export default function CajeroDashboard() {
                 tableId={selectedTable?.id || ''}
                 tableNumber={selectedTable?.number || 0}
                 onPay={(orderId, total) => {
+                    if (cashRegisterStatus?.status === 'cerrado') {
+                        setCashNotice(
+                            cashRegisterStatus.message ||
+                            `La caja${cashRegisterStatus.shiftName ? ` de ${cashRegisterStatus.shiftName}` : ''} está cerrada. No se pueden registrar pagos.`
+                        );
+                        return;
+                    }
                     setIsPreinvoiceOpen(false);
                     setCurrentOrderId(orderId);
                     setCurrentTotal(total);

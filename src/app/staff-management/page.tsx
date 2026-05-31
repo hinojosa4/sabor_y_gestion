@@ -1,7 +1,7 @@
 "use client";
 import { useState, useEffect } from "react";
 import Link from "next/link";
-import { Users, Plus, Search } from "lucide-react";
+import { Users, Plus, Search, Save } from "lucide-react";
 import { EmployeeCard } from "../../components/employeeCardForm/EmployeeCard";
 import { EmployeeForm } from "../../components/employeeCardForm/EmployeeForm";
 import { ClientCard } from "../../components/clientCard/ClientCard";
@@ -21,6 +21,20 @@ type CombinedClient = Client & {
   loyaltyPoints?: number;
 };
 type CombinedUser = CombinedEmployee | CombinedClient;
+type ShiftRow = {
+  shift: string;
+  start: string;
+  end: string;
+  hours: string;
+  description: string;
+};
+type CashShiftSettings = {
+  morningStart: string;
+  morningEnd: string;
+  afternoonStart: string;
+  afternoonEnd: string;
+  shifts: ShiftRow[];
+};
 
 const inputStyle: React.CSSProperties = {
   width: "100%",
@@ -58,6 +72,14 @@ export default function StaffManagementPage() {
   const [activeTab, setActiveTab] = useState("staff");
   const [successMsg, setSuccessMsg] = useState("");
   const [errorMsg, setErrorMsg] = useState("");
+  const [shiftSettings, setShiftSettings] = useState<CashShiftSettings | null>(null);
+  const [shiftForm, setShiftForm] = useState({
+    morningStart: "08:00",
+    morningEnd: "16:00",
+    afternoonStart: "16:00",
+    afternoonEnd: "21:00",
+  });
+  const [savingShifts, setSavingShifts] = useState(false);
   const { user, loading: userLoading } = useAuth(ADMIN);
 
   const {
@@ -96,6 +118,28 @@ export default function StaffManagementPage() {
     fetchClients();
   }, []);
 
+  useEffect(() => {
+    const fetchShiftSettings = async () => {
+      try {
+        const res = await fetch('/api/cash-shifts');
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Error al cargar horarios');
+        setShiftSettings(data);
+        setShiftForm({
+          morningStart: data.morningStart,
+          morningEnd: data.morningEnd,
+          afternoonStart: data.afternoonStart,
+          afternoonEnd: data.afternoonEnd,
+        });
+      } catch {
+        setErrorMsg("Error al cargar horarios de caja");
+        setTimeout(() => setErrorMsg(""), 4000);
+      }
+    };
+
+    fetchShiftSettings();
+  }, []);
+
   // Empleados reales: excluir clientes
   const realEmployees = filteredEmployees.filter(
     emp => (emp.rol as string) !== 'cliente'
@@ -119,20 +163,25 @@ export default function StaffManagementPage() {
     })),
   ];
 
-  const scheduleRows = [
-    { shift: "Turno Mañana", hours: "08:00 - 16:00", description: "Caja habilitada durante la mañana" },
-    { shift: "Turno Tarde", hours: "16:00 - 21:00", description: "Caja habilitada durante la tarde" },
-    { shift: "Turno Completo", hours: "08:00 - 21:00", description: "Caja habilitada durante toda la jornada" },
+  const scheduleRows = shiftSettings?.shifts ?? [
+    { shift: "Turno Mañana", start: "08:00", end: "16:00", hours: "08:00 - 16:00", description: "Caja habilitada durante la mañana" },
+    { shift: "Turno Tarde", start: "16:00", end: "21:00", hours: "16:00 - 21:00", description: "Caja habilitada durante la tarde" },
+    { shift: "Turno Completo", start: "08:00", end: "21:00", hours: "08:00 - 21:00", description: "Caja habilitada durante toda la jornada" },
   ];
 
   const cashiersByShift = scheduleRows.map((row) => ({
     ...row,
     cashiers: realEmployees.filter((employee) => {
       const shift = employee.employmentDetails?.shift as string | undefined;
-      if (row.shift === "Turno Mañana") {
-        return shift === "Turno Mañana" || shift === "Turno MaÃ±ana";
-      }
-      return shift === row.shift;
+      const normalizeShift = (value?: string) =>
+        (value || "")
+          .toLowerCase()
+          .normalize("NFD")
+          .replace(/[\u0300-\u036f]/g, "")
+          .replace(/ã±|Ã±|aa±/g, "n")
+          .trim();
+
+      return normalizeShift(shift) === normalizeShift(row.shift);
     }).filter((employee) => employee.rol === "cajero"),
   }));
 
@@ -188,6 +237,37 @@ export default function StaffManagementPage() {
   const showError = (msg: string) => {
     setErrorMsg(msg);
     setTimeout(() => setErrorMsg(""), 4000);
+  };
+
+  const handleSaveShifts = async () => {
+    setSavingShifts(true);
+    try {
+      const token = localStorage.getItem("token");
+      const res = await fetch('/api/cash-shifts', {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify(shiftForm),
+      });
+      const data = await res.json();
+
+      if (!res.ok) throw new Error(data.error || 'Error al guardar horarios');
+
+      setShiftSettings(data);
+      setShiftForm({
+        morningStart: data.morningStart,
+        morningEnd: data.morningEnd,
+        afternoonStart: data.afternoonStart,
+        afternoonEnd: data.afternoonEnd,
+      });
+      showSuccess("Horarios de caja actualizados");
+    } catch (error) {
+      showError(error instanceof Error ? error.message : "Error al guardar horarios");
+    } finally {
+      setSavingShifts(false);
+    }
   };
 
   // Manejadores de empleados (igual)
@@ -447,6 +527,89 @@ export default function StaffManagementPage() {
 
         {activeTab === "schedule" && (
           <div style={{ display: "grid", gap: 16 }}>
+            <div style={{ ...cardStyle, padding: 20 }}>
+              <div style={{
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: isMobile ? "stretch" : "center",
+                flexDirection: isMobile ? "column" : "row",
+                gap: 14,
+                marginBottom: 16,
+              }}>
+                <div>
+                  <h2 style={{ margin: 0, fontSize: 18 }}>Configurar horarios de caja</h2>
+                  <p style={{ margin: "4px 0 0", color: "var(--muted-foreground)", fontSize: 13 }}>
+                    Estos horarios controlan pagos y cierre de caja para cajeros.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={handleSaveShifts}
+                  disabled={savingShifts}
+                  style={{
+                    backgroundColor: savingShifts ? "var(--muted)" : "var(--primary)",
+                    color: savingShifts ? "var(--muted-foreground)" : "var(--primary-foreground)",
+                    border: "none",
+                    borderRadius: "var(--radius-md)",
+                    padding: "10px 16px",
+                    cursor: savingShifts ? "wait" : "pointer",
+                    display: "inline-flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    gap: 8,
+                    fontFamily: "inherit",
+                    fontWeight: 600,
+                  }}
+                >
+                  <Save size={16} />
+                  {savingShifts ? "Guardando..." : "Guardar horarios"}
+                </button>
+              </div>
+
+              <div style={{
+                display: "grid",
+                gridTemplateColumns: isMobile ? "1fr" : "repeat(4, 1fr)",
+                gap: 12,
+              }}>
+                <label style={{ display: "grid", gap: 6, fontSize: 13, fontWeight: 600 }}>
+                  Mañana inicia
+                  <input
+                    type="time"
+                    value={shiftForm.morningStart}
+                    onChange={(e) => setShiftForm(prev => ({ ...prev, morningStart: e.target.value }))}
+                    style={inputStyle}
+                  />
+                </label>
+                <label style={{ display: "grid", gap: 6, fontSize: 13, fontWeight: 600 }}>
+                  Mañana termina
+                  <input
+                    type="time"
+                    value={shiftForm.morningEnd}
+                    onChange={(e) => setShiftForm(prev => ({ ...prev, morningEnd: e.target.value }))}
+                    style={inputStyle}
+                  />
+                </label>
+                <label style={{ display: "grid", gap: 6, fontSize: 13, fontWeight: 600 }}>
+                  Tarde inicia
+                  <input
+                    type="time"
+                    value={shiftForm.afternoonStart}
+                    onChange={(e) => setShiftForm(prev => ({ ...prev, afternoonStart: e.target.value }))}
+                    style={inputStyle}
+                  />
+                </label>
+                <label style={{ display: "grid", gap: 6, fontSize: 13, fontWeight: 600 }}>
+                  Tarde termina
+                  <input
+                    type="time"
+                    value={shiftForm.afternoonEnd}
+                    onChange={(e) => setShiftForm(prev => ({ ...prev, afternoonEnd: e.target.value }))}
+                    style={inputStyle}
+                  />
+                </label>
+              </div>
+            </div>
+
             {cashiersByShift.map((row) => (
               <div key={row.shift} style={{ ...cardStyle, padding: 20 }}>
                 <div style={{

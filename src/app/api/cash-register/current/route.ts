@@ -3,9 +3,11 @@ import { connectDB } from '@/lib/db';
 import { verifyToken } from '@/lib/jwt';
 import {
   getCashCloseForShift,
+  getCashShiftContext,
   getCashRegisterSummaryForShift,
   getCashierShiftByUserId,
   getCurrentOperationalShift,
+  isWithinShiftHours,
 } from '@/lib/cashRegister';
 
 function getUserIdFromRequest(req: NextRequest) {
@@ -25,12 +27,24 @@ export async function GET(req: NextRequest) {
 
     const userId = getUserIdFromRequest(req);
     const assignedShift = await getCashierShiftByUserId(userId);
-    const shiftName = assignedShift ?? getCurrentOperationalShift();
+    const shiftName = assignedShift ?? await getCurrentOperationalShift();
 
     if (!shiftName) {
       return NextResponse.json({
         status: 'cerrado',
         message: 'Fuera del horario de caja',
+      });
+    }
+
+    if (assignedShift && !(await isWithinShiftHours(assignedShift))) {
+      const shift = await getCashShiftContext(assignedShift);
+      return NextResponse.json({
+        status: 'cerrado',
+        message: `Fuera del horario de ${assignedShift}: ${shift.shiftRange}`,
+        shiftName: assignedShift,
+        shiftDate: shift.shiftDate,
+        shiftStart: shift.shiftStart.toISOString(),
+        shiftEnd: shift.shiftEnd.toISOString(),
       });
     }
 
