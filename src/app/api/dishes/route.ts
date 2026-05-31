@@ -28,7 +28,6 @@ function validateIngredients(ingredients: unknown[]): string | null {
 export async function GET() {
   try {
     await connectDB();
-
     // IMPORTANTE: No usar .select() restrictivo en ingredients.ingredient_id
     // El virtual stockStatus necesita currentStock y minStock para calcularse.
     // Al omitir el select, Mongoose hidrata el documento completo y los virtuals
@@ -38,7 +37,31 @@ export async function GET() {
       .populate("ingredients.ingredient_id") // sin select → virtual stockStatus incluido
       .sort({ createdAt: -1 });
 
-    return NextResponse.json({ ok: true, data: dishes });
+      // Calcular hasStock: true si TODOS los ingredientes tienen currentStock
+    // suficiente para preparar al menos 1 porción del plato.
+    const dishesWithStock = dishes.map((dish) => {
+    const obj = dish.toJSON();
+
+    const hasStock =
+      dish.ingredients.length === 0 ||
+      dish.ingredients.every((item: { ingredient_id: unknown; quantity: number }) => {
+        const ing = item.ingredient_id as unknown as {
+          currentStock: number;
+          minStock: number;
+          warningStock: number;
+          isActive: boolean;
+          stockStatus: string;
+        };
+        if (!ing || !ing.isActive) return false;
+        // Igual que el mesero: bloquear si crítico O si no alcanza para 1 porción
+        if (ing.stockStatus === "critical") return false;
+        return ing.currentStock >= item.quantity;
+      });
+
+    return { ...obj, hasStock };
+  });
+
+    return NextResponse.json({ ok: true, data: dishesWithStock });
   } catch (error) {
     return NextResponse.json(
       {

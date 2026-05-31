@@ -75,6 +75,13 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    if (currentStock > maxStock) {
+      return NextResponse.json(
+        { ok: false, message: "El stock actual no puede ser mayor al stock máximo" },
+        { status: 400 }
+      );
+    }
+
     if (!unit || !VALID_UNITS.includes(unit)) {
       return NextResponse.json(
         { ok: false, message: `La unidad debe ser una de: ${VALID_UNITS.join(", ")}` },

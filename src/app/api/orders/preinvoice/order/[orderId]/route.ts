@@ -76,6 +76,7 @@ export async function GET(
       iva,
       total,
       tableNumber: table?.number ?? null,
+      serviceType: (order as { service_type?: string })?.service_type ?? 'dine_in',
     });
   } catch (error) {
     console.error('[OrderSummary] Error:', error);

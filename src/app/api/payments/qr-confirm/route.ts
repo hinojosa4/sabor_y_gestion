@@ -99,21 +99,29 @@ export async function POST(req: NextRequest) {
       timestamp: new Date(),
     });
 
-    order.status = 'paid';
+    // Para delivery: el pago se registra pero la orden sigue su flujo de cocina
+    // Para dine_in/pick_up: flujo original sin cambios
+    if (order.service_type === 'delivery') {
+      // No cambiar status — queda en pending para ir a cocina normalmente
+      // Solo registrar que el pago fue recibido
+      order.payment_method = 'QR / Transferencia';
+    } else {
+      // Flujo original de mesa — sin cambios
+      order.status = 'paid';
+      if (order.table_id) {
+        await Table.findByIdAndUpdate(order.table_id, { status: 'Libre' });
+        await pusherServer.trigger("restaurant", "table:updated", {
+          tableId: order.table_id,
+          newStatus: "Libre",
+        });
+      }
+    }
+
     order.total_amount = totalAmount;
     if (customer && !order.customer_id) {
       order.customer_id = customer._id;
     }
     await order.save();
-
-    if (order.service_type === 'dine_in' && order.table_id) {
-      await Table.findByIdAndUpdate(order.table_id, { status: 'Libre' });
-    }
-
-    await pusherServer.trigger("restaurant", "table:updated", {
-      tableId: order.table_id,
-      newStatus: "Libre",
-    });
 
     await pusherServer.trigger("restaurant", "payment:completed", {
       paymentId: payment._id.toString(),

@@ -14,6 +14,7 @@ export interface Dish {
   bgColor?: string;
   /** Emoji de fallback cuando no hay imagen ni color */
   emoji?: string;
+  hasStock?: boolean;
 }
 
 interface DishCardProps {
@@ -21,25 +22,31 @@ interface DishCardProps {
   onAdd: (dish: Dish) => void;
 }
 
+
 export function DishCard({ dish, onAdd }: DishCardProps) {
   const bg = dish.bgColor ?? "#f3f4f6";
-
+  const { hasStock } = dish;
+  const outOfStock = hasStock === false;
   return (
-    <article style={styles.card}>
+    <article style={{ ...styles.card, ...(outOfStock ? styles.cardDisabled : {}) }}>
       {/* Imagen o placeholder */}
-      <div style={{ ...styles.imageBox, backgroundColor: dish.image_url ? "transparent" : bg }}>
+      <div style={{ ...styles.imageBox, backgroundColor: dish.image_url ? "transparent" : bg, position: "relative" }}>
         {dish.image_url ? (
           <img
             src={dish.image_url}
             alt={dish.name}
-            style={styles.image}
+            style={{ ...styles.image, ...(outOfStock ? styles.imageDisabled : {}) }}
             onError={(e) => {
-              // Si falla la carga, ocultamos el img y mostramos el emoji
               (e.currentTarget as HTMLImageElement).style.display = "none";
             }}
           />
         ) : (
-          <span style={styles.emoji}>{dish.emoji ?? "🍽️"}</span>
+          <span style={{ ...styles.emoji, ...(outOfStock ? styles.emojiDisabled : {}) }}>
+            {dish.emoji ?? "🍽️"}
+          </span>
+        )}
+        {outOfStock && (
+          <div style={styles.stockBadge}>Sin stock</div>
         )}
       </div>
 
@@ -52,17 +59,24 @@ export function DishCard({ dish, onAdd }: DishCardProps) {
         </div>
 
         <div style={styles.footer}>
-          <span style={styles.price}>${dish.price.toFixed(2)}</span>
-          <button style={styles.addBtn} onClick={() => onAdd(dish)} aria-label={`Agregar ${dish.name}`}>
+          <span style={styles.price}>Bs. {dish.price.toFixed(2)}</span>
+          <button
+            style={{
+              ...styles.addBtn,
+              ...(outOfStock ? styles.addBtnDisabled : {}),
+            }}
+            onClick={() => !outOfStock && onAdd(dish)}
+            disabled={outOfStock}
+            aria-label={outOfStock ? `${dish.name} sin stock` : `Agregar ${dish.name}`}
+          >
             <PlusCircle size={16} />
-            <span>Agregar</span>
+            <span>{outOfStock ? "Sin stock" : "Agregar"}</span>
           </button>
         </div>
       </div>
     </article>
   );
 }
-
 const styles: { [key: string]: React.CSSProperties } = {
   card: {
     backgroundColor: "#ffffff",
@@ -138,4 +152,33 @@ const styles: { [key: string]: React.CSSProperties } = {
     fontWeight: 600,
     cursor: "pointer",
   },
+
+  cardDisabled: {
+  opacity: 0.7,
+  pointerEvents: "none" as const,
+  } as React.CSSProperties,
+  imageDisabled: {
+    filter: "grayscale(80%)",
+  } as React.CSSProperties,
+  emojiDisabled: {
+    filter: "grayscale(80%)",
+    opacity: 0.5,
+  } as React.CSSProperties,
+  stockBadge: {
+    position: "absolute" as const,
+    top: 8,
+    left: 8,
+    backgroundColor: "rgba(17,24,39,0.75)",
+    color: "#fff",
+    fontSize: "0.72rem",
+    fontWeight: 700,
+    letterSpacing: "0.05em",
+    textTransform: "uppercase" as const,
+    padding: "0.2rem 0.55rem",
+    borderRadius: 6,
+  } as React.CSSProperties,
+  addBtnDisabled: {
+    backgroundColor: "#d1d5db",
+    cursor: "not-allowed" as const,
+  } as React.CSSProperties,
 };
