@@ -3,6 +3,7 @@ import { useState, useEffect } from 'react';
 import { X } from 'lucide-react';
 import { FacturaFinal } from './FacturaFinal';
 import { formatOrderLabel } from '@/lib/orderDisplay';
+import { AppNotice } from '@/components/ui/AppNotice';
 
 interface PaymentModalProps {
     isOpen: boolean;
@@ -105,6 +106,7 @@ export function PaymentModal({ isOpen, onClose, orderId, tableId, tableNumber, t
     const [cashReceivedInput, setCashReceivedInput] = useState(String(totalAmount));
     const [customerEmail, setCustomerEmail] = useState('');
     const [observations, setObservations] = useState('');
+    const [notice, setNotice] = useState<{ type: 'error' | 'warning'; message: string } | null>(null);
     
     // Estados para la factura final
     const [showFactura, setShowFactura] = useState(false);
@@ -116,6 +118,7 @@ export function PaymentModal({ isOpen, onClose, orderId, tableId, tableNumber, t
             setCashReceivedInput(String(totalAmount));
             setCustomerEmail('');
             setObservations('');
+            setNotice(null);
         }
     }, [isOpen, totalAmount]);
 
@@ -132,10 +135,6 @@ export function PaymentModal({ isOpen, onClose, orderId, tableId, tableNumber, t
     const hasCashValue = cashReceivedInput.trim() !== '' && !Number.isNaN(cashReceived);
     const change = hasCashValue ? cashReceived - totalAmount : 0;
     const isValid = hasCashValue && cashReceived >= totalAmount;
-
-    const handleAmountClick = (amount: number) => {
-        setCashReceivedInput(String(amount));
-    };
 
     const handleCashReceivedChange = (value: string) => {
         const normalized = value
@@ -156,10 +155,14 @@ export function PaymentModal({ isOpen, onClose, orderId, tableId, tableNumber, t
         if (!isValid) return;
         setLoading(true);
         try {
+            const token = localStorage.getItem('token');
             // 1. Registrar pago
             const res = await fetch('/api/payments', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: {
+                    'Content-Type': 'application/json',
+                    ...(token ? { Authorization: `Bearer ${token}` } : {}),
+                },
                 body: JSON.stringify({ 
                     orderId, 
                     amount: totalAmount, 
@@ -183,11 +186,11 @@ export function PaymentModal({ isOpen, onClose, orderId, tableId, tableNumber, t
                 onClose();
             } else {
                 const error = await res.json();
-                alert(error.error || 'Error al procesar pago');
+                setNotice({ type: 'error', message: error.error || 'Error al procesar pago' });
             }
         } catch (error) {
             console.error('Error:', error);
-            alert('Error al procesar pago');
+            setNotice({ type: 'error', message: 'Error al procesar pago' });
         } finally {
             setLoading(false);
         }
@@ -205,6 +208,17 @@ export function PaymentModal({ isOpen, onClose, orderId, tableId, tableNumber, t
                         </button>
                     </div>
 
+                    {notice && (
+                        <div style={{ marginBottom: "1rem" }}>
+                            <AppNotice
+                                type={notice.type}
+                                title="No se pudo registrar el pago"
+                                message={notice.message}
+                                onClose={() => setNotice(null)}
+                            />
+                        </div>
+                    )}
+
                     {/* Mejora 1: Resumen de la orden */}
                     <OrderSummary orderId={orderId} />
 
@@ -213,29 +227,11 @@ export function PaymentModal({ isOpen, onClose, orderId, tableId, tableNumber, t
                         Total: {formatCurrency(totalAmount)}
                     </p>
 
-                    {/* Mejora 5: Botones numéricos rápidos */}
+                    {/* Monto recibido */}
                     <div style={{ marginBottom: "1rem" }}>
                         <label style={{ display: "block", marginBottom: "0.5rem", fontWeight: "bold" }}>
                             Monto recibido (Bs)
                         </label>
-                        <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap", marginBottom: "0.5rem" }}>
-                            {[100, 200, 500, 1000].map(amount => (
-                                <button
-                                    key={amount}
-                                    onClick={() => handleAmountClick(amount)}
-                                    style={{
-                                        padding: "0.5rem 1rem",
-                                        backgroundColor: "var(--secondary)",
-                                        border: `1px solid var(--border)`,
-                                        borderRadius: "var(--radius-md)",
-                                        cursor: "pointer",
-                                        fontSize: "0.875rem",
-                                    }}
-                                >
-                                    {amount} Bs
-                                </button>
-                            ))}
-                        </div>
                         <input
                             type="text"
                             inputMode="decimal"

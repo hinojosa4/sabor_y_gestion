@@ -57,6 +57,10 @@ function formatDate(dateStr: string): string {
   });
 }
 
+function formatCurrency(amount: number): string {
+  return `Bs. ${amount.toFixed(2)}`;
+}
+
 // ─── Modal Comanda Mesero ─────────────────────────────────────────
 export function ComandaMeseroModal({
   orderId,
@@ -202,7 +206,7 @@ export function ComandaMeseroModal({
                       )}
                     </div>
                     <span style={{ fontSize: 14, fontWeight: 700, color: "#374151", flexShrink: 0 }}>
-                      ${(item.unit_price * item.quantity).toFixed(2)}
+                      {formatCurrency(item.unit_price * item.quantity)}
                     </span>
                   </div>
 
@@ -231,7 +235,7 @@ export function ComandaMeseroModal({
             <div style={{ textAlign: "right" }}>
               <p style={{ margin: 0, fontSize: 12, color: "#9ca3af" }}>Total</p>
               <p style={{ margin: 0, fontSize: 20, fontWeight: 800, color: "#111" }}>
-                ${total.toFixed(2)}
+                {formatCurrency(total)}
               </p>
             </div>
           </div>

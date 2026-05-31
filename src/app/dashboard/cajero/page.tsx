@@ -3,18 +3,27 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useAuth } from '@/lib/useAuth';
 import { CAJERO } from '@/lib/roles';
-import { Search, DollarSign, Receipt, Clock } from 'lucide-react';
+import { Search, DollarSign, Receipt, Clock, CheckCircle, X } from 'lucide-react';
 import Link from 'next/link';
 import { useTableData } from '@/hooks/useTableData';
 import { PreinvoiceModal } from '@/components/caja/PreinvoiceModal';
 import { PaymentModal } from '@/components/caja/PaymentModal';
 import { formatShortOrderId } from '@/lib/orderDisplay';
+import { AppNotice } from '@/components/ui/AppNotice';
 
 interface ActiveOrder {
     _id: string;
     table_id?: string;
     status: string;
     createdAt?: string;
+}
+
+interface CashRegisterStatus {
+    status: 'abierto' | 'cerrado';
+    shiftName?: string;
+    shiftStart?: string;
+    shiftEnd?: string;
+    message?: string;
 }
 
 const containerStyle: React.CSSProperties = {
@@ -214,8 +223,25 @@ export default function CajeroDashboard() {
     const [currentTotal, setCurrentTotal] = useState(0);
     const [currentTableId, setCurrentTableId] = useState('');
     const [orderIdsByTable, setOrderIdsByTable] = useState<Record<string, string>>({});
+    const [successToast, setSuccessToast] = useState('');
+    const [cashRegisterStatus, setCashRegisterStatus] = useState<CashRegisterStatus | null>(null);
+    const [cashNotice, setCashNotice] = useState('');
 
     const { tables, loading, refreshTables } = useTableData(restaurantId);
+
+    const fetchCashRegisterStatus = useCallback(async () => {
+        try {
+            const token = localStorage.getItem("token");
+            const res = await fetch('/api/cash-register/current', {
+                headers: token ? { Authorization: `Bearer ${token}` } : {},
+            });
+            const data = await res.json();
+            setCashRegisterStatus(data);
+        } catch (error) {
+            console.error('Error al cargar estado de caja:', error);
+            setCashRegisterStatus(null);
+        }
+    }, []);
 
      const fetchActiveOrders = useCallback(async () => {
         try {
@@ -229,8 +255,8 @@ export default function CajeroDashboard() {
  
             const nextOrderIdsByTable: Record<string, string> = {};
  
-            if (!res.ok || !data.ok) {
-                console.error('Error al cargar ordenes activas:', data);
+            if (!res.ok || !data?.ok || !Array.isArray(data.data)) {
+                console.warn('No se pudieron cargar las ordenes activas:', data);
             } else {
                 (data.data as ActiveOrder[]).forEach((order) => {
                     if (!order.table_id || !order._id) return;
@@ -266,7 +292,7 @@ export default function CajeroDashboard() {
  
             setOrderIdsByTable(nextOrderIdsByTable);
         } catch (error) {
-            console.error('Error al cargar ordenes activas:', error);
+            console.warn('No se pudieron cargar las ordenes activas:', error);
             setOrderIdsByTable({});
         }
     }, [tables]);
@@ -311,6 +337,14 @@ export default function CajeroDashboard() {
     const freeTables = filteredTables.filter(t => t.status === 'Libre');
 
     const handleTableClick = (tableId: string, tableNumber: number, status: string) => {
+        if (cashRegisterStatus?.status === 'cerrado') {
+            setCashNotice(
+                cashRegisterStatus.message ||
+                `La caja${cashRegisterStatus.shiftName ? ` de ${cashRegisterStatus.shiftName}` : ''} está cerrada. No se pueden registrar pagos.`
+            );
+            return;
+        }
+
         if (status === 'Cuenta solicitada') {
             setSelectedTable({ id: tableId, number: tableNumber });
             setIsPreinvoiceOpen(true);
@@ -318,6 +352,7 @@ export default function CajeroDashboard() {
     };
     const refreshTablesRef = useRef(refreshTables);
     const fetchActiveOrdersRef = useRef(fetchActiveOrders);
+    const fetchCashRegisterStatusRef = useRef(fetchCashRegisterStatus);
     useEffect(() => {
     refreshTablesRef.current = refreshTables;
     }, [refreshTables]);
@@ -327,8 +362,30 @@ export default function CajeroDashboard() {
     }, [fetchActiveOrders]);
 
     useEffect(() => {
+        fetchCashRegisterStatusRef.current = fetchCashRegisterStatus;
+    }, [fetchCashRegisterStatus]);
+
+    useEffect(() => {
         fetchActiveOrders();
     }, [fetchActiveOrders]);
+
+    useEffect(() => {
+        fetchCashRegisterStatus();
+    }, [fetchCashRegisterStatus]);
+
+    useEffect(() => {
+        if (!successToast) return;
+
+        const timeoutId = window.setTimeout(() => setSuccessToast(''), 4200);
+        return () => window.clearTimeout(timeoutId);
+    }, [successToast]);
+
+    useEffect(() => {
+        if (!cashNotice) return;
+
+        const timeoutId = window.setTimeout(() => setCashNotice(''), 5200);
+        return () => window.clearTimeout(timeoutId);
+    }, [cashNotice]);
 
     useEffect(() => {
     let pusherInstance: InstanceType<typeof import("pusher-js")["default"]> | null = null;
@@ -357,6 +414,7 @@ export default function CajeroDashboard() {
         if (mounted) {
             refreshTablesRef.current();
             fetchActiveOrdersRef.current();
+            fetchCashRegisterStatusRef.current();
         }
         });
 
@@ -397,6 +455,15 @@ export default function CajeroDashboard() {
     }
 
     const isMobile = typeof window !== "undefined" ? window.innerWidth < 640 : false;
+    const formatShiftTime = (value?: string) =>
+        value
+            ? new Date(value).toLocaleTimeString('es-BO', {
+                hour: '2-digit',
+                minute: '2-digit',
+            })
+            : null;
+    const shiftStartTime = formatShiftTime(cashRegisterStatus?.shiftStart);
+    const shiftEndTime = formatShiftTime(cashRegisterStatus?.shiftEnd);
     const responsiveGrid: React.CSSProperties = {
         ...gridStyle,
         gridTemplateColumns: isMobile ? "1fr" : "repeat(auto-fill, minmax(300px, 1fr))",
@@ -469,26 +536,63 @@ export default function CajeroDashboard() {
                     <div>
                         <h1 style={{ margin: 0 }}>Panel de Cajero</h1>
                         <p style={{ margin: 0, fontSize: "0.75rem", color: "var(--muted-foreground)" }}>Gestiona pagos y facturación</p>
+                        {cashRegisterStatus?.shiftName && (
+                            <p style={{
+                                margin: "0.2rem 0 0",
+                                fontSize: "0.72rem",
+                                color: cashRegisterStatus.status === 'abierto' ? "#16a34a" : "#dc2626",
+                                fontWeight: 700,
+                            }}>
+                                {cashRegisterStatus.shiftName}
+                                {shiftStartTime && shiftEndTime ? ` · ${shiftStartTime} - ${shiftEndTime}` : ''}
+                                {cashRegisterStatus.status === 'cerrado' ? ' · Cerrado' : ' · Activo'}
+                            </p>
+                        )}
                     </div>
                 </div>
 
                 <div style={{ display: "flex", gap: "0.75rem" }}>
-                    <Link href="/dashboard/cajero/cierre-caja" style={{
-                        backgroundColor: "var(--primary)",
-                        color: "var(--primary-foreground)",
-                        border: "none",
-                        borderRadius: "var(--radius-md)",
-                        padding: isMobile ? "10px 16px" : "11px 22px",
-                        cursor: "pointer",
-                        display: "inline-flex",
-                        alignItems: "center",
-                        gap: 6,
-                        fontFamily: "inherit",
-                        textDecoration: "none",
-                    }}>
-                        <Receipt size={16} />
-                        Cierre de Caja
-                    </Link>
+                    {cashRegisterStatus?.status === 'cerrado' ? (
+                        <button
+                            type="button"
+                            onClick={() => setCashNotice(
+                                cashRegisterStatus.message ||
+                                `La caja${cashRegisterStatus.shiftName ? ` de ${cashRegisterStatus.shiftName}` : ''} ya está cerrada. No se pueden registrar pagos.`
+                            )}
+                            style={{
+                                backgroundColor: "var(--muted)",
+                                color: "var(--muted-foreground)",
+                                border: `1px solid var(--border)`,
+                                borderRadius: "var(--radius-md)",
+                                padding: isMobile ? "10px 16px" : "11px 22px",
+                                cursor: "not-allowed",
+                                display: "inline-flex",
+                                alignItems: "center",
+                                gap: 6,
+                                fontFamily: "inherit",
+                            }}
+                        >
+                            <Receipt size={16} />
+                            Caja Cerrada
+                        </button>
+                    ) : (
+                        <Link href="/dashboard/cajero/cierre-caja" style={{
+                            backgroundColor: "var(--primary)",
+                            color: "var(--primary-foreground)",
+                            border: "none",
+                            borderRadius: "var(--radius-md)",
+                            padding: isMobile ? "10px 16px" : "11px 22px",
+                            cursor: "pointer",
+                            display: "inline-flex",
+                            alignItems: "center",
+                            gap: 6,
+                            fontFamily: "inherit",
+                            textDecoration: "none",
+                        }}>
+                            <Receipt size={16} />
+                            Cierre de Caja
+                        </Link>
+                    )}
 
                     {/* Botón Salir */}
                     <button
@@ -512,6 +616,91 @@ export default function CajeroDashboard() {
             </header>
 
             <main style={mainStyle}>
+                {cashNotice && (
+                    <div style={{
+                        position: "fixed",
+                        top: 18,
+                        right: 18,
+                        zIndex: 80,
+                        width: "min(380px, calc(100vw - 32px))",
+                    }}>
+                        <AppNotice
+                            type="warning"
+                            title="Caja cerrada"
+                            message={cashNotice}
+                            onClose={() => setCashNotice('')}
+                        />
+                    </div>
+                )}
+
+                {successToast && (
+                    <div
+                        role="status"
+                        aria-live="polite"
+                        style={{
+                            position: "fixed",
+                            top: isMobile ? 86 : 92,
+                            right: isMobile ? 12 : 24,
+                            left: isMobile ? 12 : "auto",
+                            zIndex: 80,
+                            display: "flex",
+                            alignItems: "center",
+                            gap: 12,
+                            maxWidth: isMobile ? "none" : 420,
+                            padding: "0.9rem 1rem",
+                            backgroundColor: "var(--card)",
+                            color: "var(--foreground)",
+                            border: "1px solid #fed7aa",
+                            borderLeft: "5px solid #ea580c",
+                            borderRadius: "var(--radius-lg)",
+                            boxShadow: "0 20px 45px rgba(3, 2, 19, 0.16)",
+                        }}
+                    >
+                        <span
+                            style={{
+                                width: 38,
+                                height: 38,
+                                flex: "0 0 38px",
+                                borderRadius: "9999px",
+                                backgroundColor: "var(--primary)",
+                                color: "var(--primary-foreground)",
+                                display: "inline-flex",
+                                alignItems: "center",
+                                justifyContent: "center",
+                            }}
+                        >
+                            <CheckCircle size={20} />
+                        </span>
+                        <div style={{ minWidth: 0, flex: 1 }}>
+                            <p style={{ margin: 0, fontSize: "0.95rem", fontWeight: 700 }}>
+                                Pago registrado
+                            </p>
+                            <p style={{ margin: "0.15rem 0 0", fontSize: "0.82rem", color: "var(--muted-foreground)" }}>
+                                {successToast}
+                            </p>
+                        </div>
+                        <button
+                            type="button"
+                            aria-label="Cerrar notificación"
+                            onClick={() => setSuccessToast('')}
+                            style={{
+                                width: 32,
+                                height: 32,
+                                border: "none",
+                                borderRadius: "var(--radius-md)",
+                                backgroundColor: "#fff7ed",
+                                color: "#ea580c",
+                                cursor: "pointer",
+                                display: "inline-flex",
+                                alignItems: "center",
+                                justifyContent: "center",
+                            }}
+                        >
+                            <X size={17} />
+                        </button>
+                    </div>
+                )}
+
                 <div style={searchContainerStyle}>
                     <Search size={16} style={searchIconStyle} />
                     <input
@@ -555,7 +744,7 @@ export default function CajeroDashboard() {
                                         )}
                                     </div>
                                     <button style={{ ...buttonFullStyle, backgroundColor: "#ea580c", marginTop: "0.75rem" }}>
-                                        Ver cuenta
+                                        {cashRegisterStatus?.status === 'cerrado' ? 'Caja cerrada' : 'Ver cuenta'}
                                     </button>
                                 </div>
                             ))}
@@ -653,6 +842,13 @@ export default function CajeroDashboard() {
                 tableId={selectedTable?.id || ''}
                 tableNumber={selectedTable?.number || 0}
                 onPay={(orderId, total) => {
+                    if (cashRegisterStatus?.status === 'cerrado') {
+                        setCashNotice(
+                            cashRegisterStatus.message ||
+                            `La caja${cashRegisterStatus.shiftName ? ` de ${cashRegisterStatus.shiftName}` : ''} está cerrada. No se pueden registrar pagos.`
+                        );
+                        return;
+                    }
                     setIsPreinvoiceOpen(false);
                     setCurrentOrderId(orderId);
                     setCurrentTotal(total);
@@ -680,7 +876,8 @@ export default function CajeroDashboard() {
                     setIsPaymentModalOpen(false);
                     refreshTables();
                     fetchActiveOrders();
-                    alert('Pago registrado exitosamente');
+                    fetchCashRegisterStatus();
+                    setSuccessToast('El cobro en efectivo se guardó correctamente.');
                 }}
             />
 
