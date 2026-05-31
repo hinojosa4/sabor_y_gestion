@@ -13,14 +13,21 @@ import { CategoryTabs } from "@/components/clientScreen/delivery/CategoryTabs";
 import { DishCard, Dish } from "@/components/clientScreen/delivery/DishCard";
 import { OrderCart, CartItem } from "@/components/clientScreen/delivery/OrderCart";
 import { haversineKm, calcDeliveryFee, DELIVERY_CONFIG } from "@/lib/deliveryConfig";
+import dynamic from "next/dynamic";
+import { FacturaFinal } from "@/components/caja/FacturaFinal";
 
 // ── Tipos ──────────────────────────────────────────────────────────────────────
+const DeliveryMap = dynamic(
+  () => import("@/components/clientScreen/delivery/DeliveryMap").then(m => m.DeliveryMap),
+  { ssr: false, loading: () => <div style={{ height: 240, background: "#f3f4f6", borderRadius: 10, display: "flex", alignItems: "center", justifyContent: "center", color: "#9ca3af", fontSize: "0.85rem" }}>Cargando mapa…</div> }
+);
 
 interface ApiCategory { _id: string; name: string; isActive: boolean; }
 interface ApiDish {
   _id: string; name: string; description?: string; price: number;
   category_id: string | { _id: string; name: string } | null;
   isAvailable: boolean; image_url?: string;
+  hasStock?: boolean;
 }
 
 type PaymentMethod = "Efectivo" | "QR / Transferencia";
@@ -40,6 +47,7 @@ const BG_COLORS = [
   "#fde68a","#fecaca","#bbf7d0","#fed7aa",
   "#e9d5ff","#fbcfe8","#fef08a","#fcd34d","#a7f3d0","#bfdbfe",
 ];
+
 function bgForIndex(i: number) { return BG_COLORS[i % BG_COLORS.length]; }
 
 function categoryNameOf(dish: ApiDish, categories: ApiCategory[]): string {
@@ -54,6 +62,13 @@ export default function DeliveryPage() {
   const router = useRouter();
   const { loading: authLoading, logout } = useAuth(CLIENTE);
 
+  const [showFactura, setShowFactura]     = useState(false);
+  const [facturaData, setFacturaData]     = useState<{
+    orderId: string;
+    items: { dish: { name: string; price: number }; quantity: number; subtotal: number }[];
+    total: number;
+    deliveryFeeAmount: number;
+  } | null>(null);
   const [categories, setCategories]   = useState<ApiCategory[]>([]);
   const [apiDishes, setApiDishes]     = useState<ApiDish[]>([]);
   const [loadingData, setLoadingData] = useState(true);
@@ -171,6 +186,21 @@ export default function DeliveryPage() {
     setDeliveryFee(undefined);
   }, [submitting]);
 
+  const handleMapLocationChange = useCallback((result: {
+    lat: number; lng: number; address: string;
+    distanceKm: number; fee: number | null;
+  }) => {
+    setClientCoords({ lat: result.lat, lng: result.lng });
+    setDistanceKm(result.distanceKm);
+    setDeliveryFee(result.fee);
+    setAddress(result.address); // llena el campo automáticamente
+    if (result.fee === null) {
+      setGeoStatus("out_of_range");
+    } else {
+      setGeoStatus("done");
+    }
+  }, []);
+
   // ── Pusher ─────────────────────────────────────────────────────────────────
   useEffect(() => {
     if (!lastOrderId) return;
@@ -227,6 +257,7 @@ export default function DeliveryPage() {
       id: d._id, name: d.name, description: d.description ?? "",
       price: d.price, category: categoryNameOf(d, categories),
       image_url: d.image_url?.trim() || undefined, bgColor: bgForIndex(i),
+      hasStock: d.hasStock,
     })),
     [apiDishes, categories]
   );
@@ -263,7 +294,7 @@ export default function DeliveryPage() {
   // ── Confirmar orden ────────────────────────────────────────────────────────
   const handleConfirmOrder = async () => {
     if (!address.trim()) return;
-    if (deliveryFee === null) return; // fuera de rango, no debería llegar aquí
+    if (deliveryFee === null) return;
     const token = localStorage.getItem("token");
     if (!token) return;
 
@@ -289,13 +320,35 @@ export default function DeliveryPage() {
       const json = await res.json();
       if (!json.ok) throw new Error(json.message ?? "Error al crear orden");
 
-      setLastOrderId(json.data.order._id);
+      const orderId: string = json.data.order._id;
+      setLastOrderId(orderId);
+
+      // Limpiar carrito y cerrar modal
+      const cartSnapshot = [...cart];
       setCart([]);
       setAddress(""); setPhone(""); setNotes(""); setPaymentMethod("Efectivo");
       handleCloseModal();
-      setToastMsg("✅ ¡Pedido enviado! Te avisaremos cuando esté en camino.");
-      setToastType("success");
-      setTimeout(() => setToastMsg(null), 5000);
+
+      if (paymentMethod === "QR / Transferencia") {
+        // Redirigir a la página de pago QR existente
+        router.push(`/pago-qr/${orderId}`);
+      } else {
+        // Efectivo: mostrar factura de confirmación
+        setFacturaData({
+          orderId,
+          items: cartSnapshot.map((it) => ({
+            dish: { name: it.dish.name, price: it.dish.price },
+            quantity: it.quantity,
+            subtotal: it.dish.price * it.quantity,
+          })),
+          total: cartSnapshot.reduce((s, it) => s + it.dish.price * it.quantity, 0),
+          deliveryFeeAmount: deliveryFee ?? 0,
+        });
+        setShowFactura(true);
+        setToastMsg("✅ ¡Pedido enviado! El repartidor cobrará al entregar.");
+        setToastType("success");
+        setTimeout(() => setToastMsg(null), 6000);
+      }
     } catch (e) {
       alert(e instanceof Error ? e.message : "Error al enviar la orden");
     } finally {
@@ -377,73 +430,80 @@ export default function DeliveryPage() {
               <span style={s.summaryTotal}>Bs. {cartSubtotal.toFixed(2)}</span>
             </div>
 
-            {/* ── Bloque de geolocalización ─────────────────────────────── */}
-            <div style={s.geoBlock}>
-              <div style={s.geoHeader}>
-                <span style={s.geoTitle}>📍 Ubicación de entrega</span>
-                {(geoStatus === "error" || geoStatus === "denied" || geoStatus === "out_of_range") && (
-                  <button style={s.geoRetryBtn} onClick={requestGeolocation} disabled={submitting}>
-                    Reintentar
-                  </button>
-                )}
-              </div>
-
-              {/* Solicitando */}
-              {(geoStatus === "requesting" || geoStatus === "locating") && (
-                <div style={s.geoStatusRow}>
-                  <span style={s.geoSpinner}>⏳</span>
-                  <span style={s.geoStatusText}>Obteniendo tu ubicación…</span>
+            {/* ── Mapa + geolocalización ─────────────────────────────── */}
+              <div style={s.geoBlock}>
+                <div style={s.geoHeader}>
+                  <span style={s.geoTitle}>📍 Ubicación de entrega</span>
+                  {(geoStatus === "error" || geoStatus === "denied" || geoStatus === "out_of_range") && (
+                    <button style={s.geoRetryBtn} onClick={requestGeolocation} disabled={submitting}>
+                      Reintentar GPS
+                    </button>
+                  )}
                 </div>
-              )}
 
-              {/* Éxito */}
-              {geoStatus === "done" && distanceKm !== null && deliveryFee !== null && (
-                <div style={s.geoSuccess}>
-                  <div style={s.geoSuccessRow}>
-                    <span style={s.geoSuccessIcon}>✅</span>
-                    <span style={s.geoSuccessText}>Ubicación detectada</span>
+                {/* Mapa: visible cuando tenemos coordenadas (geoStatus done/out_of_range/denied/error) */}
+                {clientCoords && (
+                  <DeliveryMap
+                    initialLat={clientCoords.lat}
+                    initialLng={clientCoords.lng}
+                    onLocationChange={handleMapLocationChange}
+                  />
+                )}
+
+                {/* Solicitando GPS */}
+                {(geoStatus === "requesting" || geoStatus === "locating") && (
+                  <div style={s.geoStatusRow}>
+                    <span style={s.geoSpinner}>⏳</span>
+                    <span style={s.geoStatusText}>Obteniendo tu ubicación…</span>
                   </div>
+                )}
+
+                {/* Sin GPS aún: mostrar mapa centrado en el restaurante para que el usuario elija */}
+                {geoStatus === "idle" && (
+                  <DeliveryMap
+                    initialLat={DELIVERY_CONFIG.restaurant.lat}
+                    initialLng={DELIVERY_CONFIG.restaurant.lng}
+                    onLocationChange={handleMapLocationChange}
+                  />
+                )}
+
+                {/* Éxito */}
+                {geoStatus === "done" && distanceKm !== null && typeof deliveryFee === "number" && (
                   <div style={s.geoDetails}>
                     <div style={s.geoDetailItem}>
-                      <span style={s.geoDetailLabel}>Distancia:</span>
+                      <span style={s.geoDetailLabel}>Distancia</span>
                       <span style={s.geoDetailValue}>{distanceKm.toFixed(2)} km</span>
                     </div>
                     <div style={s.geoDetailItem}>
-                      <span style={s.geoDetailLabel}>Costo de envío:</span>
+                      <span style={s.geoDetailLabel}>Envío</span>
                       <span style={{ ...s.geoDetailValue, color: "#f97316", fontWeight: 700 }}>
-                        Bs. {(deliveryFee as number).toFixed(2)}
+                        Bs. {deliveryFee.toFixed(2)}
                       </span>
                     </div>
                     <div style={s.geoDetailItem}>
-                      <span style={s.geoDetailLabel}>Total con envío:</span>
+                      <span style={s.geoDetailLabel}>Total</span>
                       <span style={{ ...s.geoDetailValue, color: "#059669", fontWeight: 700 }}>
                         Bs. {totalConEnvio.toFixed(2)}
                       </span>
                     </div>
                   </div>
-                </div>
-              )}
+                )}
 
-              {/* Fuera de rango */}
-              {geoStatus === "out_of_range" && distanceKm !== null && (
-                <div style={s.geoError}>
-                  <span>❌ Tu ubicación está a <strong>{distanceKm.toFixed(2)} km</strong> del restaurante.</span>
-                  <span style={s.geoErrorSub}>
-                    Solo realizamos entregas dentro de los {DELIVERY_CONFIG.maxDistanceKm} km. Lo sentimos.
-                  </span>
-                </div>
-              )}
+                {/* Fuera de rango */}
+                {geoStatus === "out_of_range" && distanceKm !== null && (
+                  <div style={s.geoError}>
+                    <span>❌ Tu ubicación está a <strong>{distanceKm.toFixed(2)} km</strong> — fuera del radio de {DELIVERY_CONFIG.maxDistanceKm} km.</span>
+                    <span style={s.geoErrorSub}>Mueve el marcador del mapa para ajustar tu punto de entrega.</span>
+                  </div>
+                )}
 
-              {/* Permiso denegado o error */}
-              {(geoStatus === "denied" || geoStatus === "error") && geoError && (
-                <div style={{ ...s.geoError, ...s.geoErrorWarning }}>
-                  <span>⚠️ {geoError}</span>
-                  <span style={s.geoErrorSub}>
-                    Puedes continuar sin geolocalización. El costo de envío se calculará con tu dirección.
-                  </span>
-                </div>
-              )}
-            </div>
+                {/* Permiso denegado — igual se puede usar el mapa */}
+                {(geoStatus === "denied" || geoStatus === "error") && (
+                  <div style={{ ...s.geoError, ...s.geoErrorWarning }}>
+                    <span>⚠️ GPS no disponible. Usa el mapa para marcar tu ubicación.</span>
+                  </div>
+                )}
+              </div>
 
             {/* Dirección */}
             <label style={s.label}>Dirección de entrega *</label>
@@ -537,6 +597,20 @@ export default function DeliveryPage() {
                 {submitting ? "Enviando…" : "Confirmar pedido"}
               </button>
             </div>
+            {/* ── Factura post-orden (solo efectivo) ───────────────────────── */}
+              {showFactura && facturaData && (
+                <FacturaFinal
+                  isOpen={showFactura}
+                  onClose={() => { setShowFactura(false); setFacturaData(null); }}
+                  orderId={facturaData.orderId}
+                  tableNumber={null}
+                  items={facturaData.items}
+                  iva={0}
+                  total={facturaData.total + facturaData.deliveryFeeAmount}
+                  paymentMethod="cash"
+                  paymentDate={new Date()}
+                />
+              )}
           </div>
         </div>
       )}
