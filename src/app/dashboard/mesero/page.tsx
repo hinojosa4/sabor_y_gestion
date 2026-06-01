@@ -314,7 +314,7 @@ function ActiveOrderCard({
             <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
               <p style={{ margin: 0, fontSize: 14, fontWeight: 700, color: "#111" }}>Mesa {tableNum}</p>
               <span style={{ fontSize: 11, fontWeight: 700, color: "#fff", background: "#1a1a1a", padding: "2px 7px", borderRadius: 6, fontFamily: "monospace" }}>
-                #{order._id.slice(-4).toUpperCase()}
+                #{order._id.slice(-6).toUpperCase()}
               </span>
             </div>
             <p style={{ margin: 0, fontSize: 11, color: "#9ca3af" }}>{elapsed}</p>
