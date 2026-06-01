@@ -82,7 +82,7 @@ function getElapsed(createdAt: string): string {
 }
 
 function getOrderNumber(id: string): string {
-  return "#" + id.slice(-4).toUpperCase();
+  return "#" + id.slice(-6).toUpperCase();
 }
 
 function getUrgency(createdAt: string): "normal" | "warning" | "critical" {
