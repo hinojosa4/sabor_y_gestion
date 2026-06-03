@@ -60,6 +60,7 @@ const PAYMENT_STATUSES = new Set(["pending", "completed"]);
 const ACTIVE_UNPAID_ORDER_STATUSES = ["pending", "in_kitchen", "ready", "delivered"];
 const DEFAULT_PAGE_SIZE = 10;
 const MAX_PAGE_SIZE = 50;
+const BOLIVIA_UTC_OFFSET_HOURS = 4;
 
 function isCustomerRef(value: LeanOrder["customer_id"] | LeanPayment["customer_id"]): value is CustomerRef {
   return Boolean(value && typeof value === "object" && "email" in value);
@@ -67,13 +68,15 @@ function isCustomerRef(value: LeanOrder["customer_id"] | LeanPayment["customer_i
 
 function normalizeDateStart(value: string | null): Date | null {
   if (!value) return null;
-  const date = new Date(`${value}T00:00:00.000`);
+  const date = new Date(`${value}T${String(BOLIVIA_UTC_OFFSET_HOURS).padStart(2, "0")}:00:00.000Z`);
   return Number.isNaN(date.getTime()) ? null : date;
 }
 
 function normalizeDateEnd(value: string | null): Date | null {
   if (!value) return null;
-  const date = new Date(`${value}T23:59:59.999`);
+  const start = normalizeDateStart(value);
+  const date = start ? new Date(start.getTime() + 86_400_000 - 1) : null;
+  if (!date) return null;
   return Number.isNaN(date.getTime()) ? null : date;
 }
 
