@@ -33,6 +33,7 @@ interface KitchenOrder {
   createdAt: string;
   items: OrderItem[];
   total_amount: number;
+  daily_number?: number;
 }
 
 // Alerta de inventario que llega por WebSocket
@@ -81,8 +82,8 @@ function getElapsed(createdAt: string): string {
   return `${Math.floor(diff / 3600)}h ${Math.floor((diff % 3600) / 60)}min`;
 }
 
-function getOrderNumber(id: string): string {
-  return "#" + id.slice(-6).toUpperCase();
+function getOrderNumber(order: KitchenOrder): string {
+  return order.daily_number ? `#${order.daily_number}` : "#" + order._id.slice(-6).toUpperCase();
 }
 
 function getUrgency(createdAt: string): "normal" | "warning" | "critical" {
@@ -315,7 +316,7 @@ function OrderCard({
       }}>
         <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
           <span style={{ fontSize: 15, fontWeight: 800, color: "#1a1a1a", fontFamily: "monospace" }}>
-            {getOrderNumber(order._id)}
+            {getOrderNumber(order)}
           </span>
           <span style={{
             fontSize: 11, fontWeight: 700, padding: "2px 8px", borderRadius: 20,

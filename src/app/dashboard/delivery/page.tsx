@@ -46,6 +46,7 @@ interface RawOrder {
   user_id?: { name?: string; email?: string } | string;
   createdAt: string;
   items: RawItem[];
+  daily_number?: number;
 }
 
 interface CompletedRaw {
@@ -57,6 +58,7 @@ interface CompletedRaw {
   delivery_address?: string;
   user_id?: { name?: string } | string;
   createdAt: string;
+  daily_number?: number;
 }
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
@@ -164,7 +166,7 @@ function ActiveOrderCard({
           <Package size={24} className={ICON_CLASS[displayStatus]} />
           <div>
             <h3 className={`${styles.orderTitle} ${TITLE_CLASS[displayStatus]}`}>
-              Pedido #{order._id.slice(-6).toUpperCase()}
+              Pedido #{order.daily_number ?? order._id.slice(-6).toUpperCase()}
             </h3>
             <p className={styles.orderTime}>Realizado a las {formatTime(order.createdAt)}</p>
           </div>
@@ -572,7 +574,7 @@ export default function DeliveryPage() {
                         <div className={styles.completedLeft}>
                           <CheckCircle2 size={20} className={styles.completedIcon} />
                           <div>
-                            <p className={styles.completedTitle}>Pedido #{order._id.slice(-6).toUpperCase()}</p>
+                            <p className={styles.completedTitle}>Pedido #{order.daily_number ?? order._id.slice(-6).toUpperCase()}</p>
                             <p className={styles.completedSub}>
                               {typeof order.user_id === "object" && order.user_id
                                 ? (order.user_id as { name?: string }).name ?? "Cliente"

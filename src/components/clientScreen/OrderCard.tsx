@@ -56,7 +56,7 @@ export function OrderCard({ order, onView }: OrderCardProps) {
     >
       <header style={{ ...styles.header, backgroundColor: color }}>
         <div>
-          <h3 style={styles.title}>Orden #{(order._id ?? order.id).slice(-6).toUpperCase()}</h3>
+          <h3 style={styles.title}>Orden #{order.id}</h3>
           <p style={styles.date}>{order.date}</p>
         </div>
         <span style={{ ...styles.statusBadge, color }}>{order.status}</span>

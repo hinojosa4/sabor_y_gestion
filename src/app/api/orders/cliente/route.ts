@@ -6,6 +6,7 @@ import OrderItem from "@/models/OrderItem";
 import { verifyToken } from "@/lib/jwt";
 import { pusherServer } from "@/lib/pusher";
 import { haversineKm, calcDeliveryFee, DELIVERY_CONFIG } from "@/lib/deliveryConfig";
+import { getNextDailyNumber } from "@/lib/dailyOrderCounter";
 
 export async function POST(req: NextRequest) {
   try {
@@ -116,6 +117,7 @@ export async function POST(req: NextRequest) {
     // total_amount incluye el costo de envío
     const total_amount = items_total + delivery_fee;
 
+    const dailyNumber = await getNextDailyNumber();
     // ── Crear orden ───────────────────────────────────────────────────────────
     const order = await Order.create({
       restaurantId: process.env.RESTAURANT_ID ?? "default",
@@ -132,6 +134,7 @@ export async function POST(req: NextRequest) {
       delivery_coords: delivery_coords ?? undefined,
       delivery_phone: delivery_phone ?? undefined,
       notes: notes ?? undefined,
+      daily_number: dailyNumber, 
     });
 
     // ── Crear items ───────────────────────────────────────────────────────────

@@ -20,6 +20,7 @@ export interface IOrder extends Document {
   delivery_distance_km: number | null;  // ← distancia calculada guardada
   delivery_phone: string;
   notes: string;
+  daily_number: Number,
 }
 
 const OrderSchema = new Schema<IOrder>({
@@ -64,6 +65,11 @@ const OrderSchema = new Schema<IOrder>({
   },
   delivery_phone: { type: String, trim: true, default: null },
   notes:          { type: String, trim: true, maxlength: 500, default: null },
+  
+  daily_number: {
+  type: Number,
+  default: null,
+  },
 }, { timestamps: true });
 
 export default mongoose.models.Order || mongoose.model<IOrder>('Order', OrderSchema);
