@@ -182,3 +182,29 @@ export async function calculateCustomerLoyalty(customerId: string): Promise<Cust
     lastPurchaseAt: lastPurchaseAt ? new Date(lastPurchaseAt).toISOString() : null,
   };
 }
+
+export async function calculateLoyaltyDiscount(customerId: string | null | undefined, subtotal: number) {
+  const normalizedSubtotal = roundMoney(Math.max(0, subtotal));
+
+  if (!customerId || normalizedSubtotal <= 0) {
+    return {
+      subtotal: normalizedSubtotal,
+      discountPercent: 0,
+      discountAmount: 0,
+      total: normalizedSubtotal,
+      tierName: null as string | null,
+    };
+  }
+
+  const loyalty = await calculateCustomerLoyalty(customerId);
+  const discountPercent = loyalty.discountPercent;
+  const discountAmount = roundMoney(normalizedSubtotal * (discountPercent / 100));
+
+  return {
+    subtotal: normalizedSubtotal,
+    discountPercent,
+    discountAmount,
+    total: roundMoney(Math.max(0, normalizedSubtotal - discountAmount)),
+    tierName: loyalty.tier.name,
+  };
+}
