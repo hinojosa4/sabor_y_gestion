@@ -73,6 +73,19 @@ interface RawOrder {
   items: RawOrderItem[];
 }
 
+interface CustomerLoyalty {
+  totalPaidOrders: number;
+  totalSpent: number;
+  averageTicket: number;
+  points: number;
+  discountPercent: number;
+  benefits: string[];
+  tier: {
+    name: string;
+    slug: string;
+  };
+}
+
 function toFrontendOrder(raw: RawOrder, index: number): Order {
   return {
     id: String(index + 1001),
@@ -111,6 +124,7 @@ export default function ClientePage() {
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
   const [reservaOpen, setReservaOpen] = useState(false);
+  const [loyalty, setLoyalty] = useState<CustomerLoyalty | null>(null);
 
   // ── Carga inicial ─────────────────────────────────────────────────────────────
   const loadHistory = useCallback(async () => {
@@ -132,9 +146,29 @@ export default function ClientePage() {
     }
   }, []);
 
+  const loadLoyalty = useCallback(async () => {
+    const token = localStorage.getItem("token");
+    if (!token) return;
+
+    try {
+      const res = await fetch("/api/customers/me/loyalty", {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const json = await res.json();
+      if (!res.ok || !json.ok) throw new Error(json.message ?? "Error al cargar fidelizacion");
+      setLoyalty(json.data as CustomerLoyalty);
+    } catch {
+      // Respaldo: usar stats del historial local.
+      setLoyalty(null);
+    }
+  }, []);
+
   useEffect(() => {
-    if (!authLoading && user) loadHistory();
-  }, [authLoading, user, loadHistory]);
+    if (!authLoading && user) {
+      loadHistory();
+      loadLoyalty();
+    }
+  }, [authLoading, user, loadHistory, loadLoyalty]);
 
   // ── Pusher: escuchar cambios de estado en tiempo real ─────────────────────────
   useEffect(() => {
@@ -149,6 +183,11 @@ export default function ClientePage() {
       const deliveryChannel = client.subscribe("delivery");
 
       channel.bind("order:new", () => { loadHistory(); });
+
+      channel.bind("payment:completed", () => {
+        loadHistory();
+        loadLoyalty();
+      });
 
       channel.bind("order:status_updated", (data: { orderId: string; status: string }) => {
         setOrders((prev) =>
@@ -194,7 +233,7 @@ export default function ClientePage() {
         client.unsubscribe("delivery");
       });
     };
-  }, [user, loadHistory]);
+  }, [user, loadHistory, loadLoyalty]);
 
   // ── Stats ─────────────────────────────────────────────────────────────────────
   const validOrders = orders.filter((o) => o.status !== "Cancelado");
@@ -203,6 +242,7 @@ export default function ClientePage() {
   const average     = totalVisits > 0 ? totalSpent / totalVisits : 0;
   const points      = Math.floor(totalSpent);
   const isNew       = totalVisits <= 2;
+  const benefits    = loyalty?.benefits.length ? loyalty.benefits : getBenefits(totalVisits, isNew);
 
   const rawUser = (() => {
     try { return JSON.parse(localStorage.getItem("user") ?? "{}"); }
@@ -212,12 +252,14 @@ export default function ClientePage() {
   const clientStats: ClientStats = {
     name: user?.name ?? rawUser?.name ?? "Cliente",
     memberSince: rawUser?.createdAt ? formatMemberSince(rawUser.createdAt) : "este año",
-    totalVisits,
-    totalSpent,
-    average,
-    points,
-    isNew,
-    benefits: getBenefits(totalVisits, isNew),
+    totalVisits: loyalty?.totalPaidOrders ?? totalVisits,
+    totalSpent: loyalty?.totalSpent ?? totalSpent,
+    average: loyalty?.averageTicket ?? average,
+    points: loyalty?.points ?? points,
+    tierName: loyalty?.tier.name,
+    discountPercent: loyalty?.discountPercent,
+    isNew: loyalty ? loyalty.tier.slug === "nuevo" : isNew,
+    benefits,
   };
 
   const handleViewOrder  = (order: Order) => { setSelectedOrder(order); setModalOpen(true); };
