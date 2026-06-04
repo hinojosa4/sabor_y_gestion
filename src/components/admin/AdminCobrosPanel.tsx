@@ -21,6 +21,10 @@ type Cobro = {
   id: string;
   orderId: string;
   amount: number;
+  subtotal: number;
+  discountPercent: number;
+  discountAmount: number;
+  loyaltyTierName: string | null;
   method: PaymentMethod;
   methodLabel: string;
   paymentStatus: PaymentStatus;
@@ -47,6 +51,7 @@ type Summary = {
   qr: number;
   pending: number;
   count: number;
+  discounts: number;
 };
 
 type Pagination = {
@@ -128,7 +133,7 @@ function statusColor(status: string) {
 export function AdminCobrosPanel({ isMobile, compactHeader = false }: Props) {
   const today = useMemo(() => todayInputValue(), []);
   const [rows, setRows] = useState<Cobro[]>([]);
-  const [summary, setSummary] = useState<Summary>({ total: 0, cash: 0, qr: 0, pending: 0, count: 0 });
+  const [summary, setSummary] = useState<Summary>({ total: 0, cash: 0, qr: 0, pending: 0, count: 0, discounts: 0 });
   const [pagination, setPagination] = useState<Pagination>({ page: 1, pageSize: 10, totalRows: 0, totalPages: 1 });
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
@@ -175,12 +180,12 @@ export function AdminCobrosPanel({ isMobile, compactHeader = false }: Props) {
       const json = await res.json();
       if (!res.ok || !json.ok) throw new Error(json.error || "Error al cargar cobros");
       setRows(json.data ?? []);
-      setSummary(json.summary ?? { total: 0, cash: 0, qr: 0, pending: 0, count: 0 });
+      setSummary(json.summary ?? { total: 0, cash: 0, qr: 0, pending: 0, count: 0, discounts: 0 });
       setPagination(json.pagination ?? { page: 1, pageSize: 10, totalRows: 0, totalPages: 1 });
     } catch (error) {
       console.error("[AdminCobrosPanel]", error);
       setRows([]);
-      setSummary({ total: 0, cash: 0, qr: 0, pending: 0, count: 0 });
+      setSummary({ total: 0, cash: 0, qr: 0, pending: 0, count: 0, discounts: 0 });
       setPagination((current) => ({ ...current, totalRows: 0, totalPages: 1 }));
     } finally {
       setLoading(false);
@@ -232,6 +237,7 @@ export function AdminCobrosPanel({ isMobile, compactHeader = false }: Props) {
 
   const summaryCards = [
     { label: "Cobrado", value: formatCurrency(summary.total), color: "#e85d26", bg: "#fff8f5", border: "#ffd4bc" },
+    { label: "Descuentos", value: formatCurrency(summary.discounts), color: "#c2410c", bg: "#fff7ed", border: "#fed7aa" },
     { label: "Efectivo", value: formatCurrency(summary.cash), color: "#059669", bg: "#f0fdf4", border: "#a7f3d0" },
     { label: "QR", value: formatCurrency(summary.qr), color: "#2563eb", bg: "#f0f6ff", border: "#bfdbfe" },
     { label: "Pendientes", value: String(summary.pending), color: "#d97706", bg: "#fffbeb", border: "#fde68a" },
@@ -250,7 +256,7 @@ export function AdminCobrosPanel({ isMobile, compactHeader = false }: Props) {
         </button>
       </div>
 
-      <div style={{ display: "grid", gridTemplateColumns: isMobile ? "repeat(2, 1fr)" : "repeat(4, minmax(0, 1fr))", gap: 10, marginBottom: 12 }}>
+      <div style={{ display: "grid", gridTemplateColumns: isMobile ? "repeat(2, 1fr)" : "repeat(5, minmax(0, 1fr))", gap: 10, marginBottom: 12 }}>
         {summaryCards.map((card) => (
           <div key={card.label} style={{ background: card.bg, border: `1.5px solid ${card.border}`, borderRadius: 14, padding: isMobile ? "13px 14px" : "16px 18px", minWidth: 0, boxShadow: "0 2px 8px rgba(0,0,0,0.03)" }}>
             <p style={{ margin: 0, fontSize: 11, color: "#888" }}>{card.label}</p>
@@ -322,7 +328,12 @@ export function AdminCobrosPanel({ isMobile, compactHeader = false }: Props) {
                       <p style={subCellStyle}>{row.customer.email ?? "Sin correo"} · {customerTypeLabel[row.customer.type]}</p>
                     </td>
                     <td style={cellStyle}>{row.methodLabel}</td>
-                    <td style={{ ...cellStyle, fontWeight: 800 }}>{formatCurrency(row.amount)}</td>
+                    <td style={{ ...cellStyle, fontWeight: 800 }}>
+                      {formatCurrency(row.amount)}
+                      {row.discountAmount > 0 && (
+                        <p style={discountTextStyle}>-{formatCurrency(row.discountAmount)} fidelizacion</p>
+                      )}
+                    </td>
                     <td style={cellStyle}><StatusBadge label={paymentStatusLabel[row.paymentStatus] ?? row.paymentStatus} color={statusColor(row.paymentStatus)} /></td>
                     <td style={cellStyle}><StatusBadge label={orderStatusLabel[row.orderStatus] ?? row.orderStatus} color={statusColor(row.orderStatus)} /></td>
                     <td style={cellStyle}>{formatRowDate(row)}</td>
@@ -385,6 +396,13 @@ export function AdminCobrosPanel({ isMobile, compactHeader = false }: Props) {
 
             <DetailBlock title="Pago">
               <DetailLine label="Método" value={selected.methodLabel} />
+              <DetailLine label="Subtotal" value={formatCurrency(selected.subtotal)} />
+              {selected.discountAmount > 0 && (
+                <>
+                  <DetailLine label="Descuento" value={`-${formatCurrency(selected.discountAmount)} (${selected.discountPercent}%)`} />
+                  <DetailLine label="Categoria" value={selected.loyaltyTierName ?? "Fidelizacion"} />
+                </>
+              )}
               <DetailLine label="Monto" value={formatCurrency(selected.amount)} />
               <DetailLine label="Estado cobro" value={paymentStatusLabel[selected.paymentStatus] ?? selected.paymentStatus} />
               <DetailLine label={selected.dateType === "payment" ? "Fecha de pago" : "Fecha de orden"} value={formatDateTime(selected.paidAt ?? selected.createdAt)} />
@@ -421,9 +439,10 @@ export function AdminCobrosPanel({ isMobile, compactHeader = false }: Props) {
                   ))
                 )}
                 {selected.items.length > 0 && (
-                  <div style={{ display: "flex", justifyContent: "space-between", gap: 12, padding: "14px", background: "#fff8f5", borderTop: "1px solid #eee" }}>
-                    <span style={{ fontSize: 13, fontWeight: 800, color: "#1a1a1a" }}>Total</span>
-                    <strong style={{ fontSize: 15, color: "#e85d26" }}>{formatCurrency(selected.amount)}</strong>
+                  <div style={{ display: "grid", gap: 7, padding: "14px", background: "#fff8f5", borderTop: "1px solid #eee" }}>
+                    <TotalLine label="Subtotal" value={formatCurrency(selected.subtotal)} />
+                    {selected.discountAmount > 0 && <TotalLine label="Descuento" value={`-${formatCurrency(selected.discountAmount)}`} muted />}
+                    <TotalLine label="Total" value={formatCurrency(selected.amount)} strong />
                   </div>
                 )}
               </div>
@@ -461,6 +480,15 @@ function DetailLine({ label, value }: { label: string; value: string }) {
   );
 }
 
+function TotalLine({ label, value, muted = false, strong = false }: { label: string; value: string; muted?: boolean; strong?: boolean }) {
+  return (
+    <div style={{ display: "flex", justifyContent: "space-between", gap: 12 }}>
+      <span style={{ fontSize: 13, fontWeight: strong ? 800 : 700, color: muted ? "#888" : "#1a1a1a" }}>{label}</span>
+      <strong style={{ fontSize: strong ? 15 : 13, color: strong ? "#e85d26" : muted ? "#888" : "#333" }}>{value}</strong>
+    </div>
+  );
+}
+
 const productHeadStyle: React.CSSProperties = {
   fontSize: 10,
   color: "#888",
@@ -491,6 +519,13 @@ const subCellStyle: React.CSSProperties = {
   margin: "3px 0 0",
   fontSize: 11,
   color: "#888",
+  whiteSpace: "nowrap",
+};
+
+const discountTextStyle: React.CSSProperties = {
+  margin: "3px 0 0",
+  fontSize: 11,
+  color: "#c2410c",
   whiteSpace: "nowrap",
 };
 

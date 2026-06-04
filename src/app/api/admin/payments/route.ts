@@ -18,6 +18,10 @@ type LeanPayment = {
   _id: Types.ObjectId;
   order_id: string;
   amount: number;
+  subtotal?: number;
+  discount_percent?: number;
+  discount_amount?: number;
+  loyalty_tier_name?: string | null;
   method: "cash" | "card" | "qr";
   status: "pending" | "completed";
   customer_id?: CustomerRef | Types.ObjectId | string | null;
@@ -240,6 +244,10 @@ export async function GET(req: NextRequest) {
           id: payment._id.toString(),
           orderId: payment.order_id,
           amount: payment.amount,
+          subtotal: payment.subtotal ?? payment.amount,
+          discountPercent: payment.discount_percent ?? 0,
+          discountAmount: payment.discount_amount ?? 0,
+          loyaltyTierName: payment.loyalty_tier_name ?? null,
           method: payment.method,
           methodLabel: formatMethod(payment.method),
           paymentStatus: payment.status,
@@ -273,6 +281,10 @@ export async function GET(req: NextRequest) {
         id: `order-${orderId}`,
         orderId,
         amount,
+        subtotal: amount,
+        discountPercent: 0,
+        discountAmount: 0,
+        loyaltyTierName: null,
         method: null,
         methodLabel: "Sin método",
         paymentStatus: "pending" as const,
@@ -321,13 +333,14 @@ export async function GET(req: NextRequest) {
         acc.count += 1;
         if (row.paymentStatus === "completed") {
           acc.total += row.amount;
+          acc.discounts += row.discountAmount;
           if (row.method === "cash") acc.cash += row.amount;
           if (row.method === "qr") acc.qr += row.amount;
         }
         if (row.paymentStatus === "pending") acc.pending += 1;
         return acc;
       },
-      { total: 0, cash: 0, qr: 0, pending: 0, count: 0 }
+      { total: 0, cash: 0, qr: 0, pending: 0, count: 0, discounts: 0 }
     );
 
     const totalRows = rows.length;
