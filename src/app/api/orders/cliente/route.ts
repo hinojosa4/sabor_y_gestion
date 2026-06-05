@@ -6,6 +6,7 @@ import OrderItem from "@/models/OrderItem";
 import { verifyToken } from "@/lib/jwt";
 import { pusherServer } from "@/lib/pusher";
 import { haversineKm, calcDeliveryFee, DELIVERY_CONFIG } from "@/lib/deliveryConfig";
+import { getNextDailyNumber } from "@/lib/dailyOrderCounter";
 
 export async function POST(req: NextRequest) {
   try {
@@ -35,7 +36,6 @@ export async function POST(req: NextRequest) {
       notes,
       payment_method,
       delivery_fee: clientFee,          // ← recibido del cliente
-      delivery_distance_km: clientDist, // ← recibido del cliente
     } = body;
 
     // ── Validaciones básicas ──────────────────────────────────────────────────
@@ -73,7 +73,6 @@ export async function POST(req: NextRequest) {
     // ── Validación server-side del delivery fee ───────────────────────────────
     // Re-calculamos en el servidor para evitar manipulación desde el cliente.
     let delivery_fee = 0;
-    let delivery_distance_km: number | null = null;
 
     if (service_type === "delivery" && delivery_coords?.lat && delivery_coords?.lng) {
       const distKm = haversineKm(
@@ -96,7 +95,6 @@ export async function POST(req: NextRequest) {
       }
 
       delivery_fee = serverFee;
-      delivery_distance_km = Math.round(distKm * 100) / 100;
 
       // Sanity-check: si el cliente envió un fee diferente al calculado, usamos el del servidor
       if (typeof clientFee === "number" && Math.abs(clientFee - serverFee) > 0.5) {
@@ -116,6 +114,7 @@ export async function POST(req: NextRequest) {
     // total_amount incluye el costo de envío
     const total_amount = items_total + delivery_fee;
 
+    const dailyNumber = await getNextDailyNumber();
     // ── Crear orden ───────────────────────────────────────────────────────────
     const order = await Order.create({
       restaurantId: process.env.RESTAURANT_ID ?? "default",
@@ -125,13 +124,13 @@ export async function POST(req: NextRequest) {
       status: "pending",
       total_amount,
       delivery_fee,
-      delivery_distance_km,
       payment_method: payment_method ?? "Efectivo",
       table_id: table_id ?? undefined,
       delivery_address: delivery_address ?? undefined,
       delivery_coords: delivery_coords ?? undefined,
       delivery_phone: delivery_phone ?? undefined,
       notes: notes ?? undefined,
+      daily_number: dailyNumber, 
     });
 
     // ── Crear items ───────────────────────────────────────────────────────────
