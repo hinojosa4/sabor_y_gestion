@@ -6,6 +6,7 @@ import Ingredient from "@/models/Ingredient";
 import "@/models/Dish";
 import "@/models/Category";
 import mongoose, { Types } from "mongoose";
+import type { AnyBulkWriteOperation } from "mongoose";
 import Table from "@/models/Table";
 import { pusherServer } from "@/lib/pusher";
 
@@ -141,13 +142,13 @@ export async function PATCH(req: NextRequest) {
       const batchCutoff = new Date();
 
       const items = await getItemsWithIngredients();
+      type LeanOrderItem = { created_at: Date | string; [key: string]: unknown };
       const currentBatchItems = items.filter(
-        (item) => new Date((item as any).created_at) <= batchCutoff
+        (item) => new Date((item as LeanOrderItem).created_at) <= batchCutoff
       );
 
       const deductMap = new Map<string, number>();
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const bulkOps: any[] = [];
+      const bulkOps: AnyBulkWriteOperation[] = [];
 
       for (const item of currentBatchItems) {
         const dish = item.dish_id as {
@@ -238,8 +239,7 @@ export async function PATCH(req: NextRequest) {
     // ── cancelled desde in_kitchen → restaurar inventario ────────────────────
     if (newStatus === "cancelled" && order.status === "in_kitchen") {
       const items = await getItemsWithIngredients();
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const restoreBulkOps: any[] = [];
+      const restoreBulkOps: AnyBulkWriteOperation[] = [];
 
       for (const item of items) {
         const dish = item.dish_id as {

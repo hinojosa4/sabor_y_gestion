@@ -20,7 +20,7 @@ export interface IOrder extends Document {
   delivery_distance_km: number | null;  // ← distancia calculada guardada
   delivery_phone: string;
   notes: string;
-  daily_number: Number,
+  daily_number: number,
 }
 
 const OrderSchema = new Schema<IOrder>({

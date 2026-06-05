@@ -90,7 +90,8 @@ export default function DeliveryPage() {
 
   // ── Estado de geolocalización ─────────────────────────────────────────────
   const [geoStatus, setGeoStatus]       = useState<GeoStatus>("idle");
-  const [geoError, setGeoError]         = useState<string | null>(null);
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const [_geoError, setGeoError]         = useState<string | null>(null);
   const [clientCoords, setClientCoords] = useState<{ lat: number; lng: number } | null>(null);
   const [distanceKm, setDistanceKm]     = useState<number | null>(null);
   const [deliveryFee, setDeliveryFee]   = useState<number | null | undefined>(undefined);
