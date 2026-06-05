@@ -186,6 +186,7 @@ export async function POST(req: NextRequest) {
       total,
       discountAmount: loyaltyDiscount.discountAmount,
       discountPercent: loyaltyDiscount.discountPercent,
+      loyaltyTierName: loyaltyDiscount.tierName,
     });
   } catch (error) {
     console.error('[QR Confirm] Error:', error);

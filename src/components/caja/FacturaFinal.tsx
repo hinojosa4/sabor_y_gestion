@@ -18,6 +18,10 @@ interface FacturaFinalProps {
     items: OrderItem[];
     iva: number;
     total: number;
+    subtotal?: number;
+    discountAmount?: number;
+    discountPercent?: number;
+    loyaltyTierName?: string | null;
     paymentMethod: 'cash' | 'qr';
     cashReceived?: number;
     change?: number;
@@ -56,6 +60,10 @@ export function FacturaFinal({
     tableNumber,
     items,
     total,
+    subtotal,
+    discountAmount = 0,
+    discountPercent = 0,
+    loyaltyTierName,
     paymentMethod,
     cashReceived,
     change,
@@ -151,6 +159,14 @@ export function FacturaFinal({
                     </table>
 
                     <div style={{ textAlign: "right", marginBottom: "1rem" }}>
+                        {discountAmount > 0 && (
+                            <>
+                                <p style={{ margin: "0.5rem 0 0", fontSize: "0.75rem" }}>Subtotal: {formatCurrency(subtotal ?? total + discountAmount)}</p>
+                                <p style={{ margin: 0, fontSize: "0.75rem" }}>
+                                    Descuento fidelizacion{loyaltyTierName ? ` (${loyaltyTierName})` : ''}: -{formatCurrency(discountAmount)} ({discountPercent}%)
+                                </p>
+                            </>
+                        )}
                         <p style={{ margin: "0.5rem 0 0", fontWeight: "bold" }}>Total: {formatCurrency(total)}</p>
 
                         {paymentMethod === 'cash' && cashReceived !== undefined && (

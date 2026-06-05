@@ -873,11 +873,10 @@ export default function CajeroDashboard() {
                 tableNumber={selectedTable?.number || 0}  // 👈 agregar esta línea
                 totalAmount={currentTotal}
                 onSuccess={() => {
-                    setIsPaymentModalOpen(false);
                     refreshTables();
                     fetchActiveOrders();
                     fetchCashRegisterStatus();
-                    setSuccessToast('El cobro en efectivo se guardó correctamente.');
+                    setSuccessToast('El cobro se guardo. El comprobante esta listo para imprimir.');
                 }}
             />
 

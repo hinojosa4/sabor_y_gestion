@@ -237,7 +237,7 @@ export function AdminCobrosPanel({ isMobile, compactHeader = false }: Props) {
 
   const summaryCards = [
     { label: "Cobrado", value: formatCurrency(summary.total), color: "#e85d26", bg: "#fff8f5", border: "#ffd4bc" },
-    { label: "Descuentos", value: formatCurrency(summary.discounts), color: "#c2410c", bg: "#fff7ed", border: "#fed7aa" },
+    { label: "Ahorro fidelizacion", value: formatCurrency(summary.discounts), color: "#c2410c", bg: "#fff7ed", border: "#fed7aa" },
     { label: "Efectivo", value: formatCurrency(summary.cash), color: "#059669", bg: "#f0fdf4", border: "#a7f3d0" },
     { label: "QR", value: formatCurrency(summary.qr), color: "#2563eb", bg: "#f0f6ff", border: "#bfdbfe" },
     { label: "Pendientes", value: String(summary.pending), color: "#d97706", bg: "#fffbeb", border: "#fde68a" },
@@ -330,9 +330,7 @@ export function AdminCobrosPanel({ isMobile, compactHeader = false }: Props) {
                     <td style={cellStyle}>{row.methodLabel}</td>
                     <td style={{ ...cellStyle, fontWeight: 800 }}>
                       {formatCurrency(row.amount)}
-                      {row.discountAmount > 0 && (
-                        <p style={discountTextStyle}>-{formatCurrency(row.discountAmount)} fidelizacion</p>
-                      )}
+                      {row.discountAmount > 0 && <DiscountBadge amount={row.discountAmount} percent={row.discountPercent} />}
                     </td>
                     <td style={cellStyle}><StatusBadge label={paymentStatusLabel[row.paymentStatus] ?? row.paymentStatus} color={statusColor(row.paymentStatus)} /></td>
                     <td style={cellStyle}><StatusBadge label={orderStatusLabel[row.orderStatus] ?? row.orderStatus} color={statusColor(row.orderStatus)} /></td>
@@ -396,14 +394,6 @@ export function AdminCobrosPanel({ isMobile, compactHeader = false }: Props) {
 
             <DetailBlock title="Pago">
               <DetailLine label="Método" value={selected.methodLabel} />
-              <DetailLine label="Subtotal" value={formatCurrency(selected.subtotal)} />
-              {selected.discountAmount > 0 && (
-                <>
-                  <DetailLine label="Descuento" value={`-${formatCurrency(selected.discountAmount)} (${selected.discountPercent}%)`} />
-                  <DetailLine label="Categoria" value={selected.loyaltyTierName ?? "Fidelizacion"} />
-                </>
-              )}
-              <DetailLine label="Monto" value={formatCurrency(selected.amount)} />
               <DetailLine label="Estado cobro" value={paymentStatusLabel[selected.paymentStatus] ?? selected.paymentStatus} />
               <DetailLine label={selected.dateType === "payment" ? "Fecha de pago" : "Fecha de orden"} value={formatDateTime(selected.paidAt ?? selected.createdAt)} />
             </DetailBlock>
@@ -438,15 +428,10 @@ export function AdminCobrosPanel({ isMobile, compactHeader = false }: Props) {
                     </div>
                   ))
                 )}
-                {selected.items.length > 0 && (
-                  <div style={{ display: "grid", gap: 7, padding: "14px", background: "#fff8f5", borderTop: "1px solid #eee" }}>
-                    <TotalLine label="Subtotal" value={formatCurrency(selected.subtotal)} />
-                    {selected.discountAmount > 0 && <TotalLine label="Descuento" value={`-${formatCurrency(selected.discountAmount)}`} muted />}
-                    <TotalLine label="Total" value={formatCurrency(selected.amount)} strong />
-                  </div>
-                )}
               </div>
             </div>
+
+            <CobroTotals cobro={selected} />
           </aside>
         </div>
       )}
@@ -458,6 +443,14 @@ function StatusBadge({ label, color }: { label: string; color: string }) {
   return (
     <span style={{ display: "inline-flex", alignItems: "center", border: `1px solid ${color}35`, background: `${color}12`, color, padding: "4px 9px", borderRadius: 999, fontSize: 11, fontWeight: 800, whiteSpace: "nowrap" }}>
       {label}
+    </span>
+  );
+}
+
+function DiscountBadge({ amount, percent }: { amount: number; percent: number }) {
+  return (
+    <span style={discountBadgeStyle}>
+      -{formatCurrency(amount)} fidelizacion {percent > 0 ? `(${percent}%)` : ""}
     </span>
   );
 }
@@ -480,6 +473,31 @@ function DetailLine({ label, value }: { label: string; value: string }) {
   );
 }
 
+function CobroTotals({ cobro }: { cobro: Cobro }) {
+  const hasDiscount = cobro.discountAmount > 0;
+
+  return (
+    <div style={cobroTotalsStyle}>
+      <h4 style={cobroTotalsTitleStyle}>Resumen del cobro</h4>
+      <div style={cobroTotalsRowsStyle}>
+        <TotalLine label="Subtotal" value={formatCurrency(cobro.subtotal)} />
+        {hasDiscount && (
+          <TotalLine
+            label={`Descuento fidelizacion${cobro.discountPercent > 0 ? ` (${cobro.discountPercent}%)` : ""}`}
+            value={`-${formatCurrency(cobro.discountAmount)}`}
+            muted
+          />
+        )}
+        {hasDiscount && cobro.loyaltyTierName && (
+          <TotalLine label="Categoria" value={cobro.loyaltyTierName} muted />
+        )}
+        <div style={cobroTotalDividerStyle} />
+        <TotalLine label={hasDiscount ? "Total con descuento" : "Total"} value={formatCurrency(cobro.amount)} strong />
+      </div>
+    </div>
+  );
+}
+
 function TotalLine({ label, value, muted = false, strong = false }: { label: string; value: string; muted?: boolean; strong?: boolean }) {
   return (
     <div style={{ display: "flex", justifyContent: "space-between", gap: 12 }}>
@@ -494,6 +512,34 @@ const productHeadStyle: React.CSSProperties = {
   color: "#888",
   fontWeight: 800,
   textTransform: "uppercase",
+};
+
+const cobroTotalsStyle: React.CSSProperties = {
+  marginTop: 18,
+  paddingTop: 16,
+  borderTop: "1.5px solid #f0f0f0",
+};
+
+const cobroTotalsTitleStyle: React.CSSProperties = {
+  margin: "0 0 10px",
+  fontSize: 14,
+  color: "#1a1a1a",
+  fontWeight: 800,
+};
+
+const cobroTotalsRowsStyle: React.CSSProperties = {
+  display: "grid",
+  gap: 9,
+  padding: "13px 14px",
+  border: "1.5px solid #eeeeee",
+  borderRadius: 12,
+  background: "#fff",
+};
+
+const cobroTotalDividerStyle: React.CSSProperties = {
+  height: 1,
+  background: "#eeeeee",
+  margin: "2px 0",
 };
 
 const filterInputStyle: React.CSSProperties = {
@@ -522,9 +568,15 @@ const subCellStyle: React.CSSProperties = {
   whiteSpace: "nowrap",
 };
 
-const discountTextStyle: React.CSSProperties = {
-  margin: "3px 0 0",
+const discountBadgeStyle: React.CSSProperties = {
+  display: "inline-flex",
+  marginTop: 5,
+  padding: "3px 7px",
+  borderRadius: 999,
+  border: "1px solid #fed7aa",
+  background: "#fff7ed",
   fontSize: 11,
+  fontWeight: 800,
   color: "#c2410c",
   whiteSpace: "nowrap",
 };

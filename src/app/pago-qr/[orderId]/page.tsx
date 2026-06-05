@@ -78,6 +78,51 @@ interface OrderItem {
     subtotal: number;
 }
 
+type PaymentPreview = {
+    subtotal: number;
+    discountAmount: number;
+    discountPercent: number;
+    loyaltyTierName: string | null;
+    total: number;
+};
+
+function DiscountPreview({
+    preview,
+    loading,
+    formatCurrency,
+}: {
+    preview: PaymentPreview;
+    loading: boolean;
+    formatCurrency: (amount: number) => string;
+}) {
+    if (loading) {
+        return <p style={{ ...errorStyle, color: 'var(--muted-foreground)' }}>Calculando fidelizacion...</p>;
+    }
+
+    if (preview.discountAmount <= 0) return null;
+
+    return (
+        <div style={{ display: "grid", gap: "0.45rem", margin: "-0.25rem 0 1rem", padding: "0.75rem", border: "1px solid #fed7aa", borderRadius: "var(--radius-md)", background: "#fff7ed", fontSize: "0.82rem" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", gap: "0.75rem" }}>
+                <span>Subtotal</span>
+                <strong>{formatCurrency(preview.subtotal)}</strong>
+            </div>
+            <div style={{ display: "flex", justifyContent: "space-between", gap: "0.75rem", color: "#c2410c" }}>
+                <span>
+                    Descuento fidelizacion
+                    {preview.loyaltyTierName ? ` (${preview.loyaltyTierName})` : ''}
+                </span>
+                <strong>-{formatCurrency(preview.discountAmount)} ({preview.discountPercent}%)</strong>
+            </div>
+            <div style={{ height: 1, background: "#fed7aa" }} />
+            <div style={{ display: "flex", justifyContent: "space-between", gap: "0.75rem", fontWeight: 800, color: "#1a1a1a" }}>
+                <span>Total con descuento</span>
+                <strong>{formatCurrency(preview.total)}</strong>
+            </div>
+        </div>
+    );
+}
+
 export default function PagoQRPage() {
     const params  = useParams();
     const router  = useRouter();
@@ -91,6 +136,14 @@ export default function PagoQRPage() {
     const [email, setEmail]           = useState('');
     const [emailError, setEmailError] = useState('');
     const [error, setError]           = useState('');
+    const [preview, setPreview]       = useState<PaymentPreview>({
+        subtotal: 0,
+        discountAmount: 0,
+        discountPercent: 0,
+        loyaltyTierName: null,
+        total: 0,
+    });
+    const [previewLoading, setPreviewLoading] = useState(false);
     const [tableNumber, setTableNumber] = useState<number | null>(null);
     const [serviceType, setServiceType] = useState<string>('dine_in');
     const [step, setStep]             = useState<1 | 2>(1);
@@ -98,7 +151,9 @@ export default function PagoQRPage() {
     const [showFactura, setShowFactura] = useState(false);
     const [paymentData, setPaymentData] = useState<{
         orderId: string; items: OrderItem[];
-        iva: number; total: number;
+        iva: number; total: number; subtotal: number;
+        discountAmount: number; discountPercent: number;
+        loyaltyTierName: string | null;
         customerEmail: string; paymentDate: Date;
     } | null>(null);
 
@@ -117,6 +172,13 @@ export default function PagoQRPage() {
                     setItems(data.items);
                     setIva(data.iva || 0);
                     setTotal(data.total || 0);
+                    setPreview({
+                        subtotal: data.subtotal || data.total || 0,
+                        discountAmount: 0,
+                        discountPercent: 0,
+                        loyaltyTierName: null,
+                        total: data.total || 0,
+                    });
                     setTableNumber(data.tableNumber ?? null);
                 } else {
                     setError('Orden no encontrada');
@@ -134,6 +196,64 @@ export default function PagoQRPage() {
     const formatCurrency = (amount: number) =>
         new Intl.NumberFormat('es-BO', { style: 'currency', currency: 'BOB' }).format(amount);
 
+    useEffect(() => {
+        if (!orderId || total <= 0) return;
+
+        const controller = new AbortController();
+        const timeout = window.setTimeout(async () => {
+            const normalizedEmail = email.trim();
+            const validEmail = /^\S+@\S+\.\S+$/.test(normalizedEmail);
+
+            if (!validEmail) {
+                setPreview({
+                    subtotal: total,
+                    discountAmount: 0,
+                    discountPercent: 0,
+                    loyaltyTierName: null,
+                    total,
+                });
+                return;
+            }
+
+            setPreviewLoading(true);
+            try {
+                const res = await fetch('/api/payments/preview', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ orderId, email: normalizedEmail }),
+                    signal: controller.signal,
+                });
+                const data = await res.json();
+                if (!res.ok || !data.ok) throw new Error(data.error || 'Error al calcular descuento');
+
+                setPreview({
+                    subtotal: Number(data.subtotal ?? total),
+                    discountAmount: Number(data.discountAmount ?? 0),
+                    discountPercent: Number(data.discountPercent ?? 0),
+                    loyaltyTierName: data.loyaltyTierName ?? null,
+                    total: Number(data.total ?? total),
+                });
+            } catch (err) {
+                if (err instanceof DOMException && err.name === 'AbortError') return;
+                console.error('Error:', err);
+                setPreview({
+                    subtotal: total,
+                    discountAmount: 0,
+                    discountPercent: 0,
+                    loyaltyTierName: null,
+                    total,
+                });
+            } finally {
+                if (!controller.signal.aborted) setPreviewLoading(false);
+            }
+        }, 450);
+
+        return () => {
+            controller.abort();
+            window.clearTimeout(timeout);
+        };
+    }, [email, orderId, total]);
+
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         const regex = /^\S+@\S+\.\S+$/;
@@ -149,7 +269,18 @@ export default function PagoQRPage() {
             });
             const data = await res.json();
             if (res.ok) {
-                setPaymentData({ orderId, items, iva, total, customerEmail: email, paymentDate: new Date() });
+                setPaymentData({
+                    orderId,
+                    items: data.items ?? items,
+                    iva: data.iva ?? iva,
+                    subtotal: Number(data.subtotal ?? preview.subtotal),
+                    total: Number(data.total ?? preview.total),
+                    discountAmount: Number(data.discountAmount ?? 0),
+                    discountPercent: Number(data.discountPercent ?? 0),
+                    loyaltyTierName: data.loyaltyTierName ?? null,
+                    customerEmail: email,
+                    paymentDate: new Date(),
+                });
                 setShowFactura(true);
             } else {
                 setError(data.error || 'Error al procesar el pago');
@@ -200,7 +331,7 @@ export default function PagoQRPage() {
                         ))}
                         <div style={{ borderTop: "1px solid var(--border)", marginTop: "0.5rem", paddingTop: "0.5rem", display: "flex", justifyContent: "space-between", fontWeight: "bold" }}>
                             <span>Total</span>
-                            <span>{formatCurrency(total)}</span>
+                            <span>{formatCurrency(preview.total || total)}</span>
                         </div>
                     </div>
 
@@ -215,7 +346,7 @@ export default function PagoQRPage() {
                                     <QRCodeSVG value={qrUrl} size={180} />
                                 </div>
                             </div>
-                            <p style={totalStyle}>Total a pagar: {formatCurrency(total)}</p>
+                            <p style={totalStyle}>Total a pagar: {formatCurrency(preview.total || total)}</p>
                             <button
                                 style={{ ...buttonStyle, backgroundColor: "#16a34a" }}
                                 onClick={() => setStep(2)}
@@ -231,9 +362,10 @@ export default function PagoQRPage() {
                             <div style={{ backgroundColor: "#f0fdf4", border: "1px solid #bbf7d0", borderRadius: 8, padding: "0.75rem", fontSize: "0.85rem", color: "#065f46" }}>
                                 ✅ Transferencia registrada. Ingresa tu correo para recibir el comprobante.
                             </div>
-                            <p style={totalStyle}>Total a pagar: {formatCurrency(total)}</p>
+                            <p style={totalStyle}>Total a pagar: {formatCurrency(preview.total || total)}</p>
                             <form onSubmit={handleSubmit}>
                                 <input type="email" placeholder="Correo electrónico *" value={email} onChange={(e) => setEmail(e.target.value)} style={inputStyle} required />
+                                <DiscountPreview preview={preview} loading={previewLoading} formatCurrency={formatCurrency} />
                                 {emailError && <p style={errorStyle}>{emailError}</p>}
                                 <button type="submit" disabled={submitting} style={submitting ? buttonDisabledStyle : buttonStyle}>
                                     {submitting ? 'Procesando...' : 'Confirmar Pago'}
@@ -249,9 +381,10 @@ export default function PagoQRPage() {
                     {/* ── DINE_IN / PICK_UP: flujo original sin cambios ── */}
                     {serviceType !== 'delivery' && (
                         <>
-                            <p style={totalStyle}>Total a pagar: {formatCurrency(total)}</p>
+                            <p style={totalStyle}>Total a pagar: {formatCurrency(preview.total || total)}</p>
                             <form onSubmit={handleSubmit}>
                                 <input type="email" placeholder="Correo electrónico *" value={email} onChange={(e) => setEmail(e.target.value)} style={inputStyle} required />
+                                <DiscountPreview preview={preview} loading={previewLoading} formatCurrency={formatCurrency} />
                                 {emailError && <p style={errorStyle}>{emailError}</p>}
                                 <button type="submit" disabled={submitting} style={submitting ? buttonDisabledStyle : buttonStyle}>
                                     {submitting ? 'Procesando...' : 'Confirmar Pago'}
@@ -272,6 +405,10 @@ export default function PagoQRPage() {
                     items={paymentData.items}
                     iva={paymentData.iva}
                     total={paymentData.total}
+                    subtotal={paymentData.subtotal}
+                    discountAmount={paymentData.discountAmount}
+                    discountPercent={paymentData.discountPercent}
+                    loyaltyTierName={paymentData.loyaltyTierName}
                     paymentMethod="qr"
                     customerEmail={paymentData.customerEmail}
                     paymentDate={paymentData.paymentDate}

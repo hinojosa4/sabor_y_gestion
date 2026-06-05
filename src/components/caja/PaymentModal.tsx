@@ -21,6 +21,26 @@ interface OrderItemType {
     subtotal: number;
 }
 
+type PaymentReceipt = {
+    total: number;
+    subtotal: number;
+    discountAmount: number;
+    discountPercent: number;
+    loyaltyTierName: string | null;
+    cashReceived: number;
+    change: number;
+    paymentDate: Date;
+};
+
+type PaymentPreview = {
+    subtotal: number;
+    discountAmount: number;
+    discountPercent: number;
+    loyaltyTierName: string | null;
+    total: number;
+    customerName: string | null;
+};
+
 // Estilos
 const overlayStyle: React.CSSProperties = {
     position: "fixed",
@@ -42,6 +62,44 @@ const modalStyle: React.CSSProperties = {
     maxHeight: "90vh",
     overflowY: "auto",
     boxShadow: "0 20px 60px rgba(0,0,0,0.18)",
+};
+
+const discountPreviewStyle: React.CSSProperties = {
+    display: "grid",
+    gap: "0.45rem",
+    margin: "-0.35rem 0 1rem",
+    padding: "0.75rem",
+    border: "1px solid #fed7aa",
+    borderRadius: "var(--radius-md)",
+    background: "#fff7ed",
+    fontSize: "0.82rem",
+};
+
+const discountRowStyle: React.CSSProperties = {
+    display: "flex",
+    justifyContent: "space-between",
+    gap: "0.75rem",
+    color: "#555",
+};
+
+const discountDividerStyle: React.CSSProperties = {
+    height: 1,
+    background: "#fed7aa",
+};
+
+const discountTotalRowStyle: React.CSSProperties = {
+    display: "flex",
+    justifyContent: "space-between",
+    gap: "0.75rem",
+    color: "#1a1a1a",
+    fontWeight: 800,
+};
+
+const discountHintStyle: React.CSSProperties = {
+    margin: "-0.35rem 0 1rem",
+    fontSize: "0.78rem",
+    color: "var(--muted-foreground)",
+    textAlign: "center",
 };
 
 // Componente para resumen de la orden
@@ -101,10 +159,62 @@ function OrderSummary({ orderId }: { orderId: string }) {
     );
 }
 
+function PaymentDiscountPreview({
+    preview,
+    loading,
+    formatCurrency,
+}: {
+    preview: PaymentPreview;
+    loading: boolean;
+    formatCurrency: (amount: number) => string;
+}) {
+    if (loading) {
+        return (
+            <p style={discountHintStyle}>Calculando fidelizacion...</p>
+        );
+    }
+
+    if (preview.discountAmount <= 0) {
+        return null;
+    }
+
+    return (
+        <div style={discountPreviewStyle}>
+            <div style={discountRowStyle}>
+                <span>Subtotal</span>
+                <strong>{formatCurrency(preview.subtotal)}</strong>
+            </div>
+            <div style={discountRowStyle}>
+                <span>
+                    Descuento fidelizacion
+                    {preview.loyaltyTierName ? ` (${preview.loyaltyTierName})` : ''}
+                </span>
+                <strong style={{ color: '#c2410c' }}>
+                    -{formatCurrency(preview.discountAmount)} ({preview.discountPercent}%)
+                </strong>
+            </div>
+            <div style={discountDividerStyle} />
+            <div style={discountTotalRowStyle}>
+                <span>Total con descuento</span>
+                <strong>{formatCurrency(preview.total)}</strong>
+            </div>
+        </div>
+    );
+}
+
 export function PaymentModal({ isOpen, onClose, orderId, tableId, tableNumber, totalAmount, onSuccess }: PaymentModalProps) {
     const [loading, setLoading] = useState(false);
     const [cashReceivedInput, setCashReceivedInput] = useState(String(totalAmount));
     const [customerEmail, setCustomerEmail] = useState('');
+    const [preview, setPreview] = useState<PaymentPreview>({
+        subtotal: totalAmount,
+        discountAmount: 0,
+        discountPercent: 0,
+        loyaltyTierName: null,
+        total: totalAmount,
+        customerName: null,
+    });
+    const [previewLoading, setPreviewLoading] = useState(false);
     const [observations, setObservations] = useState('');
     const [notice, setNotice] = useState<{ type: 'error' | 'warning'; message: string } | null>(null);
     
@@ -112,15 +222,87 @@ export function PaymentModal({ isOpen, onClose, orderId, tableId, tableNumber, t
     const [showFactura, setShowFactura] = useState(false);
     const [orderItems, setOrderItems] = useState<OrderItemType[]>([]);
     const [orderIva, setOrderIva] = useState(0);
+    const [receipt, setReceipt] = useState<PaymentReceipt | null>(null);
 
     useEffect(() => {
         if (isOpen) {
             setCashReceivedInput(String(totalAmount));
             setCustomerEmail('');
+            setPreview({
+                subtotal: totalAmount,
+                discountAmount: 0,
+                discountPercent: 0,
+                loyaltyTierName: null,
+                total: totalAmount,
+                customerName: null,
+            });
+            setPreviewLoading(false);
             setObservations('');
             setNotice(null);
+            setShowFactura(false);
+            setReceipt(null);
         }
     }, [isOpen, totalAmount]);
+
+    useEffect(() => {
+        if (!isOpen || !orderId) return;
+
+        const controller = new AbortController();
+        const timeout = window.setTimeout(async () => {
+            const email = customerEmail.trim();
+
+            if (email === '' || !/^\S+@\S+\.\S+$/.test(email)) {
+                setPreview({
+                    subtotal: totalAmount,
+                    discountAmount: 0,
+                    discountPercent: 0,
+                    loyaltyTierName: null,
+                    total: totalAmount,
+                    customerName: null,
+                });
+                return;
+            }
+
+            setPreviewLoading(true);
+            try {
+                const res = await fetch('/api/payments/preview', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ orderId, email }),
+                    signal: controller.signal,
+                });
+                const data = await res.json();
+                if (!res.ok || !data.ok) throw new Error(data.error || 'Error al calcular descuento');
+
+                setPreview({
+                    subtotal: Number(data.subtotal ?? totalAmount),
+                    discountAmount: Number(data.discountAmount ?? 0),
+                    discountPercent: Number(data.discountPercent ?? 0),
+                    loyaltyTierName: data.loyaltyTierName ?? null,
+                    total: Number(data.total ?? totalAmount),
+                    customerName: data.customer?.name ?? null,
+                });
+            } catch (error) {
+                if (error instanceof DOMException && error.name === 'AbortError') return;
+                console.error('Error:', error);
+                setPreview({
+                    subtotal: totalAmount,
+                    discountAmount: 0,
+                    discountPercent: 0,
+                    loyaltyTierName: null,
+                    total: totalAmount,
+                    customerName: null,
+                });
+            } finally {
+                if (!controller.signal.aborted) setPreviewLoading(false);
+            }
+        }, 450);
+
+        return () => {
+            controller.abort();
+            window.clearTimeout(timeout);
+        };
+    }, [customerEmail, isOpen, orderId, totalAmount]);
 
     if (!isOpen) return null;
 
@@ -132,9 +314,10 @@ export function PaymentModal({ isOpen, onClose, orderId, tableId, tableNumber, t
     };
 
     const cashReceived = Number(cashReceivedInput);
+    const payableTotal = preview.total;
     const hasCashValue = cashReceivedInput.trim() !== '' && !Number.isNaN(cashReceived);
-    const change = hasCashValue ? cashReceived - totalAmount : 0;
-    const isValid = hasCashValue && cashReceived >= totalAmount;
+    const change = hasCashValue ? cashReceived - payableTotal : 0;
+    const isValid = hasCashValue && cashReceived >= payableTotal;
 
     const handleCashReceivedChange = (value: string) => {
         const normalized = value
@@ -165,7 +348,7 @@ export function PaymentModal({ isOpen, onClose, orderId, tableId, tableNumber, t
                 },
                 body: JSON.stringify({ 
                     orderId, 
-                    amount: totalAmount, 
+                    amount: payableTotal, 
                     method: 'cash', 
                     tableId,
                     customerEmail,
@@ -173,20 +356,35 @@ export function PaymentModal({ isOpen, onClose, orderId, tableId, tableNumber, t
                 }),
             });
             
+            const paymentData = await res.json();
+
             if (res.ok) {
                 // 2. Cargar los items de la orden para la factura
                 const orderRes = await fetch(`/api/orders/preinvoice/order/${orderId}`);
                 const orderData = await orderRes.json();
                 setOrderItems(orderData.items || []);
                 setOrderIva(0);
+
+                const paidTotal = Number(paymentData.amount ?? payableTotal);
+                const subtotal = Number(paymentData.subtotal ?? paidTotal);
+                const discountAmount = Number(paymentData.discount_amount ?? 0);
+                const discountPercent = Number(paymentData.discount_percent ?? 0);
                 
-                // 3. Mostrar factura final y cerrar modal de pago
+                // 3. Mostrar comprobante hasta que el cajero cierre.
+                setReceipt({
+                    total: paidTotal,
+                    subtotal,
+                    discountAmount,
+                    discountPercent,
+                    loyaltyTierName: paymentData.loyalty_tier_name ?? null,
+                    cashReceived,
+                    change: cashReceived - paidTotal,
+                    paymentDate: new Date(),
+                });
                 setShowFactura(true);
                 onSuccess();
-                onClose();
             } else {
-                const error = await res.json();
-                setNotice({ type: 'error', message: error.error || 'Error al procesar pago' });
+                setNotice({ type: 'error', message: paymentData.error || 'Error al procesar pago' });
             }
         } catch (error) {
             console.error('Error:', error);
@@ -195,6 +393,36 @@ export function PaymentModal({ isOpen, onClose, orderId, tableId, tableNumber, t
             setLoading(false);
         }
     };
+
+    const closeReceipt = () => {
+        setShowFactura(false);
+        setReceipt(null);
+        onClose();
+    };
+
+    if (showFactura && receipt) {
+        return (
+            <FacturaFinal
+                isOpen
+                onClose={closeReceipt}
+                orderId={orderId}
+                tableNumber={tableNumber}
+                items={orderItems}
+                iva={orderIva}
+                total={receipt.total}
+                subtotal={receipt.subtotal}
+                discountAmount={receipt.discountAmount}
+                discountPercent={receipt.discountPercent}
+                loyaltyTierName={receipt.loyaltyTierName}
+                paymentMethod="cash"
+                cashReceived={receipt.cashReceived}
+                change={receipt.change}
+                customerEmail={customerEmail || undefined}
+                observations={observations}
+                paymentDate={receipt.paymentDate}
+            />
+        );
+    }
 
     return (
         <>
@@ -224,8 +452,14 @@ export function PaymentModal({ isOpen, onClose, orderId, tableId, tableNumber, t
 
                     {/* Total a pagar */}
                     <p style={{ fontSize: "1.5rem", fontWeight: "bold", textAlign: "center", marginBottom: "1rem" }}>
-                        Total: {formatCurrency(totalAmount)}
+                        Total: {formatCurrency(payableTotal)}
                     </p>
+
+                    <PaymentDiscountPreview
+                        preview={preview}
+                        loading={previewLoading}
+                        formatCurrency={formatCurrency}
+                    />
 
                     {/* Monto recibido */}
                     <div style={{ marginBottom: "1rem" }}>
@@ -333,22 +567,6 @@ export function PaymentModal({ isOpen, onClose, orderId, tableId, tableNumber, t
                 </div>
             </div>
 
-            {/* Factura Final */}
-            <FacturaFinal
-                isOpen={showFactura}
-                onClose={() => setShowFactura(false)}
-                orderId={orderId}
-                tableNumber={tableNumber}
-                items={orderItems}
-                iva={orderIva}
-                total={totalAmount}
-                paymentMethod="cash"
-                cashReceived={cashReceived}
-                change={change}
-                customerEmail={customerEmail || undefined}
-                observations={observations}
-                paymentDate={new Date()}
-            />
         </>
     );
 }
