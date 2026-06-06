@@ -5,6 +5,7 @@ import OrderItem from "@/models/OrderItem";
 import Table from "@/models/Table";
 import { verifyToken } from "@/lib/jwt";
 import { pusherServer } from "@/lib/pusher";
+import { getNextDailyNumber } from "@/lib/dailyOrderCounter";
 
 export async function POST(req: NextRequest) {
   try {
@@ -39,6 +40,7 @@ export async function POST(req: NextRequest) {
       0
     );
 
+    const dailyNumber = await getNextDailyNumber();
     // Crear orden
     const order = await Order.create({
       restaurantId: process.env.RESTAURANT_ID ?? "default",
@@ -48,6 +50,8 @@ export async function POST(req: NextRequest) {
       service_type,
       status: "pending",
       total_amount,
+      daily_number: dailyNumber,
+
     });
 
     // Crear items
@@ -67,7 +71,7 @@ export async function POST(req: NextRequest) {
     if (table_id && service_type === "dine_in") {
       await Table.findByIdAndUpdate(table_id, { status: "Ocupada" });
     }
-    // Al final del POST, antes del return:
+    
     await pusherServer.trigger("restaurant", "order:new", {
       order: { ...order.toObject(), items: orderItems },
     });

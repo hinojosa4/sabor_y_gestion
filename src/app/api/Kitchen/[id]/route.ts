@@ -12,7 +12,7 @@ interface Params {
 const VALID_ITEM_STATUSES = ["pending", "in_kitchen", "ready", "served", "cancelled"] as const;
 type ItemStatus = typeof VALID_ITEM_STATUSES[number];
 
-// ── PATCH /api/orders/kitchen/item/[id] ───────────────────────────────────────
+// ── PATCH /api/orders/kitchen/[id] ───────────────────────────────────────
 export async function PATCH(req: NextRequest, { params }: Params) {
   try {
     await connectDB();

@@ -36,7 +36,7 @@ export function OrderModal({ order, open, onClose, onReorder }: OrderModalProps)
                         <Receipt size={24} color="#f97316" />
                     </div>
                     <div>
-                        <h2 style={styles.title}>Comanda #{order.id}</h2>
+                        <h2 style={styles.title}>Orden #{order.id}</h2>
                         <p style={styles.subtitle}>Detalle completo de tu orden</p>
                     </div>
                 </div>

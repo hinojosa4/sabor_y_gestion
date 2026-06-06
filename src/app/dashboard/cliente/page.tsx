@@ -71,7 +71,8 @@ interface RawOrder {
   notes?: string;
   createdAt: string;
   items: RawOrderItem[];
-}
+  daily_number?: number;
+}  
 
 interface CustomerLoyalty {
   totalPaidOrders: number;
@@ -88,7 +89,7 @@ interface CustomerLoyalty {
 
 function toFrontendOrder(raw: RawOrder, index: number): Order {
   return {
-    id: String(index + 1001),
+    id: raw.daily_number ? String(raw.daily_number) : String(index + 1001),
     _id: raw._id,
     date: formatDate(raw.createdAt),
     time: formatTime(raw.createdAt),
@@ -138,7 +139,9 @@ export default function ClientePage() {
       });
       const json = await res.json();
       if (!json.ok) throw new Error(json.message ?? "Error al cargar historial");
-      setOrders((json.data as RawOrder[]).map(toFrontendOrder));
+      setOrders((json.data as RawOrder[]).map((raw, index, arr) => 
+        toFrontendOrder(raw, arr.length - 1 - index)
+      ));
     } catch (e) {
       setError(e instanceof Error ? e.message : "Error de red");
     } finally {

@@ -6,6 +6,7 @@ import Ingredient from "@/models/Ingredient";
 import "@/models/Dish";
 import "@/models/Category";
 import mongoose, { Types } from "mongoose";
+import type { AnyBulkWriteOperation } from "mongoose";
 import Table from "@/models/Table";
 import { pusherServer } from "@/lib/pusher";
 
@@ -13,11 +14,17 @@ import { pusherServer } from "@/lib/pusher";
 export async function GET() {
   try {
     await connectDB();
+    // Incluir también órdenes delivered/ready que tengan items pending (segunda ronda)
+    const ordersWithPendingItems = await OrderItem.distinct("order_id", {
+      status: "pending",
+    });
+
     const orders = await Order.find({
-      status: { $in: ["pending", "in_kitchen", "ready"] },
-    })
-      .sort({ createdAt: 1 })
-      .lean();
+      $or: [
+        { status: { $in: ["pending", "in_kitchen", "ready"] } },
+        { _id: { $in: ordersWithPendingItems } }, // ← órdenes con items nuevos
+      ],
+    }).sort({ createdAt: 1 }).lean();
 
     const orderIds = orders.map((o) => o._id);
     const items = await OrderItem.find({ order_id: { $in: orderIds } })
@@ -93,7 +100,8 @@ export async function PATCH(req: NextRequest) {
     const validTransitions: Record<string, string[]> = {
       pending:    ["in_kitchen", "cancelled"],
       in_kitchen: ["ready", "cancelled"],
-      ready:      ["delivered", "picked_up"],
+      ready:      ["delivered", "picked_up", "in_kitchen"], 
+      delivered:  ["in_kitchen", "cancelled"], 
       picked_up:  ["in_transit", "cancelled"],
       in_transit: ["delivered", "cancelled"],
     };
@@ -129,16 +137,20 @@ export async function PATCH(req: NextRequest) {
     };
 
     // ── in_kitchen → descontar inventario + alertas WebSocket ────────────────
+    // ── in_kitchen → descontar inventario + alertas WebSocket ────────────────
     if (newStatus === "in_kitchen") {
+      const batchCutoff = new Date();
+
       const items = await getItemsWithIngredients();
+      type LeanOrderItem = { created_at: Date | string; [key: string]: unknown };
+      const currentBatchItems = items.filter(
+        (item) => new Date((item as LeanOrderItem).created_at) <= batchCutoff
+      );
 
-      // Recolectar IDs afectados y cantidades a descontar
-      const deductMap = new Map<string, number>(); // ingredientId → cantidad total a descontar
+      const deductMap = new Map<string, number>();
+      const bulkOps: AnyBulkWriteOperation[] = [];
 
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const bulkOps: any[] = [];
-
-      for (const item of items) {
+      for (const item of currentBatchItems) {
         const dish = item.dish_id as {
           ingredients?: {
             ingredient_id: { _id: Types.ObjectId; currentStock: number };
@@ -153,7 +165,6 @@ export async function PATCH(req: NextRequest) {
           const deduct = ing.quantity * item.quantity;
           const ingId = ing.ingredient_id._id.toString();
 
-          // Acumular para leer el estado real post-descuento
           deductMap.set(ingId, (deductMap.get(ingId) ?? 0) + deduct);
 
           if (ing.ingredient_id.currentStock < deduct) {
@@ -176,8 +187,6 @@ export async function PATCH(req: NextRequest) {
         await Ingredient.bulkWrite(bulkOps);
       }
 
-      // ── Leer ingredientes afectados con Mongoose (activa virtuals) ─────────
-      // IMPORTANTE: NO usar .lean() aquí — necesitamos el virtual stockStatus
       if (deductMap.size > 0) {
         const affectedIds = Array.from(deductMap.keys());
         const affectedIngredients = await Ingredient.find({
@@ -195,7 +204,6 @@ export async function PATCH(req: NextRequest) {
         }> = [];
 
         for (const ing of affectedIngredients) {
-          // El virtual stockStatus ahora refleja el stock actualizado
           if (ing.stockStatus === "critical" || ing.stockStatus === "low") {
             alertas.push({
               ingredientId: String(ing._id),
@@ -209,9 +217,7 @@ export async function PATCH(req: NextRequest) {
           }
         }
 
-        // ── Disparar alerta por Pusher si hay ingredientes con stock bajo ─────
         if (alertas.length > 0) {
-          // Canal "restaurant" — escuchan cocinero y mesero
           await pusherServer.trigger("restaurant", "inventory:alert", {
             orderId,
             alertas,
@@ -221,7 +227,11 @@ export async function PATCH(req: NextRequest) {
       }
 
       await OrderItem.updateMany(
-        { order_id: orderId, status: "pending" },
+        {
+          order_id: orderId,
+          status: "pending",
+          created_at: { $lte: batchCutoff },
+        },
         { status: "in_kitchen" }
       );
     }
@@ -229,8 +239,7 @@ export async function PATCH(req: NextRequest) {
     // ── cancelled desde in_kitchen → restaurar inventario ────────────────────
     if (newStatus === "cancelled" && order.status === "in_kitchen") {
       const items = await getItemsWithIngredients();
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const restoreBulkOps: any[] = [];
+      const restoreBulkOps: AnyBulkWriteOperation[] = [];
 
       for (const item of items) {
         const dish = item.dish_id as {
@@ -260,12 +269,29 @@ export async function PATCH(req: NextRequest) {
       await OrderItem.updateMany({ order_id: orderId }, { status: "cancelled" });
     }
 
-    // ── ready → marcar items como ready ──────────────────────────────────────
+    // ── ready → marcar items in_kitchen como ready ────────────────────────────
     if (newStatus === "ready") {
       await OrderItem.updateMany(
         { order_id: orderId, status: "in_kitchen" },
         { status: "ready", prepared_at: new Date() }
       );
+
+      const pendingCount = await OrderItem.countDocuments({
+        order_id: orderId,
+        status: "pending",
+      });
+
+      if (pendingCount > 0) {
+        await pusherServer.trigger("restaurant", "order:updated", {
+          orderId,
+          newStatus: order.status,
+        });
+        return NextResponse.json({
+          ok: true,
+          message: `Listo. Quedan ${pendingCount} ítem(s) adicionales pendientes en cocina.`,
+          data: order,
+        });
+      }
     }
 
     order.status = newStatus;
