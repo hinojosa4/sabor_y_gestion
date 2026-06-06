@@ -20,6 +20,7 @@ type CobroItem = {
 type Cobro = {
   id: string;
   orderId: string;
+  dailyNumber: number | null;
   amount: number;
   subtotal: number;
   discountPercent: number;
@@ -319,7 +320,7 @@ export function AdminCobrosPanel({ isMobile, compactHeader = false }: Props) {
                 rows.map((row) => (
                   <tr key={row.id} style={{ borderBottom: "1px solid #f0f0f0" }}>
                     <td style={cellStyle}>
-                      <span style={{ fontWeight: 800, color: "#1a1a1a" }}>{formatOrderLabel(row.orderId)}</span>
+                      <span style={{ fontWeight: 800, color: "#1a1a1a" }}>{formatOrderLabel(row.orderId, row.dailyNumber)}</span>
                       {row.tableNumber && <p style={subCellStyle}>Mesa {row.tableNumber}</p>}
                     </td>
                     <td style={cellStyle}>
@@ -374,7 +375,7 @@ export function AdminCobrosPanel({ isMobile, compactHeader = false }: Props) {
             <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 14, marginBottom: 20 }}>
               <div>
                 <p style={{ margin: 0, fontSize: 12, color: "#888", fontWeight: 700 }}>Detalle de cobro</p>
-                <h3 style={{ margin: "4px 0 0", fontSize: 22, color: "#1a1a1a" }}>{formatOrderLabel(selected.orderId)}</h3>
+                <h3 style={{ margin: "4px 0 0", fontSize: 22, color: "#1a1a1a" }}>{formatOrderLabel(selected.orderId, selected.dailyNumber)}</h3>
               </div>
               <button onClick={() => setSelected(null)} aria-label="Cerrar detalle" title="Cerrar detalle" style={{ width: 40, height: 40, border: "1.5px solid #e0e0e0", background: "#f7f7f7", borderRadius: 10, cursor: "pointer", display: "inline-flex", alignItems: "center", justifyContent: "center", color: "#333" }}>
                 <X size={17} />

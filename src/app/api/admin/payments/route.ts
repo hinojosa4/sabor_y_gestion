@@ -31,6 +31,7 @@ type LeanPayment = {
 
 type LeanOrder = {
   _id: Types.ObjectId;
+  daily_number?: number | null;
   table_id?: string | null;
   customer_id?: CustomerRef | Types.ObjectId | string | null;
   service_type?: "dine_in" | "delivery" | "pick_up";
@@ -243,6 +244,7 @@ export async function GET(req: NextRequest) {
         return {
           id: payment._id.toString(),
           orderId: payment.order_id,
+          dailyNumber: order?.daily_number ?? null,
           amount: payment.amount,
           subtotal: payment.subtotal ?? payment.amount,
           discountPercent: payment.discount_percent ?? 0,
@@ -280,6 +282,7 @@ export async function GET(req: NextRequest) {
       return {
         id: `order-${orderId}`,
         orderId,
+        dailyNumber: order.daily_number ?? null,
         amount,
         subtotal: amount,
         discountPercent: 0,
@@ -313,6 +316,8 @@ export async function GET(req: NextRequest) {
 
         const haystack = [
           row.orderId,
+          row.dailyNumber ? String(row.dailyNumber) : "",
+          row.dailyNumber ? `#${row.dailyNumber}` : "",
           row.customer.name,
           row.customer.email,
           row.customer.receiptEmail,
