@@ -215,7 +215,7 @@ export default function StaffManagementPage() {
 
   const getRolePriority = (role: string) => {
     if (role === 'cliente') return 100;
-    const order = ['admin', 'gerente', 'mesero', 'cocinero', 'delivery', 'cajero' , 'cliente'];
+    const order = ['admin', 'gerente', 'mesero', 'cocinero', 'bartender', 'delivery', 'cajero' , 'cliente'];
     const index = order.indexOf(role);
     return index === -1 ? 50 : index;
   };
@@ -225,6 +225,7 @@ export default function StaffManagementPage() {
     gerente: "📋 Gerentes",
     mesero: "🍽️ Meseros",
     cocinero: "🧑‍🍳 Cocineros",
+    bartender: "🍸 Bartenders",
     delivery: "🚚 Delivery",
     cajero: "💰 Cajeros",
     cliente: "👥 Clientes",

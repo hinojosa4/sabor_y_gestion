@@ -7,7 +7,7 @@ export interface AuthUser {
   _id: string;
   name: string;
   email: string;
-  rol: "admin" | "cajero" | "cocinero" | "mesero" | "cliente" | "delivery";
+  rol: "admin" | "cajero" | "cocinero" | "mesero" | "cliente" | "delivery"| "bartender";
   activo: boolean;
 }
 
@@ -57,6 +57,8 @@ export function useAuth(allowedRoles?: AuthUser["rol"][]) {
         cocinero: "/dashboard/cocinero",
         mesero: "/dashboard/mesero",
         cliente: "/dashboard/cliente",
+        delivery: "/dashboard/delivery",
+        bartender: "/dashboard/bartender",
       };
       router.replace(routes[parsed.rol] ?? "/login");
       return;

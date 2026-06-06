@@ -11,3 +11,5 @@ export const MESERO: AuthUser["rol"][] = ["mesero"];
 export const CLIENTE: AuthUser["rol"][] = ["cliente"];
 
 export const DELIVERY: AuthUser["rol"][] = ["delivery"];
+
+export const BARTENDER: AuthUser["rol"][] = ["bartender"];

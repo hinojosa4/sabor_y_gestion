@@ -11,7 +11,7 @@ interface EmployeeFormProps {
   restaurantId?: string;
 }
 
-const roleOptions: Rol[] = ['admin', 'gerente', 'mesero', 'cocinero', 'delivery', 'cajero'];
+const roleOptions: Rol[] = ['admin', 'gerente', 'mesero', 'cocinero', 'delivery', 'cajero','bartender'];
 const shiftOptions: WorkShift[] = ['Turno Mañana', 'Turno Tarde', 'Turno Completo'];
 const roleLabels: Record<Rol, string> = {
   admin: 'Administrador',
@@ -19,7 +19,8 @@ const roleLabels: Record<Rol, string> = {
   mesero: 'Mesero',
   cocinero: 'Cocinero',
   delivery: 'Delivery',
-  cajero: 'Cajero'
+  cajero: 'Cajero',
+  bartender: 'Bartender'
 };
 
 interface FormErrors {

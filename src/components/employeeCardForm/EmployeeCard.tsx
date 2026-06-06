@@ -13,7 +13,8 @@ const roleSpanishMap: Record<string, string> = {
     mesero: 'Mesero',
     cocinero: 'Cocinero',
     delivery: 'Delivery',
-    cliente: 'Cliente'
+    cliente: 'Cliente',
+    bartender: 'Bartender',
 };
 
 const statusSpanishMap: Record<string, string> = {
@@ -45,7 +46,8 @@ const getRoleStyle = (role: string) => {
         cocinero: { background: '#fed7aa', color: '#9a3412' },
         delivery: { background: '#d1fae5', color: '#065f46' },
         cajero: { background: '#fef9c3', color: '#854d0e' },
-        cliente: { background: '#f3e8ff', color: '#6b21a5' }
+        cliente: { background: '#f3e8ff', color: '#6b21a5' },
+        bartender: { background: '#f0f9ff', color: '#1e3a8a' }
     };
     return styles[role] || defaultStyle;
 };

@@ -21,6 +21,8 @@ interface Stats {
   cocineroCount: number;
   meseroCount: number;
   clienteCount: number;
+  bartenderCount: number;
+  deliveryCount: number;
 }
 
 interface RevenueStats {
@@ -35,6 +37,8 @@ const ROL_LABEL: Record<string, string> = {
   cocinero: "Cocinero",
   mesero: "Mesero",
   cliente: "Cliente",
+  bartender: "Bartender",
+  delivery: "Delivery"
 };
 
 export default function DashboardPage() {
@@ -48,6 +52,7 @@ export default function DashboardPage() {
     totalTables: 0, availableTables: 0, occupiedTables: 0, reservedTables: 0,
     adminCount: 0, cajeroCount: 0,
     cocineroCount: 0, meseroCount: 0, clienteCount: 0,
+    bartenderCount: 0, deliveryCount: 0 
   });
   const [loading, setLoading] = useState(true);
   const [revenue, setRevenue] = useState<RevenueStats>({
@@ -112,6 +117,8 @@ export default function DashboardPage() {
         cocineroCount: users.filter((u: { rol: string }) => u.rol === "cocinero").length,
         meseroCount:   users.filter((u: { rol: string }) => u.rol === "mesero").length,
         clienteCount:  users.filter((u: { rol: string }) => u.rol === "cliente").length,
+        bartenderCount: users.filter((u: { rol: string }) => u.rol === "bartender").length,
+        deliveryCount: users.filter((u: { rol: string }) => u.rol === "delivery").length
       });
     } catch (error) {
       console.error("Error al obtener estadísticas del dashboard:", error);
@@ -236,6 +243,8 @@ export default function DashboardPage() {
     { label: "Cocineros", key: "cocineroCount" as const, color: "#e85d26", icon: "👨‍🍳" },
     { label: "Meseros",   key: "meseroCount"   as const, color: "#059669", icon: "🍽️" },
     { label: "Clientes",  key: "clienteCount"  as const, color: "#888",    icon: "👤" },
+    { label: "Bartenders", key: "bartenderCount" as const, color: "#32b6d3", icon: "🍸" },
+    { label: "Delivery", key: "deliveryCount" as const, color: "#83121f", icon: "🚴" }
   ];
 
   const tableStatuses = [

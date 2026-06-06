@@ -2,7 +2,7 @@
 import mongoose, { Document, Schema } from "mongoose";
 import bcrypt from "bcryptjs";
 
-export type UserRole = "admin" | "cajero" | "cocinero" | "mesero" | "cliente";
+export type UserRole = "admin" | "cajero" | "cocinero" | "mesero" | "cliente"| "delivery"| "bartender";
 export interface IUser extends Document {
   name: string;
   email: string;
