@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react"; // 
+import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/useAuth";
 import { ADMIN } from "@/lib/roles";
@@ -21,6 +21,9 @@ interface Stats {
   cocineroCount: number;
   meseroCount: number;
   clienteCount: number;
+  // ── NUEVO ──
+  totalReservations: number;
+  pendingReservations: number;
 }
 
 interface RevenueStats {
@@ -48,6 +51,8 @@ export default function DashboardPage() {
     totalTables: 0, availableTables: 0, occupiedTables: 0, reservedTables: 0,
     adminCount: 0, cajeroCount: 0,
     cocineroCount: 0, meseroCount: 0, clienteCount: 0,
+    // ── NUEVO ──
+    totalReservations: 0, pendingReservations: 0,
   });
   const [loading, setLoading] = useState(true);
   const [revenue, setRevenue] = useState<RevenueStats>({
@@ -71,38 +76,41 @@ export default function DashboardPage() {
     return () => clearInterval(t);
   }, []);
 
-  // ── fetchStats extraído con useCallback ───────────────────────────────────
   const fetchStats = useCallback(async () => {
+    const token = localStorage.getItem("token");
     try {
-      const [dishRes, catRes, userRes, tableRes] = await Promise.all([
+      const [dishRes, catRes, userRes, tableRes, resRes] = await Promise.all([
         fetch("/api/dishes"),
         fetch("/api/categories"),
         fetch("/api/users"),
         fetch("/api/tables"),
+        // ── NUEVO: reservas de hoy y pendientes ──
+        fetch("/api/reservations", {
+          headers: { Authorization: `Bearer ${token}` },
+        }),
       ]);
 
-      const [dishData, catData, userData, tableData] = await Promise.all([
+      const [dishData, catData, userData, tableData, resData] = await Promise.all([
         dishRes.json(),
         catRes.json(),
         userRes.json(),
         tableRes.json(),
+        resRes.json(),
       ]);
 
-      // dishes y categories usan { ok, data }
-      const dishes = dishData.ok ? dishData.data : [];
-      const cats   = catData.ok  ? catData.data  : [];
-
-      // users y tables devuelven array directo (código de otros devs, no tocar)
-      const users  = Array.isArray(userData)  ? userData  : [];
-      const tables = Array.isArray(tableData) ? tableData : [];
+      const dishes       = dishData.ok ? dishData.data : [];
+      const cats         = catData.ok  ? catData.data  : [];
+      const users        = Array.isArray(userData)  ? userData  : [];
+      const tables       = Array.isArray(tableData) ? tableData : [];
+      const reservations = resData.ok ? resData.data : [];
 
       setStats({
         totalDishes:      dishes.length,
         availableDishes:  dishes.filter((d: { isAvailable: boolean }) => d.isAvailable).length,
         totalCategories:  cats.length,
-        activeCategories: cats.filter((c: { isActive: boolean }) => c.isActive).length, // ← "activo" → "isActive"
+        activeCategories: cats.filter((c: { isActive: boolean }) => c.isActive).length,
         totalUsers:       users.length,
-        activeUsers:      users.filter((u: { activo: boolean }) => u.activo).length,    // ← activo se mantiene (modelo User sin migrar)
+        activeUsers:      users.filter((u: { activo: boolean }) => u.activo).length,
         totalTables:      tables.length,
         availableTables:  tables.filter((t: { status: string }) => t.status === "Libre").length,
         occupiedTables:   tables.filter((t: { status: string }) => t.status === "Ocupada").length,
@@ -112,24 +120,25 @@ export default function DashboardPage() {
         cocineroCount: users.filter((u: { rol: string }) => u.rol === "cocinero").length,
         meseroCount:   users.filter((u: { rol: string }) => u.rol === "mesero").length,
         clienteCount:  users.filter((u: { rol: string }) => u.rol === "cliente").length,
+        // ── NUEVO ──
+        totalReservations:   reservations.length,
+        pendingReservations: reservations.filter((r: { status: string }) => r.status === "pending").length,
       });
     } catch (error) {
       console.error("Error al obtener estadísticas del dashboard:", error);
     } finally {
       setLoading(false);
     }
-  }, []); // sin dependencias — solo llama APIs públicas
+  }, []);
 
   const fetchRevenue = useCallback(async () => {
     try {
       const res = await fetch("/api/cash-register/current");
       const data = await res.json();
-
       if (!res.ok || data.status === "cerrado") {
         setRevenue({ salesTotal: 0, cashTotal: 0, qrTotal: 0 });
         return;
       }
-
       setRevenue({
         salesTotal: data.salesTotal || 0,
         cashTotal: data.cashTotal || 0,
@@ -147,41 +156,33 @@ export default function DashboardPage() {
     if (userLoading || !user) return;
     fetchStats();
     fetchRevenue();
-  }, [userLoading, user, fetchStats, fetchRevenue]); // dependencias correctas
+  }, [userLoading, user, fetchStats, fetchRevenue]);
 
   useEffect(() => {
     if (userLoading || !user) return;
-
     let pusherInstance: InstanceType<typeof import("pusher-js")["default"]> | null = null;
     let mounted = true;
-
     const setup = async () => {
       const { default: Pusher } = await import("pusher-js");
       if (!mounted) return;
-
       pusherInstance = new Pusher(process.env.NEXT_PUBLIC_PUSHER_KEY!, {
         cluster: process.env.NEXT_PUBLIC_PUSHER_CLUSTER!,
       });
-
       const channel = pusherInstance.subscribe("restaurant");
-      channel.bind("payment:completed", () => {
-        if (mounted) fetchRevenue();
-      });
-      channel.bind("table:updated", () => {
-        if (mounted) fetchRevenue();
-      });
+      channel.bind("payment:completed", () => { if (mounted) fetchRevenue(); });
+      channel.bind("table:updated",     () => { if (mounted) fetchRevenue(); });
+      // ── NUEVO: refrescar stats cuando llegue una reserva ──
+      channel.bind("reservation:new",     () => { if (mounted) fetchStats(); });
+      channel.bind("reservation:updated", () => { if (mounted) fetchStats(); });
     };
-
     setup();
-
     return () => {
       mounted = false;
       pusherInstance?.unsubscribe("restaurant");
       pusherInstance?.disconnect();
     };
-  }, [userLoading, user, fetchRevenue]);
+  }, [userLoading, user, fetchRevenue, fetchStats]);
 
-  // ── resto del componente sin cambios ──────────────────────────────────────
   const greeting = () => {
     const h = time.getHours();
     if (h < 12) return "Buenos días";
@@ -197,9 +198,7 @@ export default function DashboardPage() {
 
   const formatCurrency = (amount: number) =>
     new Intl.NumberFormat("es-BO", {
-      style: "currency",
-      currency: "BOB",
-      maximumFractionDigits: 2,
+      style: "currency", currency: "BOB", maximumFractionDigits: 2,
     }).format(amount);
 
   if (userLoading) {
@@ -209,16 +208,17 @@ export default function DashboardPage() {
       </div>
     );
   }
-
   if (!user) return null;
 
   const firstName = user.name.split(" ")[0];
 
   const statCards = [
-    { label: "Total Platos", value: loading ? "—" : stats.totalDishes,    sub: loading ? "" : `${stats.availableDishes} disponibles`, subColor: "#27ae60", icon: "🍴",  iconBg: "#fff8f5" },
-    { label: "Categorías",   value: loading ? "—" : stats.totalCategories, sub: loading ? "" : `${stats.activeCategories} activas`,    subColor: "#27ae60", icon: "🏷️", iconBg: "#f0f6ff" },
-    { label: "Usuarios",     value: loading ? "—" : stats.totalUsers,      sub: loading ? "" : `${stats.activeUsers} activos`,         subColor: "#27ae60", icon: "👥",  iconBg: "#f0fdf4" },
-    { label: "Mesas",        value: loading ? "—" : stats.totalTables,     sub: loading ? "" : `${stats.availableTables} libres`,      subColor: "#7c3aed", icon: "🪑",  iconBg: "#f5f3ff" },
+    { label: "Total Platos",  value: loading ? "—" : stats.totalDishes,       sub: loading ? "" : `${stats.availableDishes} disponibles`,      subColor: "#27ae60", icon: "🍴",  iconBg: "#fff8f5" },
+    { label: "Categorías",    value: loading ? "—" : stats.totalCategories,    sub: loading ? "" : `${stats.activeCategories} activas`,          subColor: "#27ae60", icon: "🏷️", iconBg: "#f0f6ff" },
+    { label: "Usuarios",      value: loading ? "—" : stats.totalUsers,         sub: loading ? "" : `${stats.activeUsers} activos`,               subColor: "#27ae60", icon: "👥",  iconBg: "#f0fdf4" },
+    { label: "Mesas",         value: loading ? "—" : stats.totalTables,        sub: loading ? "" : `${stats.availableTables} libres`,            subColor: "#7c3aed", icon: "🪑",  iconBg: "#f5f3ff" },
+    // ── NUEVO stat card ──
+    { label: "Reservas",      value: loading ? "—" : stats.totalReservations,  sub: loading ? "" : `${stats.pendingReservations} pendientes`,    subColor: "#d97706", icon: "📅",  iconBg: "#fffbeb" },
   ];
 
   const quickActions = [
@@ -227,7 +227,9 @@ export default function DashboardPage() {
     { icon: "👥",  title: "Gestión de Usuarios",   desc: "Administra el personal y sus permisos",         route: "/staff-management", color: "#059669", bg: "#f0fdf4", border: "#a7f3d0", stats: loading ? "—" : `${stats.totalUsers} usuarios · ${stats.activeUsers} activos` },
     { icon: "🪑",  title: "Gestión de Mesas",      desc: "Administra mesas, estados y disponibilidad",    route: "/tableManage",      color: "#7c3aed", bg: "#f5f3ff", border: "#ddd6fe", stats: loading ? "—" : `${stats.totalTables} mesas · ${stats.availableTables} libres` },
     { icon: "📦",  title: "Control de Inventario", desc: "Gestiona stock de ingredientes y alertas",      route: "/inventario",       color: "#059669", bg: "#f0fdf4", border: "#a7f3d0", stats: "Ingredientes y suministros" },
-    { icon: "Bs", title: "Control de Cobros", desc: "Consulta pagos, clientes y estados en tiempo real", route: "/dashboard/cobros", color: "#1a1a1a", bg: "#fff8f5", border: "#ffd4bc", stats: revenueLoading ? "—" : `Hoy ${formatCurrency(revenue.salesTotal)} · QR ${formatCurrency(revenue.qrTotal)}` },
+    { icon: "Bs",  title: "Control de Cobros",     desc: "Consulta pagos, clientes y estados en tiempo real", route: "/dashboard/cobros", color: "#1a1a1a", bg: "#fff8f5", border: "#ffd4bc", stats: revenueLoading ? "—" : `Hoy ${formatCurrency(revenue.salesTotal)} · QR ${formatCurrency(revenue.qrTotal)}` },
+    // ── NUEVO quick action ──
+    { icon: "📅",  title: "Gestión de Reservas",   desc: "Confirma, asienta y administra las reservas de mesa", route: "/reservations", color: "#d97706", bg: "#fffbeb", border: "#fde68a", stats: loading ? "—" : `${stats.totalReservations} reservas · ${stats.pendingReservations} pendientes` },
   ];
 
   const roles = [
@@ -255,7 +257,6 @@ export default function DashboardPage() {
   return (
     <div style={{ minHeight: "100vh", background: "#f8f7f4", fontFamily: "'Georgia', serif" }}>
 
-      {/* Responsive styles injected globally */}
       <style>{`
         * { box-sizing: border-box; }
         html { -webkit-text-size-adjust: 100%; }
@@ -263,18 +264,12 @@ export default function DashboardPage() {
 
       {/* ── Navbar ── */}
       <nav style={{
-        background: "#fff",
-        borderBottom: "2px solid #1a1a1a",
+        background: "#fff", borderBottom: "2px solid #1a1a1a",
         padding: isMobile ? "0 16px" : "0 40px",
         height: isMobile ? 56 : 64,
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "space-between",
-        position: "sticky",
-        top: 0,
-        zIndex: 100,
+        display: "flex", alignItems: "center", justifyContent: "space-between",
+        position: "sticky", top: 0, zIndex: 100,
       }}>
-        {/* Logo */}
         <div style={{ display: "flex", alignItems: "center", gap: isMobile ? 8 : 12 }}>
           <div style={{ width: isMobile ? 34 : 40, height: isMobile ? 34 : 40, borderRadius: 10, background: "#e85d26", display: "flex", alignItems: "center", justifyContent: "center", fontSize: isMobile ? 16 : 20, flexShrink: 0 }}>🍽️</div>
           {!isMobile && (
@@ -283,12 +278,8 @@ export default function DashboardPage() {
               <p style={{ margin: 0, fontSize: 11, color: "#888" }}>Panel de Administración</p>
             </div>
           )}
-          {isMobile && (
-            <p style={{ margin: 0, fontSize: 14, fontWeight: 700, color: "#1a1a1a" }}>Sabor & Gestión</p>
-          )}
+          {isMobile && <p style={{ margin: 0, fontSize: 14, fontWeight: 700, color: "#1a1a1a" }}>Sabor & Gestión</p>}
         </div>
-
-        {/* User info + logout */}
         <div style={{ display: "flex", alignItems: "center", gap: isMobile ? 8 : 14 }}>
           {!isMobile && (
             <div style={{ textAlign: "right" }}>
@@ -311,20 +302,14 @@ export default function DashboardPage() {
         borderRadius: isMobile ? 14 : 20,
         background: "linear-gradient(135deg, #1a1a1a 0%, #2d2d2d 50%, #3a2010 100%)",
         padding: isMobile ? "24px 20px" : "40px 48px",
-        position: "relative",
-        overflow: "hidden",
+        position: "relative", overflow: "hidden",
         minHeight: isMobile ? "auto" : 180,
-        display: "flex",
-        flexDirection: "column",
-        justifyContent: "center",
+        display: "flex", flexDirection: "column", justifyContent: "center",
         gap: isMobile ? 12 : 0,
       }}>
-        {/* Decorative circles */}
         <div style={{ position: "absolute", right: -40, top: -40, width: 200, height: 200, borderRadius: "50%", background: "rgba(232,93,38,0.12)" }} />
         <div style={{ position: "absolute", right: 60, bottom: -60, width: 140, height: 140, borderRadius: "50%", background: "rgba(232,93,38,0.08)" }} />
         <div style={{ position: "absolute", right: isMobile ? -10 : 40, top: "50%", transform: "translateY(-50%)", fontSize: isMobile ? 60 : 80, opacity: 0.07, userSelect: "none" }}>🍽️</div>
-
-        {/* Text block */}
         <div style={{ position: "relative", zIndex: 1 }}>
           <p style={{ margin: "0 0 6px", fontSize: isMobile ? 11 : 13, color: "rgba(255,255,255,0.5)", letterSpacing: "0.1em", textTransform: "uppercase" }}>
             {greeting()}, {firstName} 👋
@@ -332,8 +317,6 @@ export default function DashboardPage() {
           <h1 style={{ margin: "0 0 4px", fontSize: isMobile ? 22 : 32, fontWeight: 700, color: "#fff" }}>Panel de Administración</h1>
           {!isMobile && <p style={{ margin: 0, fontSize: 14, color: "rgba(255,255,255,0.6)" }}>{user.email}</p>}
         </div>
-
-        {/* Time block — below text on mobile, absolute right on desktop */}
         {isMobile ? (
           <div style={{ position: "relative", zIndex: 1 }}>
             <p style={{ margin: 0, fontSize: 24, fontWeight: 700, color: "#fff", fontVariantNumeric: "tabular-nums" }}>{formatTime(time)}</p>
@@ -356,79 +339,45 @@ export default function DashboardPage() {
       }}>
         {statCards.map((s) => {
           const isRevenueCard = s.label === "Ingresos";
-
           return (
-          <div key={s.label} style={{
-            background: "#fff",
-            border: "1.5px solid #e8e8e8",
-            borderRadius: isMobile ? 12 : 16,
-            padding: isMobile ? "14px 16px" : "20px 24px",
-            display: "flex",
-            flexDirection: isRevenueCard ? "column" : "row",
-            alignItems: "center",
-            justifyContent: isRevenueCard ? "center" : undefined,
-            gap: isMobile ? 10 : 16,
-            boxShadow: "0 2px 8px rgba(0,0,0,0.03)",
-            minWidth: 0,
-            gridColumn: isMobile && isRevenueCard ? "1 / -1" : undefined,
-          }}>
-            {isRevenueCard ? (
-              <>
-                <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 8, width: "100%" }}>
-                  <span style={{ width: 30, height: 30, borderRadius: 8, background: s.iconBg, display: "inline-flex", alignItems: "center", justifyContent: "center", fontSize: 14, flexShrink: 0 }}>{s.icon}</span>
-                  <p style={{ margin: 0, fontSize: isMobile ? 10 : 11, color: "#888" }}>{s.label}</p>
-                </div>
-                <p style={{
-                  margin: 0,
-                  width: "100%",
-                  fontSize: isMobile ? 26 : 28,
-                  fontWeight: 700,
-                  color: "#1a1a1a",
-                  lineHeight: 1.05,
-                  textAlign: "center",
-                  whiteSpace: "nowrap",
-                  fontVariantNumeric: "tabular-nums",
-                }}>{s.value}</p>
-                {!revenueLoading && (
-                  <div style={{ width: "100%", display: "grid", gap: 2, textAlign: "center" }}>
-                    <p style={{ margin: 0, fontSize: isMobile ? 10 : 11, color: s.subColor, fontWeight: 600, lineHeight: 1.2 }}>
-                      Efectivo {formatCurrency(revenue.cashTotal)}
-                    </p>
-                    <p style={{ margin: 0, fontSize: isMobile ? 10 : 11, color: s.subColor, fontWeight: 600, lineHeight: 1.2 }}>
-                      QR {formatCurrency(revenue.qrTotal)}
-                    </p>
+            <div key={s.label} style={{
+              background: "#fff", border: "1.5px solid #e8e8e8",
+              borderRadius: isMobile ? 12 : 16,
+              padding: isMobile ? "14px 16px" : "20px 24px",
+              display: "flex",
+              flexDirection: isRevenueCard ? "column" : "row",
+              alignItems: "center",
+              justifyContent: isRevenueCard ? "center" : undefined,
+              gap: isMobile ? 10 : 16,
+              boxShadow: "0 2px 8px rgba(0,0,0,0.03)",
+              minWidth: 0,
+              gridColumn: isMobile && isRevenueCard ? "1 / -1" : undefined,
+            }}>
+              {isRevenueCard ? (
+                <>
+                  <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 8, width: "100%" }}>
+                    <span style={{ width: 30, height: 30, borderRadius: 8, background: s.iconBg, display: "inline-flex", alignItems: "center", justifyContent: "center", fontSize: 14, flexShrink: 0 }}>{s.icon}</span>
+                    <p style={{ margin: 0, fontSize: isMobile ? 10 : 11, color: "#888" }}>{s.label}</p>
                   </div>
-                )}
-              </>
-            ) : (
-            <>
-              <div style={{ width: isMobile ? 38 : 48, height: isMobile ? 38 : 48, borderRadius: isMobile ? 10 : 12, background: s.iconBg, display: "flex", alignItems: "center", justifyContent: "center", fontSize: isMobile ? 18 : 22, flexShrink: 0 }}>{s.icon}</div>
-              <div style={{ minWidth: 0, flex: 1 }}>
-              <p style={{ margin: 0, fontSize: isMobile ? 10 : 11, color: "#888", marginBottom: 2 }}>{s.label}</p>
-              <p style={{
-                margin: 0,
-                fontSize: isMobile ? 22 : 28,
-                fontWeight: 700,
-                color: "#1a1a1a",
-                lineHeight: 1,
-                maxWidth: "100%",
-                overflowWrap: "anywhere",
-                wordBreak: "break-word",
-              }}>{s.value}</p>
-              {s.sub && <p style={{
-                margin: "3px 0 0",
-                fontSize: isMobile ? 10 : 11,
-                color: s.subColor,
-                fontWeight: 600,
-                lineHeight: 1.25,
-                maxWidth: "100%",
-                whiteSpace: "normal",
-                overflowWrap: "anywhere",
-              }}>{s.sub}</p>}
-              </div>
-            </>
-            )}
-          </div>
+                  <p style={{ margin: 0, width: "100%", fontSize: isMobile ? 26 : 28, fontWeight: 700, color: "#1a1a1a", lineHeight: 1.05, textAlign: "center", whiteSpace: "nowrap", fontVariantNumeric: "tabular-nums" }}>{s.value}</p>
+                  {!revenueLoading && (
+                    <div style={{ width: "100%", display: "grid", gap: 2, textAlign: "center" }}>
+                      <p style={{ margin: 0, fontSize: isMobile ? 10 : 11, color: s.subColor, fontWeight: 600, lineHeight: 1.2 }}>Efectivo {formatCurrency(revenue.cashTotal)}</p>
+                      <p style={{ margin: 0, fontSize: isMobile ? 10 : 11, color: s.subColor, fontWeight: 600, lineHeight: 1.2 }}>QR {formatCurrency(revenue.qrTotal)}</p>
+                    </div>
+                  )}
+                </>
+              ) : (
+                <>
+                  <div style={{ width: isMobile ? 38 : 48, height: isMobile ? 38 : 48, borderRadius: isMobile ? 10 : 12, background: s.iconBg, display: "flex", alignItems: "center", justifyContent: "center", fontSize: isMobile ? 18 : 22, flexShrink: 0 }}>{s.icon}</div>
+                  <div style={{ minWidth: 0, flex: 1 }}>
+                    <p style={{ margin: 0, fontSize: isMobile ? 10 : 11, color: "#888", marginBottom: 2 }}>{s.label}</p>
+                    <p style={{ margin: 0, fontSize: isMobile ? 22 : 28, fontWeight: 700, color: "#1a1a1a", lineHeight: 1, maxWidth: "100%", overflowWrap: "anywhere", wordBreak: "break-word" }}>{s.value}</p>
+                    {s.sub && <p style={{ margin: "3px 0 0", fontSize: isMobile ? 10 : 11, color: s.subColor, fontWeight: 600, lineHeight: 1.25, maxWidth: "100%", whiteSpace: "normal", overflowWrap: "anywhere" }}>{s.sub}</p>}
+                  </div>
+                </>
+              )}
+            </div>
           );
         })}
       </div>
@@ -451,19 +400,14 @@ export default function DashboardPage() {
                 key={action.route}
                 onClick={() => handleQuickAction(action.route)}
                 style={{
-                  background: "#fff",
-                  border: `1.5px solid ${action.border}`,
+                  background: "#fff", border: `1.5px solid ${action.border}`,
                   borderRadius: isMobile ? 12 : 16,
                   padding: isMobile ? "16px" : "22px 24px",
-                  cursor: "pointer",
-                  textAlign: "left",
-                  display: "flex",
-                  alignItems: "center",
-                  gap: isMobile ? 12 : 18,
+                  cursor: "pointer", textAlign: "left",
+                  display: "flex", alignItems: "center", gap: isMobile ? 12 : 18,
                   boxShadow: "0 2px 8px rgba(0,0,0,0.03)",
                   transition: "transform 0.15s, box-shadow 0.15s",
-                  fontFamily: "inherit",
-                  width: "100%",
+                  fontFamily: "inherit", width: "100%",
                 }}
                 onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.transform = "translateY(-2px)"; (e.currentTarget as HTMLButtonElement).style.boxShadow = "0 8px 24px rgba(0,0,0,0.1)"; }}
                 onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.transform = "translateY(0)"; (e.currentTarget as HTMLButtonElement).style.boxShadow = "0 2px 8px rgba(0,0,0,0.03)"; }}
@@ -480,7 +424,7 @@ export default function DashboardPage() {
           </div>
         </div>
 
-        {/* ── Columna derecha (apilada en mobile) ── */}
+        {/* ── Columna derecha ── */}
         <div style={{ display: "flex", flexDirection: "column", gap: isMobile ? 20 : 24 }}>
 
           {/* Panel Resumen de Usuarios */}

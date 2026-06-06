@@ -1,3 +1,4 @@
+// src/app/api/reservations/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { connectDB } from "@/lib/db";
 import Reservation from "@/models/Reservation";
@@ -96,6 +97,8 @@ export async function POST(req: NextRequest) {
 }
 
 // ── GET /api/reservations ──────────────────────────────────────────────────────
+// - admin / mesero: ven TODAS las reservas (con filtros opcionales)
+// - cliente: solo las suyas
 export async function GET(req: NextRequest) {
   try {
     await connectDB();
@@ -105,17 +108,40 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ ok: false, message: "No autorizado" }, { status: 401 });
     }
 
-    let userId: string;
+    let payload: { userId: string; rol: string };
     try {
-      const payload = verifyToken(authHeader.split(" ")[1]);
-      userId = payload.userId;
+      payload = verifyToken(authHeader.split(" ")[1]) as { userId: string; rol: string };
     } catch {
       return NextResponse.json({ ok: false, message: "Token inválido" }, { status: 401 });
     }
 
-    const reservations = await Reservation.find({ user_id: userId })
-      .sort({ date: -1 })
-      .populate("table_id", "number capacity location")
+    const { searchParams } = new URL(req.url);
+    const statusFilter = searchParams.get("status"); // "pending" | "confirmed" | etc.
+    const dateFilter   = searchParams.get("date");   // "YYYY-MM-DD"
+
+    // Construir query
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const query: Record<string, any> = {};
+
+    // Clientes solo ven las suyas
+    if (payload.rol === "cliente") {
+      query.user_id = payload.userId;
+    }
+
+    if (statusFilter && statusFilter !== "all") {
+      query.status = statusFilter;
+    }
+
+    if (dateFilter) {
+      const start = new Date(`${dateFilter}T00:00:00`);
+      const end   = new Date(`${dateFilter}T23:59:59`);
+      query.date  = { $gte: start, $lte: end };
+    }
+
+    const reservations = await Reservation.find(query)
+      .sort({ date: 1 })
+      .populate("table_id", "number capacity location status")
+      .populate("user_id", "name email")
       .lean();
 
     return NextResponse.json({ ok: true, data: reservations });

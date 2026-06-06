@@ -38,6 +38,7 @@ export function ReservationModal({ open, onClose, onSuccess }: Props) {
   const [form, setForm] = useState<ReservationForm>(EMPTY);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [successMsg, setSuccessMsg] = useState<string | null>(null);
 
   if (!open) return null;
 
@@ -89,8 +90,14 @@ export function ReservationModal({ open, onClose, onSuccess }: Props) {
       if (!json.ok) throw new Error(json.message ?? "Error al crear reserva");
 
       setForm(EMPTY);
-      onSuccess();
-      onClose();
+      // Mostrar mensaje de éxito antes de cerrar
+      setError(null);
+      setSuccessMsg("¡Reserva enviada! Te confirmaremos pronto 🎉");
+      setTimeout(() => {
+        setSuccessMsg(null);
+        onSuccess();
+        onClose();
+      }, 2500);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Error al enviar la reserva");
     } finally {
@@ -118,6 +125,7 @@ export function ReservationModal({ open, onClose, onSuccess }: Props) {
         <div style={s.body}>
           {/* Error */}
           {error && <div style={s.errorBox}>{error}</div>}
+          {successMsg && <div style={s.successBox}>{successMsg}</div>}
 
           {/* Nombre y Apellido */}
           <div style={s.row}>
@@ -316,4 +324,5 @@ const s: { [k: string]: React.CSSProperties } = {
   actions:   { display: "grid", gridTemplateColumns: "1fr 1.5fr", gap: "0.75rem" },
   cancelBtn: { backgroundColor: "#fff", color: "#111827", border: "1px solid #e5e7eb", borderRadius: 10, padding: "0.75rem", fontWeight: 600, cursor: "pointer", fontSize: "0.9rem" },
   submitBtn: { backgroundColor: "#f97316", color: "#fff", border: "none", borderRadius: 10, padding: "0.75rem", fontWeight: 700, cursor: "pointer", fontSize: "0.9rem" },
+  successBox: { backgroundColor: "#e8f8ef", border: "1px solid #86efac", borderRadius: 8, padding: "0.75rem 1rem", color: "#166534", fontSize: "0.875rem", fontWeight: 600, textAlign: "center" },
 };
