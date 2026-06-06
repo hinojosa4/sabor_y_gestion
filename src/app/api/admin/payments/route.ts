@@ -18,6 +18,10 @@ type LeanPayment = {
   _id: Types.ObjectId;
   order_id: string;
   amount: number;
+  subtotal?: number;
+  discount_percent?: number;
+  discount_amount?: number;
+  loyalty_tier_name?: string | null;
   method: "cash" | "card" | "qr";
   status: "pending" | "completed";
   customer_id?: CustomerRef | Types.ObjectId | string | null;
@@ -27,6 +31,7 @@ type LeanPayment = {
 
 type LeanOrder = {
   _id: Types.ObjectId;
+  daily_number?: number | null;
   table_id?: string | null;
   customer_id?: CustomerRef | Types.ObjectId | string | null;
   service_type?: "dine_in" | "delivery" | "pick_up";
@@ -60,6 +65,7 @@ const PAYMENT_STATUSES = new Set(["pending", "completed"]);
 const ACTIVE_UNPAID_ORDER_STATUSES = ["pending", "in_kitchen", "ready", "delivered"];
 const DEFAULT_PAGE_SIZE = 10;
 const MAX_PAGE_SIZE = 50;
+const BOLIVIA_UTC_OFFSET_HOURS = 4;
 
 function isCustomerRef(value: LeanOrder["customer_id"] | LeanPayment["customer_id"]): value is CustomerRef {
   return Boolean(value && typeof value === "object" && "email" in value);
@@ -67,13 +73,15 @@ function isCustomerRef(value: LeanOrder["customer_id"] | LeanPayment["customer_i
 
 function normalizeDateStart(value: string | null): Date | null {
   if (!value) return null;
-  const date = new Date(`${value}T00:00:00.000`);
+  const date = new Date(`${value}T${String(BOLIVIA_UTC_OFFSET_HOURS).padStart(2, "0")}:00:00.000Z`);
   return Number.isNaN(date.getTime()) ? null : date;
 }
 
 function normalizeDateEnd(value: string | null): Date | null {
   if (!value) return null;
-  const date = new Date(`${value}T23:59:59.999`);
+  const start = normalizeDateStart(value);
+  const date = start ? new Date(start.getTime() + 86_400_000 - 1) : null;
+  if (!date) return null;
   return Number.isNaN(date.getTime()) ? null : date;
 }
 
@@ -236,7 +244,12 @@ export async function GET(req: NextRequest) {
         return {
           id: payment._id.toString(),
           orderId: payment.order_id,
+          dailyNumber: order?.daily_number ?? null,
           amount: payment.amount,
+          subtotal: payment.subtotal ?? payment.amount,
+          discountPercent: payment.discount_percent ?? 0,
+          discountAmount: payment.discount_amount ?? 0,
+          loyaltyTierName: payment.loyalty_tier_name ?? null,
           method: payment.method,
           methodLabel: formatMethod(payment.method),
           paymentStatus: payment.status,
@@ -269,7 +282,12 @@ export async function GET(req: NextRequest) {
       return {
         id: `order-${orderId}`,
         orderId,
+        dailyNumber: order.daily_number ?? null,
         amount,
+        subtotal: amount,
+        discountPercent: 0,
+        discountAmount: 0,
+        loyaltyTierName: null,
         method: null,
         methodLabel: "Sin método",
         paymentStatus: "pending" as const,
@@ -298,6 +316,8 @@ export async function GET(req: NextRequest) {
 
         const haystack = [
           row.orderId,
+          row.dailyNumber ? String(row.dailyNumber) : "",
+          row.dailyNumber ? `#${row.dailyNumber}` : "",
           row.customer.name,
           row.customer.email,
           row.customer.receiptEmail,
@@ -318,13 +338,14 @@ export async function GET(req: NextRequest) {
         acc.count += 1;
         if (row.paymentStatus === "completed") {
           acc.total += row.amount;
+          acc.discounts += row.discountAmount;
           if (row.method === "cash") acc.cash += row.amount;
           if (row.method === "qr") acc.qr += row.amount;
         }
         if (row.paymentStatus === "pending") acc.pending += 1;
         return acc;
       },
-      { total: 0, cash: 0, qr: 0, pending: 0, count: 0 }
+      { total: 0, cash: 0, qr: 0, pending: 0, count: 0, discounts: 0 }
     );
 
     const totalRows = rows.length;

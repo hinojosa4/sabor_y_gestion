@@ -14,9 +14,15 @@ import { AppNotice } from '@/components/ui/AppNotice';
 interface ActiveOrder {
     _id: string;
     table_id?: string;
+    daily_number?: number | null;
     status: string;
     createdAt?: string;
 }
+
+type OrderIdentifier = {
+    id: string;
+    dailyNumber?: number | null;
+};
 
 interface CashRegisterStatus {
     status: 'abierto' | 'cerrado';
@@ -222,7 +228,7 @@ export default function CajeroDashboard() {
     const [currentOrderId, setCurrentOrderId] = useState('');
     const [currentTotal, setCurrentTotal] = useState(0);
     const [currentTableId, setCurrentTableId] = useState('');
-    const [orderIdsByTable, setOrderIdsByTable] = useState<Record<string, string>>({});
+    const [orderIdsByTable, setOrderIdsByTable] = useState<Record<string, OrderIdentifier>>({});
     const [successToast, setSuccessToast] = useState('');
     const [cashRegisterStatus, setCashRegisterStatus] = useState<CashRegisterStatus | null>(null);
     const [cashNotice, setCashNotice] = useState('');
@@ -253,7 +259,7 @@ export default function CajeroDashboard() {
             const res = await fetch('/api/orders/active', { headers });
             const data = await res.json();
  
-            const nextOrderIdsByTable: Record<string, string> = {};
+            const nextOrderIdsByTable: Record<string, OrderIdentifier> = {};
  
             if (!res.ok || !data?.ok || !Array.isArray(data.data)) {
                 console.warn('No se pudieron cargar las ordenes activas:', data);
@@ -261,7 +267,10 @@ export default function CajeroDashboard() {
                 (data.data as ActiveOrder[]).forEach((order) => {
                     if (!order.table_id || !order._id) return;
                     if (!nextOrderIdsByTable[order.table_id]) {
-                        nextOrderIdsByTable[order.table_id] = order._id;
+                        nextOrderIdsByTable[order.table_id] = {
+                            id: order._id,
+                            dailyNumber: order.daily_number ?? null,
+                        };
                     }
                 });
             }
@@ -276,7 +285,13 @@ export default function CajeroDashboard() {
                         const preinvoiceRes = await fetch(`/api/orders/preinvoice/${encodeURIComponent(table._id)}`);
                         const preinvoiceData = await preinvoiceRes.json();
                         if (!preinvoiceRes.ok || !preinvoiceData.orderId) return null;
-                        return [table._id, preinvoiceData.orderId] as const;
+                        return [
+                            table._id,
+                            {
+                                id: preinvoiceData.orderId,
+                                dailyNumber: preinvoiceData.dailyNumber ?? null,
+                            },
+                        ] as const;
                     } catch (error) {
                         console.error(`Error al cargar prefactura de mesa ${table._id}:`, error);
                         return null;
@@ -286,8 +301,8 @@ export default function CajeroDashboard() {
  
             fallbackOrderIds.forEach((entry) => {
                 if (!entry) return;
-                const [tableId, orderId] = entry;
-                nextOrderIdsByTable[tableId] = orderId;
+                const [tableId, orderIdentifier] = entry;
+                nextOrderIdsByTable[tableId] = orderIdentifier;
             });
  
             setOrderIdsByTable(nextOrderIdsByTable);
@@ -470,11 +485,11 @@ export default function CajeroDashboard() {
     };
 
     const renderOrderIdentifier = (
-        orderId: string | undefined,
+        order: OrderIdentifier | undefined,
         variant: 'billing' | 'occupied' | 'free',
         fallback: React.ReactNode
     ) => {
-        if (!orderId) return fallback;
+        if (!order?.id) return fallback;
 
         const variants: Record<typeof variant, React.CSSProperties> = {
             billing: {
@@ -497,10 +512,10 @@ export default function CajeroDashboard() {
         return (
             <span
                 style={{ ...orderIdBadgeBaseStyle, ...variants[variant] }}
-                title={`/api/orders/${orderId}`}
-                aria-label={`Orden ${orderId}`}
+                title={`/api/orders/${order.id}`}
+                aria-label={`Orden ${formatShortOrderId(order.id, order.dailyNumber)}`}
             >
-                {formatShortOrderId(orderId)}
+                {formatShortOrderId(order.id, order.dailyNumber)}
             </span>
         );
     };
@@ -873,11 +888,10 @@ export default function CajeroDashboard() {
                 tableNumber={selectedTable?.number || 0}  // 👈 agregar esta línea
                 totalAmount={currentTotal}
                 onSuccess={() => {
-                    setIsPaymentModalOpen(false);
                     refreshTables();
                     fetchActiveOrders();
                     fetchCashRegisterStatus();
-                    setSuccessToast('El cobro en efectivo se guardó correctamente.');
+                    setSuccessToast('El cobro se guardo. El comprobante esta listo para imprimir.');
                 }}
             />
 

@@ -181,6 +181,7 @@ export function PreinvoiceModal({
   const [total, setTotal] = useState(0);
   const printRef = useRef<HTMLDivElement>(null);
   const [orderId, setOrderId] = useState('');
+  const [dailyNumber, setDailyNumber] = useState<number | null>(null);
 
   useEffect(() => {
     if (isOpen && tableId) {
@@ -200,6 +201,7 @@ export function PreinvoiceModal({
         setSubtotal(data.subtotal || 0);
         setTotal(data.total || 0);
         setOrderId(data.orderId || '');
+        setDailyNumber(data.dailyNumber ?? null);
       }
     } catch (error) {
       console.error('Error:', error);
@@ -247,7 +249,7 @@ export function PreinvoiceModal({
           </div>
 
           <p style={tableInfoStyle}>Mesa {tableNumber}</p>
-          {orderId && <p style={orderInfoStyle}>{formatOrderLabel(orderId)}</p>}
+          {orderId && <p style={orderInfoStyle}>{formatOrderLabel(orderId, dailyNumber)}</p>}
 
           {loading ? (
             <div style={loadingContainerStyle}>
@@ -326,7 +328,7 @@ export function PreinvoiceModal({
         <div style={{ padding: '2rem', fontFamily: 'sans-serif' }}>
           <h2 style={{ textAlign: 'center', marginBottom: '1rem' }}>Pre-factura</h2>
           <p style={{ marginBottom: '1rem' }}>Mesa {tableNumber}</p>
-          {orderId && <p style={{ marginBottom: '1rem' }}><strong>{formatOrderLabel(orderId)}</strong></p>}
+          {orderId && <p style={{ marginBottom: '1rem' }}><strong>{formatOrderLabel(orderId, dailyNumber)}</strong></p>}
           <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: '1rem' }}>
             <thead>
               <tr style={{ borderBottom: '1px solid #ccc' }}>

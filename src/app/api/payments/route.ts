@@ -8,6 +8,7 @@ import { pusherServer } from "@/lib/pusher";
 import { findRegisteredCustomerByEmail } from '@/lib/customerLookup';
 import { verifyToken } from '@/lib/jwt';
 import { getOpenCashShiftForUser, getOpenOperationalCashShift } from '@/lib/cashRegister';
+import { calculateLoyaltyDiscount } from '@/lib/customerLoyalty';
 //const RESTAURANT_ID = "69e170e941daf8c2b2f76677"; // para obtener el nombre del restaurante
 
 function getUserIdFromRequest(req: NextRequest) {
@@ -57,14 +58,18 @@ export async function POST(req: NextRequest) {
       const unitPrice = item.unit_price ?? 0;
       return sum + unitPrice * quantity;
     }, 0);
-    const amount = subtotal;
-
     const { email: normalizedEmail, customer } = await findRegisteredCustomerByEmail(customerEmail);
+    const loyaltyDiscount = await calculateLoyaltyDiscount(customer?._id?.toString(), subtotal);
+    const amount = loyaltyDiscount.total;
 
     // Crear pago
     const payment = await Payment.create({
       order_id: orderId,
       amount,
+      subtotal: loyaltyDiscount.subtotal,
+      discount_percent: loyaltyDiscount.discountPercent,
+      discount_amount: loyaltyDiscount.discountAmount,
+      loyalty_tier_name: loyaltyDiscount.tierName,
       method,
       status: 'completed',
       shiftName: cashShift.shift.shiftName,
@@ -78,6 +83,7 @@ export async function POST(req: NextRequest) {
 
     // Actualizar orden
     order.status = 'paid';
+    order.total_amount = amount;
     if (customer && !order.customer_id) {
       order.customer_id = customer._id;
     }
@@ -97,6 +103,9 @@ export async function POST(req: NextRequest) {
       orderId,
       method,
       amount,
+      subtotal: loyaltyDiscount.subtotal,
+      discountPercent: loyaltyDiscount.discountPercent,
+      discountAmount: loyaltyDiscount.discountAmount,
       tableId,
       customer: customer
         ? {
