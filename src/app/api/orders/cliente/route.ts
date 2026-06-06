@@ -7,6 +7,7 @@ import { verifyToken } from "@/lib/jwt";
 import { pusherServer } from "@/lib/pusher";
 import { haversineKm, calcDeliveryFee, DELIVERY_CONFIG } from "@/lib/deliveryConfig";
 import { getNextDailyNumber } from "@/lib/dailyOrderCounter";
+import { calculateLoyaltyDiscount } from "@/lib/customerLoyalty";
 
 export async function POST(req: NextRequest) {
   try {

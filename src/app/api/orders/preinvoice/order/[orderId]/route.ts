@@ -37,6 +37,7 @@ export async function GET(
       delivery_fee?: number;
       service_type?: string;
       total_amount?: number;
+      daily_number?: number | null;
     } | null>();
 
     const table = order?.table_id
@@ -88,6 +89,7 @@ export async function GET(
       discountPercent: loyaltyDiscount.discountPercent,
       loyaltyTierName: loyaltyDiscount.tierName,
       totalBeforeDelivery: loyaltyDiscount.total,
+      dailyNumber: order?.daily_number ?? null,
       tableNumber: table?.number ?? null,
       serviceType: order?.service_type ?? 'dine_in',
     });

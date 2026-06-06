@@ -14,6 +14,7 @@ interface FacturaFinalProps {
     isOpen: boolean;
     onClose: () => void;
     orderId: string;
+    dailyNumber?: number | null;
     tableNumber: number | null;
     items: OrderItem[];
     iva: number;
@@ -58,6 +59,7 @@ export function FacturaFinal({
     isOpen,
     onClose,
     orderId,
+    dailyNumber,
     tableNumber,
     items,
     total,
@@ -126,7 +128,7 @@ export function FacturaFinal({
                     </div>
 
                     <div style={{ borderTop: `1px solid var(--border)`, borderBottom: `1px solid var(--border)`, padding: "0.5rem 0", marginBottom: "1rem" }}>
-                        <p style={{ margin: 0, fontSize: "0.75rem" }}><strong>{formatOrderLabel(orderId)}</strong></p>
+                        <p style={{ margin: 0, fontSize: "0.75rem" }}><strong>{formatOrderLabel(orderId, dailyNumber)}</strong></p>
                         <p style={{ margin: 0, fontSize: "0.75rem" }}><strong>Mesa:</strong> {tableNumber ?? 'No disponible'}</p>
                         <p style={{ margin: 0, fontSize: "0.75rem" }}><strong>Fecha:</strong> {formatDate(paymentDate)}</p>
                         <p style={{ margin: 0, fontSize: "0.75rem" }}>

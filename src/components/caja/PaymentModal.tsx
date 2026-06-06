@@ -27,6 +27,7 @@ type PaymentReceipt = {
     discountAmount: number;
     discountPercent: number;
     loyaltyTierName: string | null;
+    dailyNumber: number | null;
     cashReceived: number;
     change: number;
     paymentDate: Date;
@@ -141,6 +142,7 @@ function OrderSummary({
 }) {
     const [items, setItems] = useState<OrderItemType[]>([]);
     const [total, setTotal] = useState(0);
+    const [dailyNumber, setDailyNumber] = useState<number | null>(null);
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
@@ -151,6 +153,7 @@ function OrderSummary({
                 if (data.items) {
                     setItems(data.items);
                     setTotal(data.total || 0);
+                    setDailyNumber(data.dailyNumber ?? null);
                 }
             } catch (error) {
                 console.error('Error:', error);
@@ -167,7 +170,7 @@ function OrderSummary({
         <div style={{ marginBottom: "1rem", padding: "0.75rem", backgroundColor: "var(--muted)", borderRadius: "var(--radius-md)" }}>
             {orderId && (
                 <p style={{ margin: "0 0 0.5rem", fontSize: "0.875rem", fontWeight: "bold" }}>
-                    {formatOrderLabel(orderId)}
+                    {formatOrderLabel(orderId, dailyNumber)}
                 </p>
             )}
             <h3 style={{ margin: "0 0 0.5rem", fontSize: "0.875rem", fontWeight: "bold" }}>Productos</h3>
@@ -400,30 +403,8 @@ export function PaymentModal({ isOpen, onClose, orderId, tableId, tableNumber, t
             const paymentData = await res.json();
 
             if (res.ok) {
-                // 2. Cargar los items de la orden para la factura
-                const orderRes = await fetch(`/api/orders/preinvoice/order/${orderId}`);
-                const orderData = await orderRes.json();
-                setOrderItems(orderData.items || []);
-                setOrderIva(0);
-
-                const paidTotal = Number(paymentData.amount ?? payableTotal);
-                const subtotal = Number(paymentData.subtotal ?? paidTotal);
-                const discountAmount = Number(paymentData.discount_amount ?? 0);
-                const discountPercent = Number(paymentData.discount_percent ?? 0);
-                
-                // 3. Mostrar comprobante hasta que el cajero cierre.
-                setReceipt({
-                    total: paidTotal,
-                    subtotal,
-                    discountAmount,
-                    discountPercent,
-                    loyaltyTierName: paymentData.loyalty_tier_name ?? null,
-                    cashReceived,
-                    change: cashReceived - paidTotal,
-                    paymentDate: new Date(),
-                });
-                setShowFactura(true);
                 onSuccess();
+                onClose();
             } else {
                 setNotice({ type: 'error', message: paymentData.error || 'Error al procesar pago' });
             }
@@ -438,6 +419,7 @@ export function PaymentModal({ isOpen, onClose, orderId, tableId, tableNumber, t
     const closeReceipt = () => {
         setShowFactura(false);
         setReceipt(null);
+        onSuccess();
         onClose();
     };
 
@@ -447,6 +429,7 @@ export function PaymentModal({ isOpen, onClose, orderId, tableId, tableNumber, t
                 isOpen
                 onClose={closeReceipt}
                 orderId={orderId}
+                dailyNumber={receipt.dailyNumber}
                 tableNumber={tableNumber}
                 items={orderItems}
                 iva={orderIva}

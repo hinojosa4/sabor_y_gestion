@@ -243,6 +243,7 @@ export default function PagoQRPage() {
     });
     const [previewLoading, setPreviewLoading] = useState(false);
     const [tableNumber, setTableNumber] = useState<number | null>(null);
+    const [dailyNumber, setDailyNumber] = useState<number | null>(null);
     const [serviceType, setServiceType] = useState<string>('dine_in');
     const [step, setStep]             = useState<1 | 2>(1);
 
@@ -280,6 +281,7 @@ export default function PagoQRPage() {
                         total: data.total || 0,
                     });
                     setTableNumber(data.tableNumber ?? null);
+                    setDailyNumber(data.dailyNumber ?? null);
                 } else {
                     setError('Orden no encontrada');
                 }
@@ -424,7 +426,7 @@ export default function PagoQRPage() {
                     {/* Resumen — siempre visible */}
                     <div style={{ padding: "1rem", backgroundColor: "var(--muted)", borderRadius: "var(--radius-md)" }}>
                         <p style={{ margin: "0 0 0.5rem", fontSize: "0.875rem", fontWeight: "bold" }}>
-                            {formatOrderLabel(orderId)}
+                            {formatOrderLabel(orderId, dailyNumber)}
                         </p>
                         <h3 style={{ margin: "0 0 0.5rem", fontSize: "1rem" }}>Resumen de tu pedido</h3>
                         {items.map((item, idx) => (
@@ -513,6 +515,7 @@ export default function PagoQRPage() {
                     isOpen={showFactura}
                     onClose={() => { setShowFactura(false); router.push('/'); }}
                     orderId={paymentData.orderId}
+                    dailyNumber={dailyNumber}
                     tableNumber={tableNumber}
                     items={paymentData.items}
                     iva={paymentData.iva}
