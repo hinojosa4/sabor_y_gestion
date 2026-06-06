@@ -72,6 +72,83 @@ const errorStyle: React.CSSProperties = {
     textAlign: "center",
 };
 
+const discountPreviewStyle: React.CSSProperties = {
+    display: "grid",
+    marginTop: "0.65rem",
+    border: "1px solid #e5e7eb",
+    borderRadius: "var(--radius-md)",
+    background: "#fff",
+    fontSize: "0.82rem",
+    overflow: "hidden",
+    boxShadow: "0 1px 2px rgba(15, 23, 42, 0.04)",
+};
+
+const discountTitleStyle: React.CSSProperties = {
+    display: "flex",
+    justifyContent: "space-between",
+    alignItems: "center",
+    gap: "0.75rem",
+    padding: "0.6rem 0.75rem",
+    background: "#f8fafc",
+    borderBottom: "1px solid #e5e7eb",
+};
+
+const discountTitleMetaStyle: React.CSSProperties = {
+    color: "var(--muted-foreground)",
+    fontSize: "0.72rem",
+    textAlign: "right",
+};
+
+const discountBodyStyle: React.CSSProperties = {
+    display: "grid",
+    gap: "0.55rem",
+    padding: "0.7rem 0.75rem",
+};
+
+const discountHeaderStyle: React.CSSProperties = {
+    display: "flex",
+    justifyContent: "space-between",
+    alignItems: "center",
+    gap: "0.75rem",
+};
+
+const discountRowStyle: React.CSSProperties = {
+    display: "flex",
+    justifyContent: "space-between",
+    alignItems: "flex-start",
+    gap: "0.75rem",
+    color: "#555",
+};
+
+const discountLabelStyle: React.CSSProperties = {
+    display: "grid",
+    gap: "0.15rem",
+    minWidth: 0,
+};
+
+const discountMetaStyle: React.CSSProperties = {
+    color: "var(--muted-foreground)",
+    fontSize: "0.74rem",
+};
+
+const discountValueStyle: React.CSSProperties = {
+    color: "#c2410c",
+    textAlign: "right",
+    whiteSpace: "nowrap",
+};
+
+const discountTotalRowStyle: React.CSSProperties = {
+    display: "flex",
+    justifyContent: "space-between",
+    alignItems: "center",
+    gap: "0.75rem",
+    margin: "0.1rem -0.2rem -0.15rem",
+    padding: "0.5rem 0.2rem 0",
+    borderTop: "1px solid #e5e7eb",
+    color: "#065f46",
+    fontWeight: 800,
+};
+
 interface OrderItem {
     dish: { name: string; price: number };
     quantity: number;
@@ -83,6 +160,7 @@ type PaymentPreview = {
     discountAmount: number;
     discountPercent: number;
     loyaltyTierName: string | null;
+    deliveryFee: number;
     total: number;
 };
 
@@ -96,28 +174,47 @@ function DiscountPreview({
     formatCurrency: (amount: number) => string;
 }) {
     if (loading) {
-        return <p style={{ ...errorStyle, color: 'var(--muted-foreground)' }}>Calculando fidelizacion...</p>;
+        return <p style={{ margin: "0.65rem 0 0", fontSize: "0.78rem", color: 'var(--muted-foreground)', textAlign: "center" }}>Calculando fidelizacion...</p>;
     }
 
-    if (preview.discountAmount <= 0) return null;
+    if (preview.discountAmount <= 0 && preview.deliveryFee <= 0) return null;
 
     return (
-        <div style={{ display: "grid", gap: "0.45rem", margin: "-0.25rem 0 1rem", padding: "0.75rem", border: "1px solid #fed7aa", borderRadius: "var(--radius-md)", background: "#fff7ed", fontSize: "0.82rem" }}>
-            <div style={{ display: "flex", justifyContent: "space-between", gap: "0.75rem" }}>
-                <span>Subtotal</span>
-                <strong>{formatCurrency(preview.subtotal)}</strong>
-            </div>
-            <div style={{ display: "flex", justifyContent: "space-between", gap: "0.75rem", color: "#c2410c" }}>
-                <span>
-                    Descuento fidelizacion
-                    {preview.loyaltyTierName ? ` (${preview.loyaltyTierName})` : ''}
+        <div style={discountPreviewStyle}>
+            <div style={discountTitleStyle}>
+                <strong>Detalle de pago</strong>
+                <span style={discountTitleMetaStyle}>
+                    {preview.discountAmount > 0 ? "Fidelizacion aplicada" : "Resumen final"}
                 </span>
-                <strong>-{formatCurrency(preview.discountAmount)} ({preview.discountPercent}%)</strong>
             </div>
-            <div style={{ height: 1, background: "#fed7aa" }} />
-            <div style={{ display: "flex", justifyContent: "space-between", gap: "0.75rem", fontWeight: 800, color: "#1a1a1a" }}>
-                <span>Total con descuento</span>
-                <strong>{formatCurrency(preview.total)}</strong>
+            <div style={discountBodyStyle}>
+                <div style={discountHeaderStyle}>
+                    <span>Subtotal productos</span>
+                    <strong>{formatCurrency(preview.subtotal)}</strong>
+                </div>
+                {preview.discountAmount > 0 && (
+                    <div style={discountRowStyle}>
+                        <span style={discountLabelStyle}>
+                            <span>Descuento fidelizacion</span>
+                            {preview.loyaltyTierName && (
+                                <span style={discountMetaStyle}>{preview.loyaltyTierName}</span>
+                            )}
+                        </span>
+                        <strong style={discountValueStyle}>
+                            -{formatCurrency(preview.discountAmount)} ({preview.discountPercent}%)
+                        </strong>
+                    </div>
+                )}
+                {preview.deliveryFee > 0 && (
+                    <div style={discountRowStyle}>
+                        <span>Envio</span>
+                        <strong>{formatCurrency(preview.deliveryFee)}</strong>
+                    </div>
+                )}
+                <div style={discountTotalRowStyle}>
+                    <span>Total a pagar</span>
+                    <strong>{formatCurrency(preview.total)}</strong>
+                </div>
             </div>
         </div>
     );
@@ -141,6 +238,7 @@ export default function PagoQRPage() {
         discountAmount: 0,
         discountPercent: 0,
         loyaltyTierName: null,
+        deliveryFee: 0,
         total: 0,
     });
     const [previewLoading, setPreviewLoading] = useState(false);
@@ -154,6 +252,7 @@ export default function PagoQRPage() {
         iva: number; total: number; subtotal: number;
         discountAmount: number; discountPercent: number;
         loyaltyTierName: string | null;
+        deliveryFee: number;
         customerEmail: string; paymentDate: Date;
     } | null>(null);
 
@@ -174,9 +273,10 @@ export default function PagoQRPage() {
                     setTotal(data.total || 0);
                     setPreview({
                         subtotal: data.subtotal || data.total || 0,
-                        discountAmount: 0,
-                        discountPercent: 0,
-                        loyaltyTierName: null,
+                        discountAmount: Number(data.discountAmount ?? 0),
+                        discountPercent: Number(data.discountPercent ?? 0),
+                        loyaltyTierName: data.loyaltyTierName ?? null,
+                        deliveryFee: Number(data.deliveryFee ?? 0),
                         total: data.total || 0,
                     });
                     setTableNumber(data.tableNumber ?? null);
@@ -210,6 +310,7 @@ export default function PagoQRPage() {
                     discountAmount: 0,
                     discountPercent: 0,
                     loyaltyTierName: null,
+                    deliveryFee: 0,
                     total,
                 });
                 return;
@@ -231,6 +332,7 @@ export default function PagoQRPage() {
                     discountAmount: Number(data.discountAmount ?? 0),
                     discountPercent: Number(data.discountPercent ?? 0),
                     loyaltyTierName: data.loyaltyTierName ?? null,
+                    deliveryFee: Number(data.deliveryFee ?? 0),
                     total: Number(data.total ?? total),
                 });
             } catch (err) {
@@ -241,6 +343,7 @@ export default function PagoQRPage() {
                     discountAmount: 0,
                     discountPercent: 0,
                     loyaltyTierName: null,
+                    deliveryFee: 0,
                     total,
                 });
             } finally {
@@ -278,6 +381,7 @@ export default function PagoQRPage() {
                     discountAmount: Number(data.discountAmount ?? 0),
                     discountPercent: Number(data.discountPercent ?? 0),
                     loyaltyTierName: data.loyaltyTierName ?? null,
+                    deliveryFee: Number(data.deliveryFee ?? 0),
                     customerEmail: email,
                     paymentDate: new Date(),
                 });
@@ -329,9 +433,19 @@ export default function PagoQRPage() {
                                 <span>{formatCurrency(item.subtotal)}</span>
                             </div>
                         ))}
-                        <div style={{ borderTop: "1px solid var(--border)", marginTop: "0.5rem", paddingTop: "0.5rem", display: "flex", justifyContent: "space-between", fontWeight: "bold" }}>
-                            <span>Total</span>
-                            <span>{formatCurrency(preview.total || total)}</span>
+                        <div style={{ borderTop: "1px solid var(--border)", marginTop: "0.5rem", paddingTop: "0.5rem" }}>
+                            {preview.discountAmount > 0 || preview.deliveryFee > 0 || previewLoading ? (
+                                <DiscountPreview
+                                    preview={preview}
+                                    loading={previewLoading}
+                                    formatCurrency={formatCurrency}
+                                />
+                            ) : (
+                                <div style={{ display: "flex", justifyContent: "space-between", fontWeight: "bold" }}>
+                                    <span>Total</span>
+                                    <span>{formatCurrency(total)}</span>
+                                </div>
+                            )}
                         </div>
                     </div>
 
@@ -365,7 +479,6 @@ export default function PagoQRPage() {
                             <p style={totalStyle}>Total a pagar: {formatCurrency(preview.total || total)}</p>
                             <form onSubmit={handleSubmit}>
                                 <input type="email" placeholder="Correo electrónico *" value={email} onChange={(e) => setEmail(e.target.value)} style={inputStyle} required />
-                                <DiscountPreview preview={preview} loading={previewLoading} formatCurrency={formatCurrency} />
                                 {emailError && <p style={errorStyle}>{emailError}</p>}
                                 <button type="submit" disabled={submitting} style={submitting ? buttonDisabledStyle : buttonStyle}>
                                     {submitting ? 'Procesando...' : 'Confirmar Pago'}
@@ -384,7 +497,6 @@ export default function PagoQRPage() {
                             <p style={totalStyle}>Total a pagar: {formatCurrency(preview.total || total)}</p>
                             <form onSubmit={handleSubmit}>
                                 <input type="email" placeholder="Correo electrónico *" value={email} onChange={(e) => setEmail(e.target.value)} style={inputStyle} required />
-                                <DiscountPreview preview={preview} loading={previewLoading} formatCurrency={formatCurrency} />
                                 {emailError && <p style={errorStyle}>{emailError}</p>}
                                 <button type="submit" disabled={submitting} style={submitting ? buttonDisabledStyle : buttonStyle}>
                                     {submitting ? 'Procesando...' : 'Confirmar Pago'}
@@ -409,6 +521,7 @@ export default function PagoQRPage() {
                     discountAmount={paymentData.discountAmount}
                     discountPercent={paymentData.discountPercent}
                     loyaltyTierName={paymentData.loyaltyTierName}
+                    deliveryFee={paymentData.deliveryFee}
                     paymentMethod="qr"
                     customerEmail={paymentData.customerEmail}
                     paymentDate={paymentData.paymentDate}

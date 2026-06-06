@@ -66,25 +66,50 @@ const modalStyle: React.CSSProperties = {
 
 const discountPreviewStyle: React.CSSProperties = {
     display: "grid",
-    gap: "0.45rem",
-    margin: "-0.35rem 0 1rem",
-    padding: "0.75rem",
-    border: "1px solid #fed7aa",
+    gap: "0.5rem",
+    marginTop: "0.65rem",
+    padding: "0.65rem 0.75rem",
+    border: "1px solid var(--border)",
     borderRadius: "var(--radius-md)",
-    background: "#fff7ed",
+    background: "var(--card)",
     fontSize: "0.82rem",
+};
+
+const discountHeaderStyle: React.CSSProperties = {
+    display: "flex",
+    justifyContent: "space-between",
+    alignItems: "center",
+    gap: "0.75rem",
 };
 
 const discountRowStyle: React.CSSProperties = {
     display: "flex",
     justifyContent: "space-between",
+    alignItems: "flex-start",
     gap: "0.75rem",
     color: "#555",
 };
 
+const discountLabelStyle: React.CSSProperties = {
+    display: "grid",
+    gap: "0.15rem",
+    minWidth: 0,
+};
+
+const discountMetaStyle: React.CSSProperties = {
+    color: "var(--muted-foreground)",
+    fontSize: "0.74rem",
+};
+
+const discountValueStyle: React.CSSProperties = {
+    color: "#c2410c",
+    textAlign: "right",
+    whiteSpace: "nowrap",
+};
+
 const discountDividerStyle: React.CSSProperties = {
     height: 1,
-    background: "#fed7aa",
+    background: "var(--border)",
 };
 
 const discountTotalRowStyle: React.CSSProperties = {
@@ -96,14 +121,24 @@ const discountTotalRowStyle: React.CSSProperties = {
 };
 
 const discountHintStyle: React.CSSProperties = {
-    margin: "-0.35rem 0 1rem",
+    margin: "0.65rem 0 0",
     fontSize: "0.78rem",
     color: "var(--muted-foreground)",
     textAlign: "center",
 };
 
 // Componente para resumen de la orden
-function OrderSummary({ orderId }: { orderId: string }) {
+function OrderSummary({
+    orderId,
+    preview,
+    previewLoading,
+    formatCurrency,
+}: {
+    orderId: string;
+    preview: PaymentPreview;
+    previewLoading: boolean;
+    formatCurrency: (amount: number) => string;
+}) {
     const [items, setItems] = useState<OrderItemType[]>([]);
     const [total, setTotal] = useState(0);
     const [loading, setLoading] = useState(true);
@@ -126,17 +161,10 @@ function OrderSummary({ orderId }: { orderId: string }) {
         if (orderId) fetchOrder();
     }, [orderId]);
 
-    const formatCurrency = (amount: number) => {
-        return new Intl.NumberFormat('es-BO', {
-            style: 'currency',
-            currency: 'BOB'
-        }).format(amount);
-    };
-
     if (loading) return <p>Cargando productos...</p>;
 
     return (
-        <div style={{ marginBottom: "1rem", padding: "0.5rem", backgroundColor: "var(--muted)", borderRadius: "var(--radius-md)" }}>
+        <div style={{ marginBottom: "1rem", padding: "0.75rem", backgroundColor: "var(--muted)", borderRadius: "var(--radius-md)" }}>
             {orderId && (
                 <p style={{ margin: "0 0 0.5rem", fontSize: "0.875rem", fontWeight: "bold" }}>
                     {formatOrderLabel(orderId)}
@@ -150,10 +178,21 @@ function OrderSummary({ orderId }: { orderId: string }) {
                 </div>
             ))}
             <div style={{ borderTop: `1px solid var(--border)`, marginTop: "0.5rem", paddingTop: "0.5rem" }}>
-                <div style={{ display: "flex", justifyContent: "space-between", fontWeight: "bold" }}>
-                    <span>Total</span>
-                    <span>{formatCurrency(total)}</span>
-                </div>
+                {preview.discountAmount > 0 ? (
+                    <PaymentDiscountPreview
+                        preview={preview}
+                        loading={previewLoading}
+                        formatCurrency={formatCurrency}
+                    />
+                ) : (
+                    <>
+                        <div style={{ display: "flex", justifyContent: "space-between", fontWeight: "bold" }}>
+                            <span>Total</span>
+                            <span>{formatCurrency(total)}</span>
+                        </div>
+                        {previewLoading && <p style={discountHintStyle}>Calculando fidelizacion...</p>}
+                    </>
+                )}
             </div>
         </div>
     );
@@ -180,16 +219,18 @@ function PaymentDiscountPreview({
 
     return (
         <div style={discountPreviewStyle}>
-            <div style={discountRowStyle}>
+            <div style={discountHeaderStyle}>
                 <span>Subtotal</span>
                 <strong>{formatCurrency(preview.subtotal)}</strong>
             </div>
             <div style={discountRowStyle}>
-                <span>
-                    Descuento fidelizacion
-                    {preview.loyaltyTierName ? ` (${preview.loyaltyTierName})` : ''}
+                <span style={discountLabelStyle}>
+                    <span>Descuento fidelizacion</span>
+                    {preview.loyaltyTierName && (
+                        <span style={discountMetaStyle}>{preview.loyaltyTierName}</span>
+                    )}
                 </span>
-                <strong style={{ color: '#c2410c' }}>
+                <strong style={discountValueStyle}>
                     -{formatCurrency(preview.discountAmount)} ({preview.discountPercent}%)
                 </strong>
             </div>
@@ -448,18 +489,17 @@ export function PaymentModal({ isOpen, onClose, orderId, tableId, tableNumber, t
                     )}
 
                     {/* Mejora 1: Resumen de la orden */}
-                    <OrderSummary orderId={orderId} />
+                    <OrderSummary
+                        orderId={orderId}
+                        preview={preview}
+                        previewLoading={previewLoading}
+                        formatCurrency={formatCurrency}
+                    />
 
                     {/* Total a pagar */}
                     <p style={{ fontSize: "1.5rem", fontWeight: "bold", textAlign: "center", marginBottom: "1rem" }}>
                         Total: {formatCurrency(payableTotal)}
                     </p>
-
-                    <PaymentDiscountPreview
-                        preview={preview}
-                        loading={previewLoading}
-                        formatCurrency={formatCurrency}
-                    />
 
                     {/* Monto recibido */}
                     <div style={{ marginBottom: "1rem" }}>

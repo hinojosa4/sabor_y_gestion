@@ -97,8 +97,10 @@ export async function POST(req: NextRequest) {
     });
 
     const iva = 0;
-    const loyaltyDiscount = await calculateLoyaltyDiscount(customer?._id?.toString(), subtotal);
-    const total = loyaltyDiscount.total;
+    const orderCustomerId = order.customer_id ? order.customer_id.toString() : null;
+    const loyaltyDiscount = await calculateLoyaltyDiscount(customer?._id?.toString() ?? orderCustomerId, subtotal);
+    const deliveryFee = Number(order.delivery_fee ?? 0);
+    const total = loyaltyDiscount.total + deliveryFee;
     const totalAmount = total;
 
     const payment = await Payment.create({
@@ -184,6 +186,7 @@ export async function POST(req: NextRequest) {
       subtotal,
       iva,
       total,
+      deliveryFee,
       discountAmount: loyaltyDiscount.discountAmount,
       discountPercent: loyaltyDiscount.discountPercent,
       loyaltyTierName: loyaltyDiscount.tierName,

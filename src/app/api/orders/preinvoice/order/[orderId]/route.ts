@@ -4,6 +4,7 @@ import { connectDB } from '@/lib/db';
 import Order from '@/models/Order';
 import OrderItem from '@/models/OrderItem';
 import Table from '@/models/Table';
+import { calculateLoyaltyDiscount } from '@/lib/customerLoyalty';
 import '@/models/Dish';
 
 type LeanOrderItem = {
@@ -32,6 +33,10 @@ export async function GET(
 
     const order = await Order.findById(orderId).lean<{
       table_id?: string;
+      customer_id?: { toString(): string } | string | null;
+      delivery_fee?: number;
+      service_type?: string;
+      total_amount?: number;
     } | null>();
 
     const table = order?.table_id
@@ -68,15 +73,23 @@ export async function GET(
     });
 
     const iva = 0;
-    const total = subtotal;
+    const deliveryFee = Number(order?.delivery_fee ?? 0);
+    const customerId = order?.customer_id ? String(order.customer_id) : null;
+    const loyaltyDiscount = await calculateLoyaltyDiscount(customerId, subtotal);
+    const total = Number(order?.total_amount ?? loyaltyDiscount.total + deliveryFee);
 
     return NextResponse.json({
       items: formattedItems,
       subtotal,
       iva,
       total,
+      deliveryFee,
+      discountAmount: loyaltyDiscount.discountAmount,
+      discountPercent: loyaltyDiscount.discountPercent,
+      loyaltyTierName: loyaltyDiscount.tierName,
+      totalBeforeDelivery: loyaltyDiscount.total,
       tableNumber: table?.number ?? null,
-      serviceType: (order as { service_type?: string })?.service_type ?? 'dine_in',
+      serviceType: order?.service_type ?? 'dine_in',
     });
   } catch (error) {
     console.error('[OrderSummary] Error:', error);

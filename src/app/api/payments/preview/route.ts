@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { connectDB } from "@/lib/db";
+import Order from "@/models/Order";
 import OrderItem from "@/models/OrderItem";
 import { findRegisteredCustomerByEmail } from "@/lib/customerLookup";
 import { calculateLoyaltyDiscount } from "@/lib/customerLoyalty";
@@ -20,7 +21,17 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Orden requerida" }, { status: 400 });
     }
 
-    const items = await OrderItem.find({ order_id: orderId }).lean<LeanOrderItem[]>();
+    const [order, items] = await Promise.all([
+      Order.findById(orderId).select("customer_id delivery_fee").lean<{
+        customer_id?: { toString(): string } | string | null;
+        delivery_fee?: number;
+      } | null>(),
+      OrderItem.find({ order_id: orderId }).lean<LeanOrderItem[]>(),
+    ]);
+
+    if (!order) {
+      return NextResponse.json({ error: "Orden no encontrada" }, { status: 404 });
+    }
 
     if (!items.length) {
       return NextResponse.json({ error: "La orden no tiene productos" }, { status: 400 });
@@ -33,7 +44,10 @@ export async function POST(req: NextRequest) {
     }, 0);
 
     const { email: normalizedEmail, customer } = await findRegisteredCustomerByEmail(email);
-    const discount = await calculateLoyaltyDiscount(customer?._id?.toString(), subtotal);
+    const orderCustomerId = order.customer_id ? String(order.customer_id) : null;
+    const discount = await calculateLoyaltyDiscount(customer?._id?.toString() ?? orderCustomerId, subtotal);
+    const deliveryFee = Number(order.delivery_fee ?? 0);
+    const total = discount.total + deliveryFee;
 
     return NextResponse.json({
       ok: true,
@@ -41,7 +55,9 @@ export async function POST(req: NextRequest) {
       discountAmount: discount.discountAmount,
       discountPercent: discount.discountPercent,
       loyaltyTierName: discount.tierName,
-      total: discount.total,
+      total,
+      totalBeforeDelivery: discount.total,
+      deliveryFee,
       customer: customer
         ? {
             id: customer._id.toString(),

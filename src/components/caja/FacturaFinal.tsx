@@ -22,6 +22,7 @@ interface FacturaFinalProps {
     discountAmount?: number;
     discountPercent?: number;
     loyaltyTierName?: string | null;
+    deliveryFee?: number;
     paymentMethod: 'cash' | 'qr';
     cashReceived?: number;
     change?: number;
@@ -64,6 +65,7 @@ export function FacturaFinal({
     discountAmount = 0,
     discountPercent = 0,
     loyaltyTierName,
+    deliveryFee = 0,
     paymentMethod,
     cashReceived,
     change,
@@ -166,6 +168,9 @@ export function FacturaFinal({
                                     Descuento fidelizacion{loyaltyTierName ? ` (${loyaltyTierName})` : ''}: -{formatCurrency(discountAmount)} ({discountPercent}%)
                                 </p>
                             </>
+                        )}
+                        {deliveryFee > 0 && (
+                            <p style={{ margin: discountAmount > 0 ? 0 : "0.5rem 0 0", fontSize: "0.75rem" }}>Envio: {formatCurrency(deliveryFee)}</p>
                         )}
                         <p style={{ margin: "0.5rem 0 0", fontWeight: "bold" }}>Total: {formatCurrency(total)}</p>
 

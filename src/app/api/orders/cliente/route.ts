@@ -6,6 +6,7 @@ import OrderItem from "@/models/OrderItem";
 import { verifyToken } from "@/lib/jwt";
 import { pusherServer } from "@/lib/pusher";
 import { haversineKm, calcDeliveryFee, DELIVERY_CONFIG } from "@/lib/deliveryConfig";
+import { calculateLoyaltyDiscount } from "@/lib/customerLoyalty";
 
 export async function POST(req: NextRequest) {
   try {
@@ -113,8 +114,10 @@ export async function POST(req: NextRequest) {
       0
     );
 
-    // total_amount incluye el costo de envío
-    const total_amount = items_total + delivery_fee;
+    const loyaltyDiscount = await calculateLoyaltyDiscount(userId, items_total);
+
+    // El descuento aplica sobre productos; el envio se suma despues.
+    const total_amount = loyaltyDiscount.total + delivery_fee;
 
     // ── Crear orden ───────────────────────────────────────────────────────────
     const order = await Order.create({
@@ -124,6 +127,7 @@ export async function POST(req: NextRequest) {
       service_type,
       status: "pending",
       total_amount,
+      customer_id: userId,
       delivery_fee,
       delivery_distance_km,
       payment_method: payment_method ?? "Efectivo",
@@ -164,7 +168,21 @@ export async function POST(req: NextRequest) {
     }
 
     return NextResponse.json(
-      { ok: true, message: "Orden creada", data: { order, items: orderItems } },
+      {
+        ok: true,
+        message: "Orden creada",
+        data: {
+          order,
+          items: orderItems,
+          subtotal: loyaltyDiscount.subtotal,
+          discountAmount: loyaltyDiscount.discountAmount,
+          discountPercent: loyaltyDiscount.discountPercent,
+          loyaltyTierName: loyaltyDiscount.tierName,
+          totalBeforeDelivery: loyaltyDiscount.total,
+          deliveryFee: delivery_fee,
+          total: total_amount,
+        },
+      },
       { status: 201 }
     );
   } catch (error) {

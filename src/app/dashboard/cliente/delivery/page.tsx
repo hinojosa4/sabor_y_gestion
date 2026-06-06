@@ -33,6 +33,11 @@ interface ApiDish {
 type PaymentMethod = "Efectivo" | "QR / Transferencia";
 const PAYMENT_METHODS: PaymentMethod[] = ["Efectivo", "QR / Transferencia"];
 
+type DeliveryLoyalty = {
+  tier: { name: string };
+  discountPercent: number;
+};
+
 // Estado del proceso de geolocalización
 type GeoStatus =
   | "idle"          // sin iniciar
@@ -67,12 +72,17 @@ export default function DeliveryPage() {
     orderId: string;
     items: { dish: { name: string; price: number }; quantity: number; subtotal: number }[];
     total: number;
+    subtotal: number;
+    discountAmount: number;
+    discountPercent: number;
+    loyaltyTierName: string | null;
     deliveryFeeAmount: number;
   } | null>(null);
   const [categories, setCategories]   = useState<ApiCategory[]>([]);
   const [apiDishes, setApiDishes]     = useState<ApiDish[]>([]);
   const [loadingData, setLoadingData] = useState(true);
   const [loadError, setLoadError]     = useState<string | null>(null);
+  const [loyalty, setLoyalty]         = useState<DeliveryLoyalty | null>(null);
 
   const [selectedCategory, setSelectedCategory] = useState("Todos");
   const [cart, setCart]         = useState<CartItem[]>([]);
@@ -114,6 +124,29 @@ export default function DeliveryPage() {
   }, []);
 
   useEffect(() => { if (!authLoading) loadData(); }, [authLoading, loadData]);
+
+  useEffect(() => {
+    if (authLoading) return;
+
+    const token = localStorage.getItem("token");
+    if (!token) return;
+
+    let cancelled = false;
+    fetch("/api/customers/me/loyalty", {
+      headers: { Authorization: `Bearer ${token}` },
+    })
+      .then((res) => res.json())
+      .then((json) => {
+        if (!cancelled && json.ok) setLoyalty(json.data);
+      })
+      .catch(() => {
+        if (!cancelled) setLoyalty(null);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [authLoading]);
 
   // ── Geolocalización ───────────────────────────────────────────────────────
   const requestGeolocation = useCallback(() => {
@@ -270,6 +303,9 @@ export default function DeliveryPage() {
   );
 
   const cartSubtotal = cart.reduce((s, it) => s + it.dish.price * it.quantity, 0);
+  const loyaltyDiscountPercent = loyalty?.discountPercent ?? 0;
+  const loyaltyDiscountAmount = Math.round(cartSubtotal * (loyaltyDiscountPercent / 100) * 100) / 100;
+  const cartSubtotalAfterDiscount = Math.max(0, cartSubtotal - loyaltyDiscountAmount);
 
   // ── Carrito ────────────────────────────────────────────────────────────────
   const handleAdd = (dish: Dish) =>
@@ -341,8 +377,12 @@ export default function DeliveryPage() {
             quantity: it.quantity,
             subtotal: it.dish.price * it.quantity,
           })),
-          total: cartSnapshot.reduce((s, it) => s + it.dish.price * it.quantity, 0),
-          deliveryFeeAmount: deliveryFee ?? 0,
+          total: Number(json.data.total ?? totalConEnvio),
+          subtotal: Number(json.data.subtotal ?? cartSubtotal),
+          discountAmount: Number(json.data.discountAmount ?? loyaltyDiscountAmount),
+          discountPercent: Number(json.data.discountPercent ?? loyaltyDiscountPercent),
+          loyaltyTierName: json.data.loyaltyTierName ?? loyalty?.tier.name ?? null,
+          deliveryFeeAmount: Number(json.data.deliveryFee ?? deliveryFee ?? 0),
         });
         setShowFactura(true);
         setToastMsg("✅ ¡Pedido enviado! El repartidor cobrará al entregar.");
@@ -366,8 +406,8 @@ export default function DeliveryPage() {
 
   const totalConEnvio =
     typeof deliveryFee === "number"
-      ? cartSubtotal + deliveryFee
-      : cartSubtotal;
+      ? cartSubtotalAfterDiscount + deliveryFee
+      : cartSubtotalAfterDiscount;
 
   if (authLoading) return <main style={s.main}><div style={s.centered}>Verificando sesión…</div></main>;
 
@@ -409,6 +449,8 @@ export default function DeliveryPage() {
           <OrderCart
             items={cart}
             shippingFee={deliveryFee}
+            discountAmount={loyaltyDiscountAmount}
+            discountPercent={loyaltyDiscountPercent}
             distanceKm={distanceKm}
             onIncrement={handleIncrement}
             onDecrement={handleDecrement}
@@ -427,7 +469,7 @@ export default function DeliveryPage() {
             {/* Resumen de productos */}
             <div style={s.summaryBox}>
               <span style={s.summaryText}>{cart.length} producto{cart.length !== 1 ? "s" : ""}</span>
-              <span style={s.summaryTotal}>Bs. {cartSubtotal.toFixed(2)}</span>
+              <span style={s.summaryTotal}>Bs. {cartSubtotalAfterDiscount.toFixed(2)}</span>
             </div>
 
             {/* ── Mapa + geolocalización ─────────────────────────────── */}
@@ -562,6 +604,12 @@ export default function DeliveryPage() {
                   <span style={s.finalLabel}>Subtotal</span>
                   <span style={s.finalValue}>Bs. {cartSubtotal.toFixed(2)}</span>
                 </div>
+                {loyaltyDiscountAmount > 0 && (
+                  <div style={s.finalRow}>
+                    <span style={s.finalLabel}>Descuento fidelizacion ({loyaltyDiscountPercent}%)</span>
+                    <span style={{ ...s.finalValue, color: "#c2410c" }}>-Bs. {loyaltyDiscountAmount.toFixed(2)}</span>
+                  </div>
+                )}
                 <div style={s.finalRow}>
                   <span style={s.finalLabel}>Envío ({distanceKm?.toFixed(2)} km)</span>
                   <span style={s.finalValue}>Bs. {deliveryFee.toFixed(2)}</span>
@@ -606,7 +654,12 @@ export default function DeliveryPage() {
                   tableNumber={null}
                   items={facturaData.items}
                   iva={0}
-                  total={facturaData.total + facturaData.deliveryFeeAmount}
+                  total={facturaData.total}
+                  subtotal={facturaData.subtotal}
+                  discountAmount={facturaData.discountAmount}
+                  discountPercent={facturaData.discountPercent}
+                  loyaltyTierName={facturaData.loyaltyTierName}
+                  deliveryFee={facturaData.deliveryFeeAmount}
                   paymentMethod="cash"
                   paymentDate={new Date()}
                 />
