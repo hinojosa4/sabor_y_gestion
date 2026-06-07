@@ -14,10 +14,16 @@ interface FacturaFinalProps {
     isOpen: boolean;
     onClose: () => void;
     orderId: string;
+    dailyNumber?: number | null;
     tableNumber: number | null;
     items: OrderItem[];
     iva: number;
     total: number;
+    subtotal?: number;
+    discountAmount?: number;
+    discountPercent?: number;
+    loyaltyTierName?: string | null;
+    deliveryFee?: number;
     paymentMethod: 'cash' | 'qr';
     cashReceived?: number;
     change?: number;
@@ -53,9 +59,15 @@ export function FacturaFinal({
     isOpen,
     onClose,
     orderId,
+    dailyNumber,
     tableNumber,
     items,
     total,
+    subtotal,
+    discountAmount = 0,
+    discountPercent = 0,
+    loyaltyTierName,
+    deliveryFee = 0,
     paymentMethod,
     cashReceived,
     change,
@@ -116,7 +128,7 @@ export function FacturaFinal({
                     </div>
 
                     <div style={{ borderTop: `1px solid var(--border)`, borderBottom: `1px solid var(--border)`, padding: "0.5rem 0", marginBottom: "1rem" }}>
-                        <p style={{ margin: 0, fontSize: "0.75rem" }}><strong>{formatOrderLabel(orderId)}</strong></p>
+                        <p style={{ margin: 0, fontSize: "0.75rem" }}><strong>{formatOrderLabel(orderId, dailyNumber)}</strong></p>
                         <p style={{ margin: 0, fontSize: "0.75rem" }}><strong>Mesa:</strong> {tableNumber ?? 'No disponible'}</p>
                         <p style={{ margin: 0, fontSize: "0.75rem" }}><strong>Fecha:</strong> {formatDate(paymentDate)}</p>
                         <p style={{ margin: 0, fontSize: "0.75rem" }}>
@@ -151,6 +163,17 @@ export function FacturaFinal({
                     </table>
 
                     <div style={{ textAlign: "right", marginBottom: "1rem" }}>
+                        {discountAmount > 0 && (
+                            <>
+                                <p style={{ margin: "0.5rem 0 0", fontSize: "0.75rem" }}>Subtotal: {formatCurrency(subtotal ?? total + discountAmount)}</p>
+                                <p style={{ margin: 0, fontSize: "0.75rem" }}>
+                                    Descuento fidelizacion{loyaltyTierName ? ` (${loyaltyTierName})` : ''}: -{formatCurrency(discountAmount)} ({discountPercent}%)
+                                </p>
+                            </>
+                        )}
+                        {deliveryFee > 0 && (
+                            <p style={{ margin: discountAmount > 0 ? 0 : "0.5rem 0 0", fontSize: "0.75rem" }}>Envio: {formatCurrency(deliveryFee)}</p>
+                        )}
                         <p style={{ margin: "0.5rem 0 0", fontWeight: "bold" }}>Total: {formatCurrency(total)}</p>
 
                         {paymentMethod === 'cash' && cashReceived !== undefined && (

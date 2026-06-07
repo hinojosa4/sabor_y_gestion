@@ -4,6 +4,10 @@ import mongoose, { Document, Schema, Types } from 'mongoose';
 export interface IPayment extends Document {
   order_id: string;
   amount: number;
+  subtotal?: number;
+  discount_percent?: number;
+  discount_amount?: number;
+  loyalty_tier_name?: string | null;
   method: 'cash' | 'card' | 'qr';
   status: 'pending' | 'completed';
   shiftName?: string;
@@ -18,6 +22,10 @@ export interface IPayment extends Document {
 const PaymentSchema = new Schema<IPayment>({
   order_id: { type: String, required: true },
   amount: { type: Number, required: true },
+  subtotal: { type: Number, default: 0 },
+  discount_percent: { type: Number, default: 0, min: 0, max: 100 },
+  discount_amount: { type: Number, default: 0, min: 0 },
+  loyalty_tier_name: { type: String, trim: true, default: null },
   method: { type: String, enum: ['cash', 'card', 'qr'], required: true },
   status: { type: String, enum: ['pending', 'completed'], default: 'pending' },
   shiftName: { type: String, default: null, index: true },

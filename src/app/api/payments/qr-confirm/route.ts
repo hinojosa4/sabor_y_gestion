@@ -10,6 +10,7 @@ import { sendPaymentEmail } from '@/lib/email';
 import { pusherServer } from '@/lib/pusher';
 import { findRegisteredCustomerByEmail } from '@/lib/customerLookup';
 import { getOpenOperationalCashShift } from '@/lib/cashRegister';
+import { calculateLoyaltyDiscount } from '@/lib/customerLoyalty';
 import '@/models/Dish';
 
 type LeanOrderItem = {
@@ -96,12 +97,19 @@ export async function POST(req: NextRequest) {
     });
 
     const iva = 0;
-    const total = subtotal;
+    const orderCustomerId = order.customer_id ? order.customer_id.toString() : null;
+    const loyaltyDiscount = await calculateLoyaltyDiscount(customer?._id?.toString() ?? orderCustomerId, subtotal);
+    const deliveryFee = Number(order.delivery_fee ?? 0);
+    const total = loyaltyDiscount.total + deliveryFee;
     const totalAmount = total;
 
     const payment = await Payment.create({
       order_id: orderId,
       amount: totalAmount,
+      subtotal: loyaltyDiscount.subtotal,
+      discount_percent: loyaltyDiscount.discountPercent,
+      discount_amount: loyaltyDiscount.discountAmount,
+      loyalty_tier_name: loyaltyDiscount.tierName,
       method: 'qr',
       status: 'completed',
       customer_id: customer?._id ?? null,
@@ -138,6 +146,9 @@ export async function POST(req: NextRequest) {
       orderId,
       method: 'qr',
       amount: totalAmount,
+      subtotal: loyaltyDiscount.subtotal,
+      discountPercent: loyaltyDiscount.discountPercent,
+      discountAmount: loyaltyDiscount.discountAmount,
       tableId: order.table_id,
       customer: customer
         ? {
@@ -163,6 +174,8 @@ export async function POST(req: NextRequest) {
       subtotal,
       iva,
       total,
+      discountAmount: loyaltyDiscount.discountAmount,
+      discountPercent: loyaltyDiscount.discountPercent,
     });
 
     return NextResponse.json({
@@ -173,6 +186,10 @@ export async function POST(req: NextRequest) {
       subtotal,
       iva,
       total,
+      deliveryFee,
+      discountAmount: loyaltyDiscount.discountAmount,
+      discountPercent: loyaltyDiscount.discountPercent,
+      loyaltyTierName: loyaltyDiscount.tierName,
     });
   } catch (error) {
     console.error('[QR Confirm] Error:', error);

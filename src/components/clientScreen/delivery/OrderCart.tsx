@@ -12,6 +12,8 @@ interface OrderCartProps {
   items: CartItem[];
   /** Costo de envío calculado (Bs.). undefined = aún no calculado, null = fuera de rango */
   shippingFee?: number | null;
+  discountAmount?: number;
+  discountPercent?: number;
   /** Distancia calculada en km */
   distanceKm?: number | null;
   onIncrement: (dishId: string) => void;
@@ -23,6 +25,8 @@ interface OrderCartProps {
 export function OrderCart({
   items,
   shippingFee,
+  discountAmount = 0,
+  discountPercent = 0,
   distanceKm,
   onIncrement,
   onDecrement,
@@ -31,10 +35,11 @@ export function OrderCart({
 }: OrderCartProps) {
   const totalCount = items.reduce((sum, it) => sum + it.quantity, 0);
   const subtotal   = items.reduce((sum, it) => sum + it.dish.price * it.quantity, 0);
+  const discountedSubtotal = Math.max(0, subtotal - discountAmount);
 
   const feeKnown    = typeof shippingFee === "number";
   const feeOutRange = shippingFee === null;
-  const total       = items.length === 0 ? 0 : subtotal + (feeKnown ? (shippingFee as number) : 0);
+  const total       = items.length === 0 ? 0 : discountedSubtotal + (feeKnown ? (shippingFee as number) : 0);
 
   return (
     <section style={styles.card}>
@@ -82,6 +87,13 @@ export function OrderCart({
               <span style={styles.summaryValue}>Bs. {subtotal.toFixed(2)}</span>
             </div>
 
+            {discountAmount > 0 && (
+              <div style={styles.summaryRow}>
+                <span style={styles.summaryLabel}>Descuento fidelizacion ({discountPercent}%):</span>
+                <span style={styles.discountValue}>-Bs. {discountAmount.toFixed(2)}</span>
+              </div>
+            )}
+
             {/* Envío */}
             <div style={styles.summaryRow}>
               <span style={styles.summaryLabel}>Envío:</span>
@@ -128,7 +140,7 @@ export function OrderCart({
                   ? "—"
                   : feeKnown
                   ? `Bs. ${total.toFixed(2)}`
-                  : `Bs. ${subtotal.toFixed(2)} + envío`}
+                  : `Bs. ${discountedSubtotal.toFixed(2)} + envío`}
               </span>
             </div>
           </div>
@@ -229,6 +241,7 @@ const styles: { [key: string]: React.CSSProperties } = {
   summaryRow: { display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: "0.875rem" },
   summaryLabel: { color: "#6b7280" },
   summaryValue: { color: "#111827", fontWeight: 600 },
+  discountValue: { color: "#c2410c", fontWeight: 700 },
   summaryValueError: { color: "#dc2626", fontWeight: 600 },
   shippingNote: {
     display: "inline-flex", alignItems: "center", gap: "0.3rem",

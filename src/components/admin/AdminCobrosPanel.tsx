@@ -20,7 +20,12 @@ type CobroItem = {
 type Cobro = {
   id: string;
   orderId: string;
+  dailyNumber: number | null;
   amount: number;
+  subtotal: number;
+  discountPercent: number;
+  discountAmount: number;
+  loyaltyTierName: string | null;
   method: PaymentMethod;
   methodLabel: string;
   paymentStatus: PaymentStatus;
@@ -47,6 +52,7 @@ type Summary = {
   qr: number;
   pending: number;
   count: number;
+  discounts: number;
 };
 
 type Pagination = {
@@ -128,7 +134,7 @@ function statusColor(status: string) {
 export function AdminCobrosPanel({ isMobile, compactHeader = false }: Props) {
   const today = useMemo(() => todayInputValue(), []);
   const [rows, setRows] = useState<Cobro[]>([]);
-  const [summary, setSummary] = useState<Summary>({ total: 0, cash: 0, qr: 0, pending: 0, count: 0 });
+  const [summary, setSummary] = useState<Summary>({ total: 0, cash: 0, qr: 0, pending: 0, count: 0, discounts: 0 });
   const [pagination, setPagination] = useState<Pagination>({ page: 1, pageSize: 10, totalRows: 0, totalPages: 1 });
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
@@ -175,12 +181,12 @@ export function AdminCobrosPanel({ isMobile, compactHeader = false }: Props) {
       const json = await res.json();
       if (!res.ok || !json.ok) throw new Error(json.error || "Error al cargar cobros");
       setRows(json.data ?? []);
-      setSummary(json.summary ?? { total: 0, cash: 0, qr: 0, pending: 0, count: 0 });
+      setSummary(json.summary ?? { total: 0, cash: 0, qr: 0, pending: 0, count: 0, discounts: 0 });
       setPagination(json.pagination ?? { page: 1, pageSize: 10, totalRows: 0, totalPages: 1 });
     } catch (error) {
       console.error("[AdminCobrosPanel]", error);
       setRows([]);
-      setSummary({ total: 0, cash: 0, qr: 0, pending: 0, count: 0 });
+      setSummary({ total: 0, cash: 0, qr: 0, pending: 0, count: 0, discounts: 0 });
       setPagination((current) => ({ ...current, totalRows: 0, totalPages: 1 }));
     } finally {
       setLoading(false);
@@ -314,7 +320,7 @@ export function AdminCobrosPanel({ isMobile, compactHeader = false }: Props) {
                 rows.map((row) => (
                   <tr key={row.id} style={{ borderBottom: "1px solid #f0f0f0" }}>
                     <td style={cellStyle}>
-                      <span style={{ fontWeight: 800, color: "#1a1a1a" }}>{formatOrderLabel(row.orderId)}</span>
+                      <span style={{ fontWeight: 800, color: "#1a1a1a" }}>{formatOrderLabel(row.orderId, row.dailyNumber)}</span>
                       {row.tableNumber && <p style={subCellStyle}>Mesa {row.tableNumber}</p>}
                     </td>
                     <td style={cellStyle}>
@@ -322,7 +328,9 @@ export function AdminCobrosPanel({ isMobile, compactHeader = false }: Props) {
                       <p style={subCellStyle}>{row.customer.email ?? "Sin correo"} · {customerTypeLabel[row.customer.type]}</p>
                     </td>
                     <td style={cellStyle}>{row.methodLabel}</td>
-                    <td style={{ ...cellStyle, fontWeight: 800 }}>{formatCurrency(row.amount)}</td>
+                    <td style={{ ...cellStyle, fontWeight: 800 }}>
+                      {formatCurrency(row.amount)}
+                    </td>
                     <td style={cellStyle}><StatusBadge label={paymentStatusLabel[row.paymentStatus] ?? row.paymentStatus} color={statusColor(row.paymentStatus)} /></td>
                     <td style={cellStyle}><StatusBadge label={orderStatusLabel[row.orderStatus] ?? row.orderStatus} color={statusColor(row.orderStatus)} /></td>
                     <td style={cellStyle}>{formatRowDate(row)}</td>
@@ -367,7 +375,7 @@ export function AdminCobrosPanel({ isMobile, compactHeader = false }: Props) {
             <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 14, marginBottom: 20 }}>
               <div>
                 <p style={{ margin: 0, fontSize: 12, color: "#888", fontWeight: 700 }}>Detalle de cobro</p>
-                <h3 style={{ margin: "4px 0 0", fontSize: 22, color: "#1a1a1a" }}>{formatOrderLabel(selected.orderId)}</h3>
+                <h3 style={{ margin: "4px 0 0", fontSize: 22, color: "#1a1a1a" }}>{formatOrderLabel(selected.orderId, selected.dailyNumber)}</h3>
               </div>
               <button onClick={() => setSelected(null)} aria-label="Cerrar detalle" title="Cerrar detalle" style={{ width: 40, height: 40, border: "1.5px solid #e0e0e0", background: "#f7f7f7", borderRadius: 10, cursor: "pointer", display: "inline-flex", alignItems: "center", justifyContent: "center", color: "#333" }}>
                 <X size={17} />
@@ -385,7 +393,6 @@ export function AdminCobrosPanel({ isMobile, compactHeader = false }: Props) {
 
             <DetailBlock title="Pago">
               <DetailLine label="Método" value={selected.methodLabel} />
-              <DetailLine label="Monto" value={formatCurrency(selected.amount)} />
               <DetailLine label="Estado cobro" value={paymentStatusLabel[selected.paymentStatus] ?? selected.paymentStatus} />
               <DetailLine label={selected.dateType === "payment" ? "Fecha de pago" : "Fecha de orden"} value={formatDateTime(selected.paidAt ?? selected.createdAt)} />
             </DetailBlock>
@@ -420,14 +427,10 @@ export function AdminCobrosPanel({ isMobile, compactHeader = false }: Props) {
                     </div>
                   ))
                 )}
-                {selected.items.length > 0 && (
-                  <div style={{ display: "flex", justifyContent: "space-between", gap: 12, padding: "14px", background: "#fff8f5", borderTop: "1px solid #eee" }}>
-                    <span style={{ fontSize: 13, fontWeight: 800, color: "#1a1a1a" }}>Total</span>
-                    <strong style={{ fontSize: 15, color: "#e85d26" }}>{formatCurrency(selected.amount)}</strong>
-                  </div>
-                )}
               </div>
             </div>
+
+            <CobroTotals cobro={selected} />
           </aside>
         </div>
       )}
@@ -461,11 +464,73 @@ function DetailLine({ label, value }: { label: string; value: string }) {
   );
 }
 
+function CobroTotals({ cobro }: { cobro: Cobro }) {
+  const hasDiscount = cobro.discountAmount > 0;
+
+  return (
+    <div style={cobroTotalsStyle}>
+      <h4 style={cobroTotalsTitleStyle}>Resumen del cobro</h4>
+      <div style={cobroTotalsRowsStyle}>
+        <TotalLine label="Subtotal" value={formatCurrency(cobro.subtotal)} />
+        {hasDiscount && (
+          <TotalLine
+            label={`Descuento fidelizacion${cobro.discountPercent > 0 ? ` (${cobro.discountPercent}%)` : ""}`}
+            value={`-${formatCurrency(cobro.discountAmount)}`}
+            muted
+          />
+        )}
+        {hasDiscount && cobro.loyaltyTierName && (
+          <TotalLine label="Categoria" value={cobro.loyaltyTierName} muted />
+        )}
+        <div style={cobroTotalDividerStyle} />
+        <TotalLine label={hasDiscount ? "Total con descuento" : "Total"} value={formatCurrency(cobro.amount)} strong />
+      </div>
+    </div>
+  );
+}
+
+function TotalLine({ label, value, muted = false, strong = false }: { label: string; value: string; muted?: boolean; strong?: boolean }) {
+  return (
+    <div style={{ display: "flex", justifyContent: "space-between", gap: 12 }}>
+      <span style={{ fontSize: 13, fontWeight: strong ? 800 : 700, color: muted ? "#888" : "#1a1a1a" }}>{label}</span>
+      <strong style={{ fontSize: strong ? 15 : 13, color: strong ? "#e85d26" : muted ? "#888" : "#333" }}>{value}</strong>
+    </div>
+  );
+}
+
 const productHeadStyle: React.CSSProperties = {
   fontSize: 10,
   color: "#888",
   fontWeight: 800,
   textTransform: "uppercase",
+};
+
+const cobroTotalsStyle: React.CSSProperties = {
+  marginTop: 18,
+  paddingTop: 16,
+  borderTop: "1.5px solid #f0f0f0",
+};
+
+const cobroTotalsTitleStyle: React.CSSProperties = {
+  margin: "0 0 10px",
+  fontSize: 14,
+  color: "#1a1a1a",
+  fontWeight: 800,
+};
+
+const cobroTotalsRowsStyle: React.CSSProperties = {
+  display: "grid",
+  gap: 9,
+  padding: "13px 14px",
+  border: "1.5px solid #eeeeee",
+  borderRadius: 12,
+  background: "#fff",
+};
+
+const cobroTotalDividerStyle: React.CSSProperties = {
+  height: 1,
+  background: "#eeeeee",
+  margin: "2px 0",
 };
 
 const filterInputStyle: React.CSSProperties = {

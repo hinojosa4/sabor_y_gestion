@@ -10,6 +10,8 @@ export interface ClientStats {
     average: number;
     points: number;
     benefits: string[];
+    tierName?: string;
+    discountPercent?: number;
     isNew?: boolean;
 }
 
@@ -30,10 +32,10 @@ export function ClientInfoCard({ data }: ClientInfoCardProps) {
                         <p style={styles.memberSince}>Miembro desde {data.memberSince}</p>
                     </div>
                 </div>
-                {data.isNew && (
+                {(data.tierName || data.isNew) && (
                     <button style={styles.newBadge}>
                         <Sparkles size={14} />
-                        <span>Cliente Nuevo</span>
+                        <span>{data.tierName ?? "Cliente Nuevo"}</span>
                     </button>
                 )}
             </div>
@@ -50,14 +52,14 @@ export function ClientInfoCard({ data }: ClientInfoCardProps) {
                     bg="#ecfdf5"
                     icon={<DollarSign size={22} color="#10b981" />}
                     label="Total Gastado"
-                    value={`$${data.totalSpent.toFixed(2)}`}
+                    value={`Bs ${data.totalSpent.toFixed(2)}`}
                     valueColor="#10b981"
                 />
                 <StatBox
                     bg="#faf5ff"
                     icon={<TrendingUp size={22} color="#8b5cf6" />}
                     label="Promedio"
-                    value={`$${data.average.toFixed(2)}`}
+                    value={`Bs ${data.average.toFixed(2)}`}
                     valueColor="#8b5cf6"
                 />
                 <StatBox
@@ -73,6 +75,9 @@ export function ClientInfoCard({ data }: ClientInfoCardProps) {
                 <div style={styles.benefitsHeader}>
                     <Star size={18} color="#f97316" />
                     <h3 style={styles.benefitsTitle}>Tus Beneficios</h3>
+                    {data.discountPercent ? (
+                        <span style={styles.discountBadge}>{data.discountPercent}% dto.</span>
+                    ) : null}
                 </div>
                 <div style={styles.benefitsGrid}>
                     {data.benefits.map((b, i) => (
@@ -198,6 +203,7 @@ const styles: { [key: string]: React.CSSProperties } = {
         alignItems: "center",
         gap: "0.5rem",
         marginBottom: "0.75rem",
+        flexWrap: "wrap",
     },
     benefitsTitle: {
         margin: 0,
@@ -211,6 +217,16 @@ const styles: { [key: string]: React.CSSProperties } = {
         gap: "0.4rem 1.5rem",
         fontSize: "0.875rem",
         color: "#374151",
+    },
+    discountBadge: {
+        marginLeft: "auto",
+        borderRadius: 8,
+        backgroundColor: "#fff7ed",
+        border: "1px solid #fed7aa",
+        color: "#c2410c",
+        padding: "0.25rem 0.55rem",
+        fontSize: "0.78rem",
+        fontWeight: 700,
     },
     benefitItem: {
         display: "flex",
