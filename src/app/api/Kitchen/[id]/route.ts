@@ -12,7 +12,7 @@ interface Params {
 const VALID_ITEM_STATUSES = ["pending", "in_kitchen", "ready", "served", "cancelled"] as const;
 type ItemStatus = typeof VALID_ITEM_STATUSES[number];
 
-// ── PATCH /api/orders/kitchen/item/[id] ───────────────────────────────────────
+// ── PATCH /api/orders/kitchen/[id] ───────────────────────────────────────
 export async function PATCH(req: NextRequest, { params }: Params) {
   try {
     await connectDB();
@@ -78,15 +78,25 @@ export async function PATCH(req: NextRequest, { params }: Params) {
       });
     }
 
+    // Notificar al cliente por canal privado
+    const parentOrder = await Order.findById(item.order_id);
+    if (allReady && parentOrder?.user_id) {
+      await pusherServer.trigger(`client-${parentOrder.user_id}`, "order:status", {
+        orderId: String(item.order_id),
+        newStatus: "ready",
+        service_type: parentOrder.service_type,
+      });
+    }
+
     return NextResponse.json({ ok: true, data: item });
-  } catch (error) {
-    return NextResponse.json(
-      {
-        ok: false,
-        message: "Error al actualizar ítem",
-        error: error instanceof Error ? error.message : String(error),
-      },
-      { status: 500 }
-    );
+    } catch (error) {
+      return NextResponse.json(
+        {
+          ok: false,
+          message: "Error al actualizar ítem",
+          error: error instanceof Error ? error.message : String(error),
+        },
+        { status: 500 }
+      );
   }
 }

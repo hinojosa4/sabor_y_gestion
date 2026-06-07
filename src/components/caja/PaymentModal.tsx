@@ -2,6 +2,8 @@
 import { useState, useEffect } from 'react';
 import { X } from 'lucide-react';
 import { FacturaFinal } from './FacturaFinal';
+import { formatOrderLabel } from '@/lib/orderDisplay';
+import { AppNotice } from '@/components/ui/AppNotice';
 
 interface PaymentModalProps {
     isOpen: boolean;
@@ -18,6 +20,27 @@ interface OrderItemType {
     quantity: number;
     subtotal: number;
 }
+
+type PaymentReceipt = {
+    total: number;
+    subtotal: number;
+    discountAmount: number;
+    discountPercent: number;
+    loyaltyTierName: string | null;
+    dailyNumber: number | null;
+    cashReceived: number;
+    change: number;
+    paymentDate: Date;
+};
+
+type PaymentPreview = {
+    subtotal: number;
+    discountAmount: number;
+    discountPercent: number;
+    loyaltyTierName: string | null;
+    total: number;
+    customerName: string | null;
+};
 
 // Estilos
 const overlayStyle: React.CSSProperties = {
@@ -42,12 +65,84 @@ const modalStyle: React.CSSProperties = {
     boxShadow: "0 20px 60px rgba(0,0,0,0.18)",
 };
 
+const discountPreviewStyle: React.CSSProperties = {
+    display: "grid",
+    gap: "0.5rem",
+    marginTop: "0.65rem",
+    padding: "0.65rem 0.75rem",
+    border: "1px solid var(--border)",
+    borderRadius: "var(--radius-md)",
+    background: "var(--card)",
+    fontSize: "0.82rem",
+};
+
+const discountHeaderStyle: React.CSSProperties = {
+    display: "flex",
+    justifyContent: "space-between",
+    alignItems: "center",
+    gap: "0.75rem",
+};
+
+const discountRowStyle: React.CSSProperties = {
+    display: "flex",
+    justifyContent: "space-between",
+    alignItems: "flex-start",
+    gap: "0.75rem",
+    color: "#555",
+};
+
+const discountLabelStyle: React.CSSProperties = {
+    display: "grid",
+    gap: "0.15rem",
+    minWidth: 0,
+};
+
+const discountMetaStyle: React.CSSProperties = {
+    color: "var(--muted-foreground)",
+    fontSize: "0.74rem",
+};
+
+const discountValueStyle: React.CSSProperties = {
+    color: "#c2410c",
+    textAlign: "right",
+    whiteSpace: "nowrap",
+};
+
+const discountDividerStyle: React.CSSProperties = {
+    height: 1,
+    background: "var(--border)",
+};
+
+const discountTotalRowStyle: React.CSSProperties = {
+    display: "flex",
+    justifyContent: "space-between",
+    gap: "0.75rem",
+    color: "#1a1a1a",
+    fontWeight: 800,
+};
+
+const discountHintStyle: React.CSSProperties = {
+    margin: "0.65rem 0 0",
+    fontSize: "0.78rem",
+    color: "var(--muted-foreground)",
+    textAlign: "center",
+};
+
 // Componente para resumen de la orden
-function OrderSummary({ orderId }: { orderId: string }) {
+function OrderSummary({
+    orderId,
+    preview,
+    previewLoading,
+    formatCurrency,
+}: {
+    orderId: string;
+    preview: PaymentPreview;
+    previewLoading: boolean;
+    formatCurrency: (amount: number) => string;
+}) {
     const [items, setItems] = useState<OrderItemType[]>([]);
-    const [subtotal, setSubtotal] = useState(0);
-    const [iva, setIva] = useState(0);
     const [total, setTotal] = useState(0);
+    const [dailyNumber, setDailyNumber] = useState<number | null>(null);
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
@@ -57,9 +152,8 @@ function OrderSummary({ orderId }: { orderId: string }) {
                 const data = await res.json();
                 if (data.items) {
                     setItems(data.items);
-                    setSubtotal(data.subtotal || 0);
-                    setIva(data.iva || 0);
                     setTotal(data.total || 0);
+                    setDailyNumber(data.dailyNumber ?? null);
                 }
             } catch (error) {
                 console.error('Error:', error);
@@ -70,17 +164,15 @@ function OrderSummary({ orderId }: { orderId: string }) {
         if (orderId) fetchOrder();
     }, [orderId]);
 
-    const formatCurrency = (amount: number) => {
-        return new Intl.NumberFormat('es-BO', {
-            style: 'currency',
-            currency: 'BOB'
-        }).format(amount);
-    };
-
     if (loading) return <p>Cargando productos...</p>;
 
     return (
-        <div style={{ marginBottom: "1rem", padding: "0.5rem", backgroundColor: "var(--muted)", borderRadius: "var(--radius-md)" }}>
+        <div style={{ marginBottom: "1rem", padding: "0.75rem", backgroundColor: "var(--muted)", borderRadius: "var(--radius-md)" }}>
+            {orderId && (
+                <p style={{ margin: "0 0 0.5rem", fontSize: "0.875rem", fontWeight: "bold" }}>
+                    {formatOrderLabel(orderId, dailyNumber)}
+                </p>
+            )}
             <h3 style={{ margin: "0 0 0.5rem", fontSize: "0.875rem", fontWeight: "bold" }}>Productos</h3>
             {items.map((item, idx) => (
                 <div key={idx} style={{ display: "flex", justifyContent: "space-between", fontSize: "0.75rem", marginBottom: "0.25rem" }}>
@@ -89,18 +181,68 @@ function OrderSummary({ orderId }: { orderId: string }) {
                 </div>
             ))}
             <div style={{ borderTop: `1px solid var(--border)`, marginTop: "0.5rem", paddingTop: "0.5rem" }}>
-                <div style={{ display: "flex", justifyContent: "space-between", fontSize: "0.75rem" }}>
-                    <span>Subtotal</span>
-                    <span>{formatCurrency(subtotal)}</span>
-                </div>
-                <div style={{ display: "flex", justifyContent: "space-between", fontSize: "0.75rem" }}>
-                    <span>IVA (13%)</span>
-                    <span>{formatCurrency(iva)}</span>
-                </div>
-                <div style={{ display: "flex", justifyContent: "space-between", fontWeight: "bold", marginTop: "0.25rem" }}>
-                    <span>Total</span>
-                    <span>{formatCurrency(total)}</span>
-                </div>
+                {preview.discountAmount > 0 ? (
+                    <PaymentDiscountPreview
+                        preview={preview}
+                        loading={previewLoading}
+                        formatCurrency={formatCurrency}
+                    />
+                ) : (
+                    <>
+                        <div style={{ display: "flex", justifyContent: "space-between", fontWeight: "bold" }}>
+                            <span>Total</span>
+                            <span>{formatCurrency(total)}</span>
+                        </div>
+                        {previewLoading && <p style={discountHintStyle}>Calculando fidelizacion...</p>}
+                    </>
+                )}
+            </div>
+        </div>
+    );
+}
+
+function PaymentDiscountPreview({
+    preview,
+    loading,
+    formatCurrency,
+}: {
+    preview: PaymentPreview;
+    loading: boolean;
+    formatCurrency: (amount: number) => string;
+}) {
+    if (loading) {
+        return (
+            <p style={discountHintStyle}>Calculando fidelizacion...</p>
+        );
+    }
+
+    if (preview.discountAmount <= 0) {
+        return null;
+    }
+
+    return (
+        <div style={discountPreviewStyle}>
+            <div style={discountHeaderStyle}>
+                <span>Subtotal</span>
+                <strong>{formatCurrency(preview.subtotal)}</strong>
+            </div>
+            <div style={discountRowStyle}>
+                <span style={discountLabelStyle}>
+                    <span>
+                        Descuento fidelizacion{preview.discountPercent > 0 ? ` (${preview.discountPercent}%)` : ''}
+                    </span>
+                    {preview.loyaltyTierName && (
+                        <span style={discountMetaStyle}>{preview.loyaltyTierName}</span>
+                    )}
+                </span>
+                <strong style={discountValueStyle}>
+                    -{formatCurrency(preview.discountAmount)}
+                </strong>
+            </div>
+            <div style={discountDividerStyle} />
+            <div style={discountTotalRowStyle}>
+                <span>Total con descuento</span>
+                <strong>{formatCurrency(preview.total)}</strong>
             </div>
         </div>
     );
@@ -108,23 +250,105 @@ function OrderSummary({ orderId }: { orderId: string }) {
 
 export function PaymentModal({ isOpen, onClose, orderId, tableId, tableNumber, totalAmount, onSuccess }: PaymentModalProps) {
     const [loading, setLoading] = useState(false);
-    const [cashReceived, setCashReceived] = useState(totalAmount);
+    const [cashReceivedInput, setCashReceivedInput] = useState(String(totalAmount));
     const [customerEmail, setCustomerEmail] = useState('');
+    const [preview, setPreview] = useState<PaymentPreview>({
+        subtotal: totalAmount,
+        discountAmount: 0,
+        discountPercent: 0,
+        loyaltyTierName: null,
+        total: totalAmount,
+        customerName: null,
+    });
+    const [previewLoading, setPreviewLoading] = useState(false);
     const [observations, setObservations] = useState('');
+    const [notice, setNotice] = useState<{ type: 'error' | 'warning'; message: string } | null>(null);
     
     // Estados para la factura final
     const [showFactura, setShowFactura] = useState(false);
     const [orderItems, setOrderItems] = useState<OrderItemType[]>([]);
-    const [orderSubtotal, setOrderSubtotal] = useState(0);
     const [orderIva, setOrderIva] = useState(0);
+    const [receipt, setReceipt] = useState<PaymentReceipt | null>(null);
 
     useEffect(() => {
         if (isOpen) {
-            setCashReceived(totalAmount);
+            setCashReceivedInput(String(totalAmount));
             setCustomerEmail('');
+            setPreview({
+                subtotal: totalAmount,
+                discountAmount: 0,
+                discountPercent: 0,
+                loyaltyTierName: null,
+                total: totalAmount,
+                customerName: null,
+            });
+            setPreviewLoading(false);
             setObservations('');
+            setNotice(null);
+            setShowFactura(false);
+            setReceipt(null);
         }
     }, [isOpen, totalAmount]);
+
+    useEffect(() => {
+        if (!isOpen || !orderId) return;
+
+        const controller = new AbortController();
+        const timeout = window.setTimeout(async () => {
+            const email = customerEmail.trim();
+
+            if (email === '' || !/^\S+@\S+\.\S+$/.test(email)) {
+                setPreview({
+                    subtotal: totalAmount,
+                    discountAmount: 0,
+                    discountPercent: 0,
+                    loyaltyTierName: null,
+                    total: totalAmount,
+                    customerName: null,
+                });
+                return;
+            }
+
+            setPreviewLoading(true);
+            try {
+                const res = await fetch('/api/payments/preview', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ orderId, email }),
+                    signal: controller.signal,
+                });
+                const data = await res.json();
+                if (!res.ok || !data.ok) throw new Error(data.error || 'Error al calcular descuento');
+
+                setPreview({
+                    subtotal: Number(data.subtotal ?? totalAmount),
+                    discountAmount: Number(data.discountAmount ?? 0),
+                    discountPercent: Number(data.discountPercent ?? 0),
+                    loyaltyTierName: data.loyaltyTierName ?? null,
+                    total: Number(data.total ?? totalAmount),
+                    customerName: data.customer?.name ?? null,
+                });
+            } catch (error) {
+                if (error instanceof DOMException && error.name === 'AbortError') return;
+                console.error('Error:', error);
+                setPreview({
+                    subtotal: totalAmount,
+                    discountAmount: 0,
+                    discountPercent: 0,
+                    loyaltyTierName: null,
+                    total: totalAmount,
+                    customerName: null,
+                });
+            } finally {
+                if (!controller.signal.aborted) setPreviewLoading(false);
+            }
+        }, 450);
+
+        return () => {
+            controller.abort();
+            window.clearTimeout(timeout);
+        };
+    }, [customerEmail, isOpen, orderId, totalAmount]);
 
     if (!isOpen) return null;
 
@@ -135,24 +359,42 @@ export function PaymentModal({ isOpen, onClose, orderId, tableId, tableNumber, t
         }).format(amount);
     };
 
-    const change = cashReceived - totalAmount;
-    const isValid = cashReceived >= totalAmount;
+    const cashReceived = Number(cashReceivedInput);
+    const payableTotal = preview.total;
+    const hasCashValue = cashReceivedInput.trim() !== '' && !Number.isNaN(cashReceived);
+    const change = hasCashValue ? cashReceived - payableTotal : 0;
+    const isValid = hasCashValue && cashReceived >= payableTotal;
 
-    const handleAmountClick = (amount: number) => {
-        setCashReceived(amount);
+    const handleCashReceivedChange = (value: string) => {
+        const normalized = value
+            .replace(',', '.')
+            .replace(/[^\d.]/g, '')
+            .replace(/(\..*)\./g, '$1');
+
+        if (normalized === '') {
+            setCashReceivedInput('');
+            return;
+        }
+
+        const withoutLeadingZeros = normalized.replace(/^0+(?=\d)/, '');
+        setCashReceivedInput(withoutLeadingZeros);
     };
 
     const handlePayment = async () => {
         if (!isValid) return;
         setLoading(true);
         try {
+            const token = localStorage.getItem('token');
             // 1. Registrar pago
             const res = await fetch('/api/payments', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: {
+                    'Content-Type': 'application/json',
+                    ...(token ? { Authorization: `Bearer ${token}` } : {}),
+                },
                 body: JSON.stringify({ 
                     orderId, 
-                    amount: totalAmount, 
+                    amount: payableTotal, 
                     method: 'cash', 
                     tableId,
                     customerEmail,
@@ -160,29 +402,53 @@ export function PaymentModal({ isOpen, onClose, orderId, tableId, tableNumber, t
                 }),
             });
             
+            const paymentData = await res.json();
+
             if (res.ok) {
-                // 2. Cargar los items de la orden para la factura
-                const orderRes = await fetch(`/api/orders/preinvoice/order/${orderId}`);
-                const orderData = await orderRes.json();
-                setOrderItems(orderData.items || []);
-                setOrderSubtotal(orderData.subtotal || 0);
-                setOrderIva(orderData.iva || 0);
-                
-                // 3. Mostrar factura final y cerrar modal de pago
-                setShowFactura(true);
                 onSuccess();
                 onClose();
             } else {
-                const error = await res.json();
-                alert(error.error || 'Error al procesar pago');
+                setNotice({ type: 'error', message: paymentData.error || 'Error al procesar pago' });
             }
         } catch (error) {
             console.error('Error:', error);
-            alert('Error al procesar pago');
+            setNotice({ type: 'error', message: 'Error al procesar pago' });
         } finally {
             setLoading(false);
         }
     };
+
+    const closeReceipt = () => {
+        setShowFactura(false);
+        setReceipt(null);
+        onSuccess();
+        onClose();
+    };
+
+    if (showFactura && receipt) {
+        return (
+            <FacturaFinal
+                isOpen
+                onClose={closeReceipt}
+                orderId={orderId}
+                dailyNumber={receipt.dailyNumber}
+                tableNumber={tableNumber}
+                items={orderItems}
+                iva={orderIva}
+                total={receipt.total}
+                subtotal={receipt.subtotal}
+                discountAmount={receipt.discountAmount}
+                discountPercent={receipt.discountPercent}
+                loyaltyTierName={receipt.loyaltyTierName}
+                paymentMethod="cash"
+                cashReceived={receipt.cashReceived}
+                change={receipt.change}
+                customerEmail={customerEmail || undefined}
+                observations={observations}
+                paymentDate={receipt.paymentDate}
+            />
+        );
+    }
 
     return (
         <>
@@ -196,43 +462,40 @@ export function PaymentModal({ isOpen, onClose, orderId, tableId, tableNumber, t
                         </button>
                     </div>
 
+                    {notice && (
+                        <div style={{ marginBottom: "1rem" }}>
+                            <AppNotice
+                                type={notice.type}
+                                title="No se pudo registrar el pago"
+                                message={notice.message}
+                                onClose={() => setNotice(null)}
+                            />
+                        </div>
+                    )}
+
                     {/* Mejora 1: Resumen de la orden */}
-                    <OrderSummary orderId={orderId} />
+                    <OrderSummary
+                        orderId={orderId}
+                        preview={preview}
+                        previewLoading={previewLoading}
+                        formatCurrency={formatCurrency}
+                    />
 
                     {/* Total a pagar */}
                     <p style={{ fontSize: "1.5rem", fontWeight: "bold", textAlign: "center", marginBottom: "1rem" }}>
-                        Total: {formatCurrency(totalAmount)}
+                        Total: {formatCurrency(payableTotal)}
                     </p>
 
-                    {/* Mejora 5: Botones numéricos rápidos */}
+                    {/* Monto recibido */}
                     <div style={{ marginBottom: "1rem" }}>
                         <label style={{ display: "block", marginBottom: "0.5rem", fontWeight: "bold" }}>
                             Monto recibido (Bs)
                         </label>
-                        <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap", marginBottom: "0.5rem" }}>
-                            {[100, 200, 500, 1000].map(amount => (
-                                <button
-                                    key={amount}
-                                    onClick={() => handleAmountClick(amount)}
-                                    style={{
-                                        padding: "0.5rem 1rem",
-                                        backgroundColor: "var(--secondary)",
-                                        border: `1px solid var(--border)`,
-                                        borderRadius: "var(--radius-md)",
-                                        cursor: "pointer",
-                                        fontSize: "0.875rem",
-                                    }}
-                                >
-                                    {amount} Bs
-                                </button>
-                            ))}
-                        </div>
                         <input
-                            type="number"
-                            value={cashReceived}
-                            onChange={(e) => setCashReceived(Number(e.target.value) || 0)}
-                            min={totalAmount}
-                            step="1"
+                            type="text"
+                            inputMode="decimal"
+                            value={cashReceivedInput}
+                            onChange={(e) => handleCashReceivedChange(e.target.value)}
                             autoFocus
                             style={{
                                 width: "100%",
@@ -329,23 +592,6 @@ export function PaymentModal({ isOpen, onClose, orderId, tableId, tableNumber, t
                 </div>
             </div>
 
-            {/* Factura Final */}
-            <FacturaFinal
-                isOpen={showFactura}
-                onClose={() => setShowFactura(false)}
-                orderId={orderId}
-                tableNumber={tableNumber}
-                items={orderItems}
-                subtotal={orderSubtotal}
-                iva={orderIva}
-                total={totalAmount}
-                paymentMethod="cash"
-                cashReceived={cashReceived}
-                change={change}
-                customerEmail={customerEmail || undefined}
-                observations={observations}
-                paymentDate={new Date()}
-            />
         </>
     );
 }

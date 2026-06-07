@@ -4,6 +4,7 @@ import Ingredient from "@/models/Ingredient";
 import IngredientCategory from "@/models/IngredientCategory";
 import "@/models/IngredientCategory";
 import mongoose from "mongoose";
+import { pusherServer } from "@/lib/pusher";
 
 const VALID_UNITS = ["kg", "lt", "unit", "gr", "ml"] as const;
 
@@ -18,29 +19,18 @@ export async function GET(_req: NextRequest, { params }: Params) {
     const { id } = await params;
 
     if (!mongoose.Types.ObjectId.isValid(id)) {
-      return NextResponse.json(
-        { ok: false, message: "ID de ingrediente no válido" },
-        { status: 400 }
-      );
+      return NextResponse.json({ ok: false, message: "ID de ingrediente no válido" }, { status: 400 });
     }
 
     const ingredient = await Ingredient.findById(id).populate("category_id", "name");
-
     if (!ingredient) {
-      return NextResponse.json(
-        { ok: false, message: "Ingrediente no encontrado" },
-        { status: 404 }
-      );
+      return NextResponse.json({ ok: false, message: "Ingrediente no encontrado" }, { status: 404 });
     }
 
     return NextResponse.json({ ok: true, data: ingredient });
   } catch (error) {
     return NextResponse.json(
-      {
-        ok: false,
-        message: "Error al obtener el ingrediente",
-        error: error instanceof Error ? error.message : "Error desconocido",
-      },
+      { ok: false, message: "Error al obtener el ingrediente", error: error instanceof Error ? error.message : "Error desconocido" },
       { status: 500 }
     );
   }
@@ -53,52 +43,73 @@ export async function PUT(req: NextRequest, { params }: Params) {
     const { id } = await params;
 
     if (!mongoose.Types.ObjectId.isValid(id)) {
-      return NextResponse.json(
-        { ok: false, message: "ID de ingrediente no válido" },
-        { status: 400 }
-      );
+      return NextResponse.json({ ok: false, message: "ID de ingrediente no válido" }, { status: 400 });
     }
 
     const ingredient = await Ingredient.findById(id);
     if (!ingredient) {
-      return NextResponse.json(
-        { ok: false, message: "Ingrediente no encontrado" },
-        { status: 404 }
-      );
+      return NextResponse.json({ ok: false, message: "Ingrediente no encontrado" }, { status: 404 });
     }
 
     const body = await req.json();
-    const { name, currentStock, minStock, maxStock, unit, supplier, category_id, isActive } = body;
+    console.log("PUT BODY:", JSON.stringify(body, null, 2));
 
-    // ── Validaciones ──────────────────────────────────────────────────────────
+    const {
+      name, currentStock,
+      minStock, warningStock, reorderPoint, maxStock,
+      unit, supplier, category_id, isActive,
+    } = body;
 
-    if (!name || !name.trim()) {
+    await pusherServer.trigger("restaurant", "ingredient:updated", {});
+    if (!name?.trim()) {
+      return NextResponse.json({ ok: true, data: ingredient });
+    }
+
+    if (currentStock === undefined || currentStock === null || typeof currentStock !== "number" || isNaN(currentStock)) {
+  return NextResponse.json({ ok: false, message: "El stock actual es obligatorio" }, { status: 400 });
+}
+
+  const numFields: [string, unknown, string][] = [
+    ["El stock mínimo",         minStock,     "no puede ser negativo"],
+    ["El stock de advertencia", warningStock, "no puede ser negativo"],
+    ["El punto de reorden",     reorderPoint, "no puede ser negativo"],
+    ["El stock máximo",         maxStock,     "no puede ser negativo"],
+  ];
+
+  for (const [label, val, msg] of numFields) {
+    if (val === undefined || val === null || typeof val !== "number" || isNaN(val as number) || (val as number) < 0) {
+      return NextResponse.json({ ok: false, message: `${label} ${msg}` }, { status: 400 });
+    }
+  }
+
+    for (const [label, val, msg] of numFields) {
+      if (val === undefined || val === null || typeof val !== "number" || (val as number) < 0) {
+        return NextResponse.json({ ok: false, message: `${label} ${msg}` }, { status: 400 });
+      }
+    }
+
+    if (warningStock <= minStock) {
       return NextResponse.json(
-        { ok: false, message: "El nombre es obligatorio" },
+        { ok: false, message: "El stock de advertencia (🟡) debe ser mayor al stock mínimo (🔴)" },
+        { status: 400 }
+      );
+    }
+    if (reorderPoint <= warningStock) {
+      return NextResponse.json(
+        { ok: false, message: "El punto de reorden debe ser mayor al stock de advertencia (🟡)" },
+        { status: 400 }
+      );
+    }
+    if (maxStock <= reorderPoint) {
+      return NextResponse.json(
+        { ok: false, message: "El stock máximo debe ser mayor al punto de reorden" },
         { status: 400 }
       );
     }
 
-    if (currentStock === undefined || currentStock === null || typeof currentStock !== "number" || currentStock < 0) {
+    if (currentStock > maxStock) {
       return NextResponse.json(
-        { ok: false, message: "El stock actual no puede ser negativo" },
-        { status: 400 }
-      );
-    }
-
-    // FIX: aceptar minStock === 0 correctamente (antes fallaba con 0 por ser falsy)
-    if (minStock === undefined || minStock === null || typeof minStock !== "number" || minStock < 0) {
-      return NextResponse.json(
-        { ok: false, message: "El stock mínimo no puede ser negativo" },
-        { status: 400 }
-      );
-    }
-
-    // FIX: usar < en lugar de <= para permitir maxStock igual a minStock+algo
-    // y dar mensaje claro
-    if (maxStock === undefined || maxStock === null || typeof maxStock !== "number" || maxStock < minStock) {
-      return NextResponse.json(
-        { ok: false, message: "El stock máximo debe ser mayor o igual al mínimo" },
+        { ok: false, message: "El stock actual no puede ser mayor al stock máximo" },
         { status: 400 }
       );
     }
@@ -110,51 +121,45 @@ export async function PUT(req: NextRequest, { params }: Params) {
       );
     }
 
-    // Verificar nombre duplicado excluyendo el propio documento
-    const duplicate = await Ingredient.findOne({
-      name: name.trim(),
-      _id: { $ne: id },
-    });
-
+    const duplicate = await Ingredient.findOne({ name: name.trim(), _id: { $ne: id } });
     if (duplicate) {
-      return NextResponse.json(
-        { ok: false, message: "Ya existe otro ingrediente con ese nombre" },
-        { status: 409 }
-      );
+      return NextResponse.json({ ok: false, message: "Ya existe otro ingrediente con ese nombre" }, { status: 409 });
     }
 
-    // Validar category_id si viene
     if (category_id) {
       if (!mongoose.Types.ObjectId.isValid(category_id)) {
-        return NextResponse.json(
-          { ok: false, message: "ID de categoría no válido" },
-          { status: 400 }
-        );
+        return NextResponse.json({ ok: false, message: "ID de categoría no válido" }, { status: 400 });
       }
       const categoryExists = await IngredientCategory.findById(category_id);
       if (!categoryExists) {
-        return NextResponse.json(
-          { ok: false, message: "La categoría especificada no existe" },
-          { status: 404 }
-        );
+        return NextResponse.json({ ok: false, message: "La categoría especificada no existe" }, { status: 404 });
       }
     }
 
-    // FIX: usar returnDocument en lugar de new (deprecado en Mongoose)
-    const updated = await Ingredient.findByIdAndUpdate(
+    // FIX: Usar findByIdAndUpdate para actualizar, luego re-leer con findById
+    // para que el virtual stockStatus se calcule sobre los valores nuevos.
+    // findByIdAndUpdate con returnDocument:"after" devuelve el doc hidratado
+    // pero el virtual puede quedar en cache con los valores viejos en algunas
+    // versiones de Mongoose. Re-leer garantiza el valor correcto.
+    await Ingredient.findByIdAndUpdate(
       id,
       {
         name: name.trim(),
         currentStock,
         minStock,
+        warningStock,
+        reorderPoint,
         maxStock,
         unit,
         supplier: supplier?.trim() || "",
         category_id: category_id || null,
         isActive: isActive ?? true,
       },
-      { returnDocument: "after", runValidators: false } // FIX: runValidators: false para evitar el bug del virtual stockStatus
-    ).populate("category_id", "name");
+      { runValidators: false }
+    );
+
+    // Re-leer para obtener virtual stockStatus recalculado correctamente
+    const updated = await Ingredient.findById(id).populate("category_id", "name");
 
     return NextResponse.json({
       ok: true,
@@ -162,21 +167,12 @@ export async function PUT(req: NextRequest, { params }: Params) {
       data: updated,
     });
   } catch (error) {
-    // FIX: capturar errores de validación de Mongoose y devolverlos como 400
     if (error instanceof mongoose.Error.ValidationError) {
       const messages = Object.values(error.errors).map((e) => e.message).join(". ");
-      return NextResponse.json(
-        { ok: false, message: messages },
-        { status: 400 }
-      );
+      return NextResponse.json({ ok: false, message: messages }, { status: 400 });
     }
-
     return NextResponse.json(
-      {
-        ok: false,
-        message: "Error al actualizar el ingrediente",
-        error: error instanceof Error ? error.message : "Error desconocido",
-      },
+      { ok: false, message: "Error al actualizar el ingrediente", error: error instanceof Error ? error.message : "Error desconocido" },
       { status: 500 }
     );
   }
@@ -189,32 +185,19 @@ export async function DELETE(_req: NextRequest, { params }: Params) {
     const { id } = await params;
 
     if (!mongoose.Types.ObjectId.isValid(id)) {
-      return NextResponse.json(
-        { ok: false, message: "ID de ingrediente no válido" },
-        { status: 400 }
-      );
+      return NextResponse.json({ ok: false, message: "ID de ingrediente no válido" }, { status: 400 });
     }
 
     const deleted = await Ingredient.findByIdAndDelete(id);
-
     if (!deleted) {
-      return NextResponse.json(
-        { ok: false, message: "Ingrediente no encontrado" },
-        { status: 404 }
-      );
+      return NextResponse.json({ ok: false, message: "Ingrediente no encontrado" }, { status: 404 });
     }
 
-    return NextResponse.json({
-      ok: true,
-      message: "Ingrediente eliminado correctamente",
-    });
+    await pusherServer.trigger("restaurant", "ingredient:deleted", {});
+    return NextResponse.json({ ok: true, message: "Ingrediente eliminado correctamente" });
   } catch (error) {
     return NextResponse.json(
-      {
-        ok: false,
-        message: "Error al eliminar el ingrediente",
-        error: error instanceof Error ? error.message : "Error desconocido",
-      },
+      { ok: false, message: "Error al eliminar el ingrediente", error: error instanceof Error ? error.message : "Error desconocido" },
       { status: 500 }
     );
   }

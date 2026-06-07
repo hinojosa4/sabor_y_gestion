@@ -7,7 +7,7 @@ interface AuthUser {
   _id: string;
   name: string;
   email: string;
-  rol: "admin" | "cajero" | "cocinero" | "mesero" | "cliente";
+  rol: "admin" | "cajero" | "cocinero" | "mesero" | "cliente" | "delivery";
   activo: boolean;
 }
 
@@ -17,6 +17,7 @@ const ROUTES: Record<string, string> = {
   cocinero: "/dashboard/cocinero",
   mesero: "/dashboard/mesero",
   cliente: "/dashboard/cliente",
+  delivery: "/dashboard/delivery",
 };
 
 function formatCountdown(ms: number): string {

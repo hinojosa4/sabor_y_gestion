@@ -3,14 +3,42 @@ import { NextResponse } from 'next/server';
 import { connectDB } from '@/lib/db';
 import User from '@/models/User';
 import { userSchema } from '@/validations/user';
+import { calculateCustomerLoyalty } from '@/lib/customerLoyalty';
 
 // GET: Listar usuarios
 export async function GET() {
   await connectDB();
   const users = await User.find()
-  .select('+loyaltyPoints')
-  .sort({ createdAt: -1 });
-  return NextResponse.json(users);
+    .select('+loyaltyPoints')
+    .sort({ createdAt: -1 })
+    .lean();
+
+  const usersWithLoyalty = await Promise.all(
+    users.map(async (user) => {
+      if (user.rol !== 'cliente') return user;
+
+      try {
+        const loyalty = await calculateCustomerLoyalty(user._id.toString());
+        return {
+          ...user,
+          loyaltyPoints: loyalty.points,
+          loyaltyTier: {
+            name: loyalty.tier.name,
+            discountPercent: loyalty.discountPercent,
+            totalPaidOrders: loyalty.totalPaidOrders,
+            totalSpent: loyalty.totalSpent,
+          },
+        };
+      } catch {
+        return {
+          ...user,
+          loyaltyTier: null,
+        };
+      }
+    })
+  );
+
+  return NextResponse.json(usersWithLoyalty);
 }
 
 // POST: Crear usuario

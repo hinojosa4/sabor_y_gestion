@@ -2,6 +2,8 @@
 import { useState, useEffect, useRef } from 'react';
 import { ArrowLeft, DollarSign, CreditCard, Receipt, Printer } from 'lucide-react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
+import { AppNotice } from '@/components/ui/AppNotice';
 
 interface CashRegisterData {
     openingDate: string;
@@ -14,6 +16,11 @@ interface CashRegisterData {
     status: 'abierto' | 'cerrado';
     closingDate?: string;
     closingBalance?: number;
+    shiftName?: string;
+    shiftDate?: string;
+    shiftStart?: string;
+    shiftEnd?: string;
+    message?: string;
 }
 
 // Estilos usando variables CSS del globals.css
@@ -237,13 +244,19 @@ const backButtonLargeStyle: React.CSSProperties = {
 };
 
 export default function CierreCajaPage() {
+    const router = useRouter();
     const [loading, setLoading] = useState(true);
     const [data, setData] = useState<CashRegisterData | null>(null);
     const [closing, setClosing] = useState(false);
+    const [showCloseConfirm, setShowCloseConfirm] = useState(false);
+    const [notice, setNotice] = useState<{ type: 'success' | 'error' | 'warning'; title: string; message: string } | null>(null);
 
     const fetchCierreData = async () => {
         try {
-            const res = await fetch('/api/cash-register/current');
+            const token = localStorage.getItem('token');
+            const res = await fetch('/api/cash-register/current', {
+                headers: token ? { Authorization: `Bearer ${token}` } : {},
+            });
             const result = await res.json();
             setData(result);
         } catch (error) {
@@ -298,24 +311,54 @@ export default function CierreCajaPage() {
     }, []); // solo al montar
 
     const handleCierre = async () => {
-        if (!confirm('¿Estás seguro de realizar el cierre de caja? No podrás revertirlo.')) return;
+        setShowCloseConfirm(false);
         setClosing(true);
         try {
+            const rawUser = localStorage.getItem('user');
+            const token = localStorage.getItem('token');
+            const userId = rawUser ? JSON.parse(rawUser)?._id : undefined;
             const res = await fetch('/api/cash-register/close', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ closingBalance: data?.salesTotal })
+                headers: {
+                    'Content-Type': 'application/json',
+                    ...(token ? { Authorization: `Bearer ${token}` } : {}),
+                },
+                body: JSON.stringify({
+                    openingBalance: data?.openingBalance,
+                    closingBalance: data?.salesTotal,
+                    salesTotal: data?.salesTotal,
+                    cashTotal: data?.cashTotal,
+                    qrTotal: data?.qrTotal,
+                    tablesServed: data?.tablesServed,
+                    ordersCount: data?.ordersCount,
+                    userId,
+                })
             });
             if (res.ok) {
-                alert('Cierre de caja realizado con éxito');
+                setNotice({
+                    type: 'success',
+                    title: 'Caja cerrada',
+                    message: 'El cierre del turno se registró correctamente.',
+                });
                 fetchCierreDataRef.current();
+                window.setTimeout(() => {
+                    router.push('/dashboard/cajero');
+                }, 900);
             } else {
                 const error = await res.json();
-                alert(error.error || 'Error al cerrar caja');
+                setNotice({
+                    type: 'error',
+                    title: 'No se pudo cerrar caja',
+                    message: error.error || 'Error al cerrar caja',
+                });
             }
         } catch (error) {
             console.error('Error:', error);
-            alert('Error al cerrar caja');
+            setNotice({
+                type: 'error',
+                title: 'No se pudo cerrar caja',
+                message: 'Error al cerrar caja',
+            });
         } finally {
             setClosing(false);
         }
@@ -379,6 +422,17 @@ export default function CierreCajaPage() {
             </header>
 
             <main style={mainStyle}>
+                {notice && (
+                    <div style={{ marginBottom: "1rem" }}>
+                        <AppNotice
+                            type={notice.type}
+                            title={notice.title}
+                            message={notice.message}
+                            onClose={() => setNotice(null)}
+                        />
+                    </div>
+                )}
+
                 {data && data.status === 'abierto' ? (
                     <>
                         {/* Resumen del Turno */}
@@ -386,7 +440,7 @@ export default function CierreCajaPage() {
                             <div style={cardHeaderStyle}>
                                 <h2 style={cardTitleStyle}>Resumen del Turno</h2>
                                 <p style={cardSubtitleStyle}>
-                                    Apertura: {formatDate(data.openingDate)}
+                                    {data.shiftName ? `${data.shiftName} · ` : ''}Apertura: {formatDate(data.openingDate)}
                                 </p>
                             </div>
                             <div style={gridStatsStyle}>
@@ -446,7 +500,7 @@ export default function CierreCajaPage() {
                                 <Printer size={16} />
                                 Imprimir
                             </button>
-                            <button style={closeButtonStyle} onClick={handleCierre} disabled={closing}>
+                            <button style={closeButtonStyle} onClick={() => setShowCloseConfirm(true)} disabled={closing}>
                                 {closing ? 'Cerrando...' : 'Cerrar Caja'}
                             </button>
                         </div>
@@ -455,13 +509,79 @@ export default function CierreCajaPage() {
                     <div style={closedContainerStyle}>
                         <Receipt size={64} style={{ color: "var(--muted-foreground)", margin: "0 auto 1rem" }} />
                         <h2 style={closedTitleStyle}>Caja Cerrada</h2>
-                        <p style={closedTextStyle}>El cierre de caja fue realizado</p>
+                        <p style={closedTextStyle}>
+                            {data?.message || (data?.shiftName ? `El cierre de ${data.shiftName} fue realizado` : 'El cierre de caja fue realizado')}
+                        </p>
                         <Link href="/dashboard/cajero" style={backButtonLargeStyle}>
                             Volver al Panel
                         </Link>
                     </div>
                 )}
             </main>
+
+            {showCloseConfirm && (
+                <div style={{
+                    position: "fixed",
+                    inset: 0,
+                    zIndex: 70,
+                    backgroundColor: "rgba(0,0,0,0.5)",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    padding: "1rem",
+                }}>
+                    <div style={{
+                        width: "100%",
+                        maxWidth: 420,
+                        backgroundColor: "var(--card)",
+                        border: `1px solid var(--border)`,
+                        borderRadius: "var(--radius-lg)",
+                        boxShadow: "0 20px 60px rgba(0,0,0,0.2)",
+                        padding: "1.25rem",
+                    }}>
+                        <AppNotice
+                            type="warning"
+                            title="Confirmar cierre"
+                            message="Esta acción cerrará la caja del turno actual y no podrá revertirse."
+                        />
+                        <div style={{ display: "flex", gap: "0.75rem", marginTop: "1rem" }}>
+                            <button
+                                type="button"
+                                onClick={() => setShowCloseConfirm(false)}
+                                style={{
+                                    flex: 1,
+                                    padding: "0.65rem",
+                                    borderRadius: "var(--radius-md)",
+                                    border: `1px solid var(--border)`,
+                                    backgroundColor: "transparent",
+                                    color: "var(--foreground)",
+                                    cursor: "pointer",
+                                    fontFamily: "inherit",
+                                }}
+                            >
+                                Cancelar
+                            </button>
+                            <button
+                                type="button"
+                                onClick={handleCierre}
+                                style={{
+                                    flex: 1,
+                                    padding: "0.65rem",
+                                    borderRadius: "var(--radius-md)",
+                                    border: "none",
+                                    backgroundColor: "var(--destructive)",
+                                    color: "white",
+                                    cursor: "pointer",
+                                    fontFamily: "inherit",
+                                    fontWeight: 700,
+                                }}
+                            >
+                                Cerrar Caja
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }

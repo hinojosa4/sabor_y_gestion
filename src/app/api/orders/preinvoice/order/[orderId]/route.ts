@@ -1,22 +1,22 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { Types } from 'mongoose';
 import { connectDB } from '@/lib/db';
+import Order from '@/models/Order';
 import OrderItem from '@/models/OrderItem';
-import Dish from '@/models/Dish';
+import Table from '@/models/Table';
+import { calculateLoyaltyDiscount } from '@/lib/customerLoyalty';
+import '@/models/Dish';
 
 type LeanOrderItem = {
   _id: Types.ObjectId;
   order_id: Types.ObjectId;
-  dish_id?: Types.ObjectId;
+  dish_id?: {
+    name?: string;
+    price?: number;
+  } | null;
   quantity: number;
   unit_price: number;
   subtotal?: number;
-};
-
-type LeanDish = {
-  _id: Types.ObjectId;
-  name: string;
-  price: number;
 };
 
 export async function GET(
@@ -25,42 +25,41 @@ export async function GET(
 ) {
   try {
     await connectDB();
-
     const { orderId } = await params;
 
+    if (!Types.ObjectId.isValid(orderId)) {
+      return NextResponse.json({ items: [], subtotal: 0, iva: 0, total: 0 });
+    }
+
+    const order = await Order.findById(orderId).lean<{
+      table_id?: string;
+      customer_id?: { toString(): string } | string | null;
+      delivery_fee?: number;
+      service_type?: string;
+      total_amount?: number;
+      daily_number?: number | null;
+    } | null>();
+
+    const table = order?.table_id
+      ? await Table.findById(order.table_id).select('number').lean<{ number?: number } | null>()
+      : null;
+
     const items = await OrderItem.find({ order_id: orderId })
+      .populate({ path: 'dish_id', model: 'Dish', select: 'name price' })
       .lean<LeanOrderItem[]>();
 
     if (!items.length) {
-      return NextResponse.json({
-        items: [],
-        subtotal: 0,
-        iva: 0,
-        total: 0,
-      });
+      return NextResponse.json({ items: [], subtotal: 0, iva: 0, total: 0 });
     }
-
-    const dishIds = items
-      .map((item) => item.dish_id)
-      .filter((dishId): dishId is Types.ObjectId => Boolean(dishId));
-
-    const dishes = await Dish.find({
-      _id: { $in: dishIds },
-    }).lean<LeanDish[]>();
-
-    const dishMap = new Map(
-      dishes.map((dish) => [dish._id.toString(), dish])
-    );
 
     let subtotal = 0;
 
     const formattedItems = items.map((item) => {
-      const dishId = item.dish_id?.toString();
-      const dish = dishId ? dishMap.get(dishId) : undefined;
+      const dish = item.dish_id;
 
       const price = item.unit_price ?? dish?.price ?? 0;
       const quantity = item.quantity ?? 1;
-      const subt = item.subtotal ?? price * quantity;
+      const subt = price * quantity;
 
       subtotal += subt;
 
@@ -74,21 +73,28 @@ export async function GET(
       };
     });
 
-    const iva = subtotal * 0.13;
-    const total = subtotal + iva;
+    const iva = 0;
+    const deliveryFee = Number(order?.delivery_fee ?? 0);
+    const customerId = order?.customer_id ? String(order.customer_id) : null;
+    const loyaltyDiscount = await calculateLoyaltyDiscount(customerId, subtotal);
+    const total = Number(order?.total_amount ?? loyaltyDiscount.total + deliveryFee);
 
     return NextResponse.json({
       items: formattedItems,
       subtotal,
       iva,
       total,
+      deliveryFee,
+      discountAmount: loyaltyDiscount.discountAmount,
+      discountPercent: loyaltyDiscount.discountPercent,
+      loyaltyTierName: loyaltyDiscount.tierName,
+      totalBeforeDelivery: loyaltyDiscount.total,
+      dailyNumber: order?.daily_number ?? null,
+      tableNumber: table?.number ?? null,
+      serviceType: order?.service_type ?? 'dine_in',
     });
   } catch (error) {
     console.error('[OrderSummary] Error:', error);
-
-    return NextResponse.json(
-      { error: 'Error interno' },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: 'Error interno' }, { status: 500 });
   }
 }

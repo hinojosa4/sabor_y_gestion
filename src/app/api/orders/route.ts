@@ -5,6 +5,7 @@ import OrderItem from "@/models/OrderItem";
 import Table from "@/models/Table";
 import { verifyToken } from "@/lib/jwt";
 import { pusherServer } from "@/lib/pusher";
+import { getNextDailyNumber } from "@/lib/dailyOrderCounter";
 
 export async function POST(req: NextRequest) {
   try {
@@ -21,7 +22,7 @@ export async function POST(req: NextRequest) {
     }
 
     const body = await req.json();
-    const { table_id, service_type = "dine_in", items } = body;
+    const { table_id, service_type = "dine_in", items, user_id } = body;
 
     if (!items || !Array.isArray(items) || items.length === 0) {
       return NextResponse.json({ ok: false, message: "Se requiere al menos un ítem" }, { status: 400 });
@@ -39,14 +40,18 @@ export async function POST(req: NextRequest) {
       0
     );
 
+    const dailyNumber = await getNextDailyNumber();
     // Crear orden
     const order = await Order.create({
       restaurantId: process.env.RESTAURANT_ID ?? "default",
       table_id: table_id ?? undefined,
       mesero_id: meseroId,
+      user_id: user_id ?? undefined,
       service_type,
       status: "pending",
       total_amount,
+      daily_number: dailyNumber,
+
     });
 
     // Crear items
@@ -66,20 +71,26 @@ export async function POST(req: NextRequest) {
     if (table_id && service_type === "dine_in") {
       await Table.findByIdAndUpdate(table_id, { status: "Ocupada" });
     }
-    // Al final del POST, antes del return:
+    
     await pusherServer.trigger("restaurant", "order:new", {
       order: { ...order.toObject(), items: orderItems },
     });
+
+    if (service_type === "delivery") {
+      await pusherServer.trigger("delivery", "order:new_delivery", {
+        order: { ...order.toObject(), items: orderItems },
+      });
+    }
 
     return NextResponse.json(
       { ok: true, message: "Orden creada", data: { order, items: orderItems } },
       { status: 201 }
     );
-  } catch (error) {
-    console.error("[POST /api/orders]", error);
-    return NextResponse.json(
-      { ok: false, message: "Error al crear la orden", error: error instanceof Error ? error.message : String(error) },
-      { status: 500 }
-    );
-  }
+    } catch (error) {
+      console.error("[POST /api/orders]", error);
+      return NextResponse.json(
+        { ok: false, message: "Error al crear la orden", error: error instanceof Error ? error.message : String(error) },
+        { status: 500 }
+      );
+    }
 }
