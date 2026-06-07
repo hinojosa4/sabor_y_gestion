@@ -4,6 +4,8 @@ import { connectDB } from "@/lib/db";
 import Reservation from "@/models/Reservation";
 import { verifyToken } from "@/lib/jwt";
 import { pusherServer } from "@/lib/pusher";
+import "@/models/User";
+import "@/models/Table"; 
 
 // ── POST /api/reservations ─────────────────────────────────────────────────────
 export async function POST(req: NextRequest) {
