@@ -21,6 +21,27 @@ interface OrderItemType {
     subtotal: number;
 }
 
+type PaymentReceipt = {
+    total: number;
+    subtotal: number;
+    discountAmount: number;
+    discountPercent: number;
+    loyaltyTierName: string | null;
+    dailyNumber: number | null;
+    cashReceived: number;
+    change: number;
+    paymentDate: Date;
+};
+
+type PaymentPreview = {
+    subtotal: number;
+    discountAmount: number;
+    discountPercent: number;
+    loyaltyTierName: string | null;
+    total: number;
+    customerName: string | null;
+};
+
 // Estilos
 const overlayStyle: React.CSSProperties = {
     position: "fixed",
@@ -44,10 +65,84 @@ const modalStyle: React.CSSProperties = {
     boxShadow: "0 20px 60px rgba(0,0,0,0.18)",
 };
 
+const discountPreviewStyle: React.CSSProperties = {
+    display: "grid",
+    gap: "0.5rem",
+    marginTop: "0.65rem",
+    padding: "0.65rem 0.75rem",
+    border: "1px solid var(--border)",
+    borderRadius: "var(--radius-md)",
+    background: "var(--card)",
+    fontSize: "0.82rem",
+};
+
+const discountHeaderStyle: React.CSSProperties = {
+    display: "flex",
+    justifyContent: "space-between",
+    alignItems: "center",
+    gap: "0.75rem",
+};
+
+const discountRowStyle: React.CSSProperties = {
+    display: "flex",
+    justifyContent: "space-between",
+    alignItems: "flex-start",
+    gap: "0.75rem",
+    color: "#555",
+};
+
+const discountLabelStyle: React.CSSProperties = {
+    display: "grid",
+    gap: "0.15rem",
+    minWidth: 0,
+};
+
+const discountMetaStyle: React.CSSProperties = {
+    color: "var(--muted-foreground)",
+    fontSize: "0.74rem",
+};
+
+const discountValueStyle: React.CSSProperties = {
+    color: "#c2410c",
+    textAlign: "right",
+    whiteSpace: "nowrap",
+};
+
+const discountDividerStyle: React.CSSProperties = {
+    height: 1,
+    background: "var(--border)",
+};
+
+const discountTotalRowStyle: React.CSSProperties = {
+    display: "flex",
+    justifyContent: "space-between",
+    gap: "0.75rem",
+    color: "#1a1a1a",
+    fontWeight: 800,
+};
+
+const discountHintStyle: React.CSSProperties = {
+    margin: "0.65rem 0 0",
+    fontSize: "0.78rem",
+    color: "var(--muted-foreground)",
+    textAlign: "center",
+};
+
 // Componente para resumen de la orden
-function OrderSummary({ orderId }: { orderId: string }) {
+function OrderSummary({
+    orderId,
+    preview,
+    previewLoading,
+    formatCurrency,
+}: {
+    orderId: string;
+    preview: PaymentPreview;
+    previewLoading: boolean;
+    formatCurrency: (amount: number) => string;
+}) {
     const [items, setItems] = useState<OrderItemType[]>([]);
     const [total, setTotal] = useState(0);
+    const [dailyNumber, setDailyNumber] = useState<number | null>(null);
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
@@ -58,6 +153,7 @@ function OrderSummary({ orderId }: { orderId: string }) {
                 if (data.items) {
                     setItems(data.items);
                     setTotal(data.total || 0);
+                    setDailyNumber(data.dailyNumber ?? null);
                 }
             } catch (error) {
                 console.error('Error:', error);
@@ -68,20 +164,13 @@ function OrderSummary({ orderId }: { orderId: string }) {
         if (orderId) fetchOrder();
     }, [orderId]);
 
-    const formatCurrency = (amount: number) => {
-        return new Intl.NumberFormat('es-BO', {
-            style: 'currency',
-            currency: 'BOB'
-        }).format(amount);
-    };
-
     if (loading) return <p>Cargando productos...</p>;
 
     return (
-        <div style={{ marginBottom: "1rem", padding: "0.5rem", backgroundColor: "var(--muted)", borderRadius: "var(--radius-md)" }}>
+        <div style={{ marginBottom: "1rem", padding: "0.75rem", backgroundColor: "var(--muted)", borderRadius: "var(--radius-md)" }}>
             {orderId && (
                 <p style={{ margin: "0 0 0.5rem", fontSize: "0.875rem", fontWeight: "bold" }}>
-                    {formatOrderLabel(orderId)}
+                    {formatOrderLabel(orderId, dailyNumber)}
                 </p>
             )}
             <h3 style={{ margin: "0 0 0.5rem", fontSize: "0.875rem", fontWeight: "bold" }}>Productos</h3>
@@ -92,10 +181,66 @@ function OrderSummary({ orderId }: { orderId: string }) {
                 </div>
             ))}
             <div style={{ borderTop: `1px solid var(--border)`, marginTop: "0.5rem", paddingTop: "0.5rem" }}>
-                <div style={{ display: "flex", justifyContent: "space-between", fontWeight: "bold" }}>
-                    <span>Total</span>
-                    <span>{formatCurrency(total)}</span>
-                </div>
+                {preview.discountAmount > 0 ? (
+                    <PaymentDiscountPreview
+                        preview={preview}
+                        loading={previewLoading}
+                        formatCurrency={formatCurrency}
+                    />
+                ) : (
+                    <>
+                        <div style={{ display: "flex", justifyContent: "space-between", fontWeight: "bold" }}>
+                            <span>Total</span>
+                            <span>{formatCurrency(total)}</span>
+                        </div>
+                        {previewLoading && <p style={discountHintStyle}>Calculando fidelizacion...</p>}
+                    </>
+                )}
+            </div>
+        </div>
+    );
+}
+
+function PaymentDiscountPreview({
+    preview,
+    loading,
+    formatCurrency,
+}: {
+    preview: PaymentPreview;
+    loading: boolean;
+    formatCurrency: (amount: number) => string;
+}) {
+    if (loading) {
+        return (
+            <p style={discountHintStyle}>Calculando fidelizacion...</p>
+        );
+    }
+
+    if (preview.discountAmount <= 0) {
+        return null;
+    }
+
+    return (
+        <div style={discountPreviewStyle}>
+            <div style={discountHeaderStyle}>
+                <span>Subtotal</span>
+                <strong>{formatCurrency(preview.subtotal)}</strong>
+            </div>
+            <div style={discountRowStyle}>
+                <span style={discountLabelStyle}>
+                    <span>Descuento fidelizacion</span>
+                    {preview.loyaltyTierName && (
+                        <span style={discountMetaStyle}>{preview.loyaltyTierName}</span>
+                    )}
+                </span>
+                <strong style={discountValueStyle}>
+                    -{formatCurrency(preview.discountAmount)} ({preview.discountPercent}%)
+                </strong>
+            </div>
+            <div style={discountDividerStyle} />
+            <div style={discountTotalRowStyle}>
+                <span>Total con descuento</span>
+                <strong>{formatCurrency(preview.total)}</strong>
             </div>
         </div>
     );
@@ -105,6 +250,15 @@ export function PaymentModal({ isOpen, onClose, orderId, tableId, tableNumber, t
     const [loading, setLoading] = useState(false);
     const [cashReceivedInput, setCashReceivedInput] = useState(String(totalAmount));
     const [customerEmail, setCustomerEmail] = useState('');
+    const [preview, setPreview] = useState<PaymentPreview>({
+        subtotal: totalAmount,
+        discountAmount: 0,
+        discountPercent: 0,
+        loyaltyTierName: null,
+        total: totalAmount,
+        customerName: null,
+    });
+    const [previewLoading, setPreviewLoading] = useState(false);
     const [observations, setObservations] = useState('');
     const [notice, setNotice] = useState<{ type: 'error' | 'warning'; message: string } | null>(null);
     
@@ -112,15 +266,87 @@ export function PaymentModal({ isOpen, onClose, orderId, tableId, tableNumber, t
     const [showFactura, setShowFactura] = useState(false);
     const [orderItems, setOrderItems] = useState<OrderItemType[]>([]);
     const [orderIva, setOrderIva] = useState(0);
+    const [receipt, setReceipt] = useState<PaymentReceipt | null>(null);
 
     useEffect(() => {
         if (isOpen) {
             setCashReceivedInput(String(totalAmount));
             setCustomerEmail('');
+            setPreview({
+                subtotal: totalAmount,
+                discountAmount: 0,
+                discountPercent: 0,
+                loyaltyTierName: null,
+                total: totalAmount,
+                customerName: null,
+            });
+            setPreviewLoading(false);
             setObservations('');
             setNotice(null);
+            setShowFactura(false);
+            setReceipt(null);
         }
     }, [isOpen, totalAmount]);
+
+    useEffect(() => {
+        if (!isOpen || !orderId) return;
+
+        const controller = new AbortController();
+        const timeout = window.setTimeout(async () => {
+            const email = customerEmail.trim();
+
+            if (email === '' || !/^\S+@\S+\.\S+$/.test(email)) {
+                setPreview({
+                    subtotal: totalAmount,
+                    discountAmount: 0,
+                    discountPercent: 0,
+                    loyaltyTierName: null,
+                    total: totalAmount,
+                    customerName: null,
+                });
+                return;
+            }
+
+            setPreviewLoading(true);
+            try {
+                const res = await fetch('/api/payments/preview', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ orderId, email }),
+                    signal: controller.signal,
+                });
+                const data = await res.json();
+                if (!res.ok || !data.ok) throw new Error(data.error || 'Error al calcular descuento');
+
+                setPreview({
+                    subtotal: Number(data.subtotal ?? totalAmount),
+                    discountAmount: Number(data.discountAmount ?? 0),
+                    discountPercent: Number(data.discountPercent ?? 0),
+                    loyaltyTierName: data.loyaltyTierName ?? null,
+                    total: Number(data.total ?? totalAmount),
+                    customerName: data.customer?.name ?? null,
+                });
+            } catch (error) {
+                if (error instanceof DOMException && error.name === 'AbortError') return;
+                console.error('Error:', error);
+                setPreview({
+                    subtotal: totalAmount,
+                    discountAmount: 0,
+                    discountPercent: 0,
+                    loyaltyTierName: null,
+                    total: totalAmount,
+                    customerName: null,
+                });
+            } finally {
+                if (!controller.signal.aborted) setPreviewLoading(false);
+            }
+        }, 450);
+
+        return () => {
+            controller.abort();
+            window.clearTimeout(timeout);
+        };
+    }, [customerEmail, isOpen, orderId, totalAmount]);
 
     if (!isOpen) return null;
 
@@ -132,9 +358,10 @@ export function PaymentModal({ isOpen, onClose, orderId, tableId, tableNumber, t
     };
 
     const cashReceived = Number(cashReceivedInput);
+    const payableTotal = preview.total;
     const hasCashValue = cashReceivedInput.trim() !== '' && !Number.isNaN(cashReceived);
-    const change = hasCashValue ? cashReceived - totalAmount : 0;
-    const isValid = hasCashValue && cashReceived >= totalAmount;
+    const change = hasCashValue ? cashReceived - payableTotal : 0;
+    const isValid = hasCashValue && cashReceived >= payableTotal;
 
     const handleCashReceivedChange = (value: string) => {
         const normalized = value
@@ -165,7 +392,7 @@ export function PaymentModal({ isOpen, onClose, orderId, tableId, tableNumber, t
                 },
                 body: JSON.stringify({ 
                     orderId, 
-                    amount: totalAmount, 
+                    amount: payableTotal, 
                     method: 'cash', 
                     tableId,
                     customerEmail,
@@ -173,20 +400,13 @@ export function PaymentModal({ isOpen, onClose, orderId, tableId, tableNumber, t
                 }),
             });
             
+            const paymentData = await res.json();
+
             if (res.ok) {
-                // 2. Cargar los items de la orden para la factura
-                const orderRes = await fetch(`/api/orders/preinvoice/order/${orderId}`);
-                const orderData = await orderRes.json();
-                setOrderItems(orderData.items || []);
-                setOrderIva(0);
-                
-                // 3. Mostrar factura final y cerrar modal de pago
-                setShowFactura(true);
                 onSuccess();
                 onClose();
             } else {
-                const error = await res.json();
-                setNotice({ type: 'error', message: error.error || 'Error al procesar pago' });
+                setNotice({ type: 'error', message: paymentData.error || 'Error al procesar pago' });
             }
         } catch (error) {
             console.error('Error:', error);
@@ -195,6 +415,38 @@ export function PaymentModal({ isOpen, onClose, orderId, tableId, tableNumber, t
             setLoading(false);
         }
     };
+
+    const closeReceipt = () => {
+        setShowFactura(false);
+        setReceipt(null);
+        onSuccess();
+        onClose();
+    };
+
+    if (showFactura && receipt) {
+        return (
+            <FacturaFinal
+                isOpen
+                onClose={closeReceipt}
+                orderId={orderId}
+                dailyNumber={receipt.dailyNumber}
+                tableNumber={tableNumber}
+                items={orderItems}
+                iva={orderIva}
+                total={receipt.total}
+                subtotal={receipt.subtotal}
+                discountAmount={receipt.discountAmount}
+                discountPercent={receipt.discountPercent}
+                loyaltyTierName={receipt.loyaltyTierName}
+                paymentMethod="cash"
+                cashReceived={receipt.cashReceived}
+                change={receipt.change}
+                customerEmail={customerEmail || undefined}
+                observations={observations}
+                paymentDate={receipt.paymentDate}
+            />
+        );
+    }
 
     return (
         <>
@@ -220,11 +472,16 @@ export function PaymentModal({ isOpen, onClose, orderId, tableId, tableNumber, t
                     )}
 
                     {/* Mejora 1: Resumen de la orden */}
-                    <OrderSummary orderId={orderId} />
+                    <OrderSummary
+                        orderId={orderId}
+                        preview={preview}
+                        previewLoading={previewLoading}
+                        formatCurrency={formatCurrency}
+                    />
 
                     {/* Total a pagar */}
                     <p style={{ fontSize: "1.5rem", fontWeight: "bold", textAlign: "center", marginBottom: "1rem" }}>
-                        Total: {formatCurrency(totalAmount)}
+                        Total: {formatCurrency(payableTotal)}
                     </p>
 
                     {/* Monto recibido */}
@@ -333,22 +590,6 @@ export function PaymentModal({ isOpen, onClose, orderId, tableId, tableNumber, t
                 </div>
             </div>
 
-            {/* Factura Final */}
-            <FacturaFinal
-                isOpen={showFactura}
-                onClose={() => setShowFactura(false)}
-                orderId={orderId}
-                tableNumber={tableNumber}
-                items={orderItems}
-                iva={orderIva}
-                total={totalAmount}
-                paymentMethod="cash"
-                cashReceived={cashReceived}
-                change={change}
-                customerEmail={customerEmail || undefined}
-                observations={observations}
-                paymentDate={new Date()}
-            />
         </>
     );
 }

@@ -24,6 +24,8 @@ interface SendPaymentEmailParams {
     subtotal: number;
     iva: number;
     total: number;
+    discountAmount?: number;
+    discountPercent?: number;
     change?: number;
 }
 
@@ -32,7 +34,10 @@ export async function sendPaymentEmail({
     orderId,
     method,
     items,
+    subtotal,
     total,
+    discountAmount = 0,
+    discountPercent = 0,
     change
 }: SendPaymentEmailParams) {
     const itemsHtml = items.map(item => `
@@ -62,6 +67,16 @@ export async function sendPaymentEmail({
                     ${itemsHtml}
                 </tbody>
                 <tfoot>
+                    ${discountAmount > 0 ? `
+                    <tr>
+                        <td style="padding: 8px; text-align: left;">Subtotal</td>
+                        <td style="padding: 8px; text-align: right;">${formatCurrency(subtotal)}</td>
+                    </tr>
+                    <tr>
+                        <td style="padding: 8px; text-align: left;">Descuento fidelizaciÃ³n (${discountPercent}%)</td>
+                        <td style="padding: 8px; text-align: right;">-${formatCurrency(discountAmount)}</td>
+                    </tr>
+                    ` : ''}
                     <tr>
                         <td style="padding: 8px; text-align: left;"><strong>Total</strong></td>
                         <td style="padding: 8px; text-align: right;"><strong>${formatCurrency(total)}</strong></td>

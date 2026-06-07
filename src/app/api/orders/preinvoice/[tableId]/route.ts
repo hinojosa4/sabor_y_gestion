@@ -82,6 +82,7 @@ export async function GET(
       iva,
       total,
       orderId: order._id,
+      dailyNumber: (order as { daily_number?: number | null }).daily_number ?? null,
     });
   } catch (error) {
     console.error('[Preinvoice] Error:', error);
