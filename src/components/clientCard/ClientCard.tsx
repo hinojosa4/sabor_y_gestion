@@ -9,6 +9,13 @@ interface Client {
     rol: string;
     activo: boolean;
     createdAt: string;
+    loyaltyPoints?: number;
+    loyaltyTier?: {
+        name: string;
+        discountPercent: number;
+        totalPaidOrders?: number;
+        totalSpent?: number;
+    } | null;
 }
 
 interface ClientCardProps {
@@ -43,34 +50,36 @@ export function ClientCard({ client, onEdit, onDelete }: ClientCardProps) {
         color: "var(--foreground)",
     };
 
-    // Estilo de badge similar al de EmployeeCard
-    const statusBadgeStyle = (isActive: boolean): React.CSSProperties => {
-        if (isActive) {
-            return {
-                display: "inline-flex",
-                marginTop: "0.5rem",
-                padding: "0.125rem 0.5rem",
-                borderRadius: "var(--radius-md)",
-                fontSize: "0.75rem",
-                fontWeight: "var(--font-weight-medium)",
-                backgroundColor: "#dcfce7",   // verde claro
-                color: "#166534",             // verde oscuro
-                border: "none",
-            };
-        } else {
-            return {
-                display: "inline-flex",
-                marginTop: "0.5rem",
-                padding: "0.125rem 0.5rem",
-                borderRadius: "var(--radius-md)",
-                fontSize: "0.75rem",
-                fontWeight: "var(--font-weight-medium)",
-                backgroundColor: "#fee2e2",   // rojo claro
-                color: "#991b1b",             // rojo oscuro
-                border: "none",
-            };
-        }
+    const badgeRowStyle: React.CSSProperties = {
+        display: "flex",
+        flexWrap: "wrap",
+        gap: "0.5rem",
+        marginTop: "0.5rem",
     };
+
+    const badgeStyle = (backgroundColor: string, color: string): React.CSSProperties => ({
+        display: "inline-flex",
+        alignItems: "center",
+        justifyContent: "center",
+        padding: "0.125rem 0.5rem",
+        borderRadius: "var(--radius-md)",
+        fontSize: "0.75rem",
+        fontWeight: "var(--font-weight-medium)",
+        backgroundColor,
+        color,
+        border: "none",
+        maxWidth: "100%",
+    });
+
+    const statusBadgeStyle = (isActive: boolean): React.CSSProperties =>
+        isActive
+            ? badgeStyle("#dcfce7", "#166534")
+            : badgeStyle("#fee2e2", "#991b1b");
+
+    const loyaltyBadgeStyle: React.CSSProperties = badgeStyle("#ffedd5", "#9a3412");
+    const loyaltyLabel = client.loyaltyTier
+        ? `${client.loyaltyTier.name}${client.loyaltyTier.discountPercent > 0 ? ` · ${client.loyaltyTier.discountPercent}%` : ""}`
+        : "Sin categoria";
 
     const infoContainerStyle: React.CSSProperties = {
         display: "flex",
@@ -84,6 +93,7 @@ export function ClientCard({ client, onEdit, onDelete }: ClientCardProps) {
         display: "flex",
         alignItems: "center",
         gap: "0.5rem",
+        minWidth: 0,
     };
 
     const actionsContainerStyle: React.CSSProperties = {
@@ -125,15 +135,20 @@ export function ClientCard({ client, onEdit, onDelete }: ClientCardProps) {
             <div style={contentStyle}>
                 <div>
                     <h4 style={nameStyle}>{client.name}</h4>
-                    <span style={statusBadgeStyle(client.activo)}>
-                        {client.activo ? "Activo" : "Inactivo"}
-                    </span>
+                    <div style={badgeRowStyle}>
+                        <span style={statusBadgeStyle(client.activo)}>
+                            {client.activo ? "Activo" : "Inactivo"}
+                        </span>
+                        <span style={loyaltyBadgeStyle}>
+                            {loyaltyLabel}
+                        </span>
+                    </div>
                 </div>
 
                 <div style={infoContainerStyle}>
                     <div style={infoRowStyle}>
                         <Mail size={16} style={{ flexShrink: 0 }} />
-                        <span>{client.email}</span>
+                        <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{client.email}</span>
                     </div>
                     <div style={infoRowStyle}>
                         <User size={16} style={{ flexShrink: 0 }} />

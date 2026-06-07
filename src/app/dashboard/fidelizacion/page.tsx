@@ -28,6 +28,8 @@ type TierForm = {
   isActive: boolean;
 };
 
+type TierFormErrors = Partial<Record<keyof TierForm, string>>;
+
 const emptyForm: TierForm = {
   name: "",
   minOrders: "0",
@@ -83,6 +85,65 @@ function formToPayload(form: TierForm) {
   };
 }
 
+function parseRequiredNumber(value: string) {
+  if (value.trim() === "") return null;
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+function validateTierForm(form: TierForm): TierFormErrors {
+  const errors: TierFormErrors = {};
+  const name = form.name.trim();
+  const minOrders = parseRequiredNumber(form.minOrders);
+  const minSpent = parseRequiredNumber(form.minSpent);
+  const discountPercent = parseRequiredNumber(form.discountPercent);
+  const sortOrder = parseRequiredNumber(form.sortOrder);
+
+  if (!name) {
+    errors.name = "El nombre es obligatorio";
+  } else if (name.length < 2) {
+    errors.name = "El nombre debe tener al menos 2 caracteres";
+  } else if (name.length > 80) {
+    errors.name = "El nombre no puede superar 80 caracteres";
+  }
+
+  if (minOrders === null || minOrders < 0 || !Number.isInteger(minOrders)) {
+    errors.minOrders = "Ingresa un numero entero mayor o igual a 0";
+  }
+
+  if (minSpent === null || minSpent < 0) {
+    errors.minSpent = "Ingresa un monto mayor o igual a 0";
+  }
+
+  if (discountPercent === null || discountPercent < 0 || discountPercent > 100) {
+    errors.discountPercent = "El descuento debe estar entre 0 y 100";
+  }
+
+  if (sortOrder === null || sortOrder < 0 || !Number.isInteger(sortOrder)) {
+    errors.sortOrder = "Ingresa un numero entero mayor o igual a 0";
+  }
+
+  return errors;
+}
+
+function sanitizeIntegerInput(value: string) {
+  return value.replace(/[^\d]/g, "");
+}
+
+function sanitizeDecimalInput(value: string) {
+  const normalized = value.replace(",", ".").replace(/[^\d.]/g, "");
+  const [integerPart, ...decimalParts] = normalized.split(".");
+  return decimalParts.length > 0
+    ? `${integerPart}.${decimalParts.join("")}`
+    : integerPart;
+}
+
+function blockInvalidNumberKey(event: React.KeyboardEvent<HTMLInputElement>) {
+  if (["-", "+", "e", "E"].includes(event.key)) {
+    event.preventDefault();
+  }
+}
+
 export default function FidelizacionPage() {
   const router = useRouter();
   const isMobile = useIsMobile();
@@ -96,6 +157,7 @@ export default function FidelizacionPage() {
   const [modalOpen, setModalOpen] = useState(false);
   const [editingTier, setEditingTier] = useState<LoyaltyTier | null>(null);
   const [form, setForm] = useState<TierForm>(emptyForm);
+  const [formErrors, setFormErrors] = useState<TierFormErrors>({});
 
   const token = useMemo(() => {
     if (typeof window === "undefined") return null;
@@ -136,6 +198,7 @@ export default function FidelizacionPage() {
   const openCreate = () => {
     setEditingTier(null);
     setForm(emptyForm);
+    setFormErrors({});
     setError("");
     setModalOpen(true);
   };
@@ -143,6 +206,7 @@ export default function FidelizacionPage() {
   const openEdit = (tier: LoyaltyTier) => {
     setEditingTier(tier);
     setForm(tierToForm(tier));
+    setFormErrors({});
     setError("");
     setModalOpen(true);
   };
@@ -151,13 +215,16 @@ export default function FidelizacionPage() {
     setModalOpen(false);
     setEditingTier(null);
     setForm(emptyForm);
+    setFormErrors({});
     setError("");
   };
 
   const saveTier = async () => {
     if (!token) return;
-    if (!form.name.trim()) {
-      setError("El nombre es obligatorio");
+    const validationErrors = validateTierForm(form);
+    setFormErrors(validationErrors);
+    if (Object.keys(validationErrors).length > 0) {
+      setError("Corrige los campos marcados antes de guardar");
       return;
     }
 
@@ -244,11 +311,10 @@ export default function FidelizacionPage() {
           </div>
         )}
 
-        <div style={{ display: "grid", gridTemplateColumns: isMobile ? "repeat(2, 1fr)" : "repeat(4, 1fr)", gap: 12, marginBottom: 18 }}>
+        <div style={{ display: "grid", gridTemplateColumns: isMobile ? "repeat(2, 1fr)" : "repeat(3, 1fr)", gap: 12, marginBottom: 18 }}>
           <SummaryCard label="Categorias" value={String(tiers.length)} color="#1a1a1a" />
           <SummaryCard label="Activas" value={String(activeCount)} color="#059669" />
           <SummaryCard label="Mayor descuento" value={`${maxDiscount}%`} color="#e85d26" />
-          <SummaryCard label="Base puntos" value="1 Bs = 1 punto" color="#2563eb" />
         </div>
 
         <div style={{ background: "#fff", border: "1.5px solid #e8e8e8", borderRadius: 12, overflow: "hidden", boxShadow: "0 2px 8px rgba(0,0,0,0.04)" }}>
@@ -317,22 +383,76 @@ export default function FidelizacionPage() {
 
             <div style={{ display: "grid", gap: 13 }}>
               <Field label="Nombre">
-                <input value={form.name} onChange={(event) => setForm({ ...form, name: event.target.value })} style={inputStyle} placeholder="Cliente Preferente" />
+                <input
+                  value={form.name}
+                  onChange={(event) => {
+                    setForm({ ...form, name: event.target.value });
+                    setFormErrors((prev) => ({ ...prev, name: undefined }));
+                  }}
+                  style={fieldInputStyle(formErrors.name)}
+                  placeholder="Cliente Preferente"
+                  maxLength={80}
+                />
+                <FieldError message={formErrors.name} />
               </Field>
               <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap: 12 }}>
                 <Field label="Pedidos minimos">
-                  <input type="number" min={0} value={form.minOrders} onChange={(event) => setForm({ ...form, minOrders: event.target.value })} style={inputStyle} />
+                  <input
+                    type="text"
+                    inputMode="numeric"
+                    value={form.minOrders}
+                    onKeyDown={blockInvalidNumberKey}
+                    onChange={(event) => {
+                      setForm({ ...form, minOrders: sanitizeIntegerInput(event.target.value) });
+                      setFormErrors((prev) => ({ ...prev, minOrders: undefined }));
+                    }}
+                    style={fieldInputStyle(formErrors.minOrders)}
+                  />
+                  <FieldError message={formErrors.minOrders} />
                 </Field>
                 <Field label="Gasto minimo">
-                  <input type="number" min={0} step="0.01" value={form.minSpent} onChange={(event) => setForm({ ...form, minSpent: event.target.value })} style={inputStyle} />
+                  <input
+                    type="text"
+                    inputMode="decimal"
+                    value={form.minSpent}
+                    onKeyDown={blockInvalidNumberKey}
+                    onChange={(event) => {
+                      setForm({ ...form, minSpent: sanitizeDecimalInput(event.target.value) });
+                      setFormErrors((prev) => ({ ...prev, minSpent: undefined }));
+                    }}
+                    style={fieldInputStyle(formErrors.minSpent)}
+                  />
+                  <FieldError message={formErrors.minSpent} />
                 </Field>
               </div>
               <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap: 12 }}>
                 <Field label="Descuento %">
-                  <input type="number" min={0} max={100} step="0.01" value={form.discountPercent} onChange={(event) => setForm({ ...form, discountPercent: event.target.value })} style={inputStyle} />
+                  <input
+                    type="text"
+                    inputMode="decimal"
+                    value={form.discountPercent}
+                    onKeyDown={blockInvalidNumberKey}
+                    onChange={(event) => {
+                      setForm({ ...form, discountPercent: sanitizeDecimalInput(event.target.value) });
+                      setFormErrors((prev) => ({ ...prev, discountPercent: undefined }));
+                    }}
+                    style={fieldInputStyle(formErrors.discountPercent)}
+                  />
+                  <FieldError message={formErrors.discountPercent} />
                 </Field>
                 <Field label="Orden">
-                  <input type="number" min={0} value={form.sortOrder} onChange={(event) => setForm({ ...form, sortOrder: event.target.value })} style={inputStyle} />
+                  <input
+                    type="text"
+                    inputMode="numeric"
+                    value={form.sortOrder}
+                    onKeyDown={blockInvalidNumberKey}
+                    onChange={(event) => {
+                      setForm({ ...form, sortOrder: sanitizeIntegerInput(event.target.value) });
+                      setFormErrors((prev) => ({ ...prev, sortOrder: undefined }));
+                    }}
+                    style={fieldInputStyle(formErrors.sortOrder)}
+                  />
+                  <FieldError message={formErrors.sortOrder} />
                 </Field>
               </div>
               <Field label="Beneficios">
@@ -372,6 +492,16 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
       <span style={{ fontSize: 11, color: "#555", fontWeight: 800, textTransform: "uppercase" }}>{label}</span>
       {children}
     </label>
+  );
+}
+
+function FieldError({ message }: { message?: string }) {
+  if (!message) return null;
+
+  return (
+    <span style={{ marginTop: -2, fontSize: 11, color: "#c2410c", fontWeight: 700 }}>
+      {message}
+    </span>
   );
 }
 
@@ -459,6 +589,12 @@ const inputStyle: React.CSSProperties = {
   color: "#1a1a1a",
   outline: "none",
 };
+
+const fieldInputStyle = (error?: string): React.CSSProperties => ({
+  ...inputStyle,
+  borderColor: error ? "#e85d26" : "#e0e0e0",
+  background: error ? "#fff7f5" : "#fff",
+});
 
 const errorBoxStyle: React.CSSProperties = {
   background: "#fff0ee",

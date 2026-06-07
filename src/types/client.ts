@@ -7,4 +7,10 @@ export interface Client {
     activo: boolean;
     createdAt: string;
     loyaltyPoints?: number;
+    loyaltyTier?: {
+        name: string;
+        discountPercent: number;
+        totalPaidOrders?: number;
+        totalSpent?: number;
+    } | null;
 }

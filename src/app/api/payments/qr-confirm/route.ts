@@ -168,6 +168,7 @@ export async function POST(req: NextRequest) {
     await sendPaymentEmail({
       to: normalizedEmail,
       orderId: order._id.toString(),
+      dailyNumber: order.daily_number ?? null,
       amount: totalAmount,
       method: 'qr',
       items: formattedItems,
@@ -182,6 +183,7 @@ export async function POST(req: NextRequest) {
       success: true,
       message: 'Pago confirmado correctamente',
       orderId: order._id,
+      dailyNumber: order.daily_number ?? null,
       items: formattedItems,
       subtotal,
       iva,
