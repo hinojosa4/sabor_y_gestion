@@ -19,6 +19,7 @@ type CombinedClient = Client & {
   employmentDetails: null;
   _source: "client";
   loyaltyPoints?: number;
+  loyaltyTier?: Client["loyaltyTier"];
 };
 type CombinedUser = CombinedEmployee | CombinedClient;
 type ShiftRow = {
@@ -157,6 +158,7 @@ export default function StaffManagementPage() {
       createdAt: client.createdAt,
       employmentDetails: null,
       loyaltyPoints: client.loyaltyPoints,
+      loyaltyTier: client.loyaltyTier,
       _source: 'client',
       activo: client.activo,
       rol: client.rol,
@@ -318,7 +320,11 @@ export default function StaffManagementPage() {
         isActive: clientData.activo ?? true,
         loyaltyPoints: clientData.loyaltyPoints,
       });
-      setClients(prev => prev.map(c => c._id === updated._id ? updated : c));
+      setClients(prev => prev.map(c => (
+        c._id === updated._id
+          ? { ...c, ...updated, loyaltyTier: updated.loyaltyTier ?? c.loyaltyTier }
+          : c
+      )));
       showSuccess("Cliente actualizado correctamente");
       setIsClientModalOpen(false);
       setEditingClient(null);
@@ -496,6 +502,7 @@ export default function StaffManagementPage() {
                                 activo: user.isActive,
                                 createdAt: user.createdAt,
                                 loyaltyPoints: user.loyaltyPoints ?? 0,
+                                loyaltyTier: user.loyaltyTier ?? null,
                               };
                               return (
                                 <ClientCard

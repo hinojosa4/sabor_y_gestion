@@ -195,13 +195,15 @@ function DiscountPreview({
                 {preview.discountAmount > 0 && (
                     <div style={discountRowStyle}>
                         <span style={discountLabelStyle}>
-                            <span>Descuento fidelizacion</span>
+                            <span>
+                                Descuento fidelizacion{preview.discountPercent > 0 ? ` (${preview.discountPercent}%)` : ''}
+                            </span>
                             {preview.loyaltyTierName && (
                                 <span style={discountMetaStyle}>{preview.loyaltyTierName}</span>
                             )}
                         </span>
                         <strong style={discountValueStyle}>
-                            -{formatCurrency(preview.discountAmount)} ({preview.discountPercent}%)
+                            -{formatCurrency(preview.discountAmount)}
                         </strong>
                     </div>
                 )}
@@ -251,6 +253,7 @@ export default function PagoQRPage() {
     const [paymentData, setPaymentData] = useState<{
         orderId: string; items: OrderItem[];
         iva: number; total: number; subtotal: number;
+        dailyNumber: number | null;
         discountAmount: number; discountPercent: number;
         loyaltyTierName: string | null;
         deliveryFee: number;
@@ -378,6 +381,7 @@ export default function PagoQRPage() {
                     orderId,
                     items: data.items ?? items,
                     iva: data.iva ?? iva,
+                    dailyNumber: data.dailyNumber ?? dailyNumber,
                     subtotal: Number(data.subtotal ?? preview.subtotal),
                     total: Number(data.total ?? preview.total),
                     discountAmount: Number(data.discountAmount ?? 0),
@@ -515,7 +519,7 @@ export default function PagoQRPage() {
                     isOpen={showFactura}
                     onClose={() => { setShowFactura(false); router.push('/'); }}
                     orderId={paymentData.orderId}
-                    dailyNumber={dailyNumber}
+                    dailyNumber={paymentData.dailyNumber}
                     tableNumber={tableNumber}
                     items={paymentData.items}
                     iva={paymentData.iva}

@@ -167,7 +167,7 @@ export function FacturaFinal({
                             <>
                                 <p style={{ margin: "0.5rem 0 0", fontSize: "0.75rem" }}>Subtotal: {formatCurrency(subtotal ?? total + discountAmount)}</p>
                                 <p style={{ margin: 0, fontSize: "0.75rem" }}>
-                                    Descuento fidelizacion{loyaltyTierName ? ` (${loyaltyTierName})` : ''}: -{formatCurrency(discountAmount)} ({discountPercent}%)
+                                    Descuento fidelizacion{discountPercent > 0 ? ` (${discountPercent}%)` : ''}{loyaltyTierName ? ` - ${loyaltyTierName}` : ''}: -{formatCurrency(discountAmount)}
                                 </p>
                             </>
                         )}

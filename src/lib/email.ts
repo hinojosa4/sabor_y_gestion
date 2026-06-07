@@ -1,5 +1,6 @@
 // src/lib/email.ts
 import nodemailer from 'nodemailer';
+import { formatShortOrderId } from '@/lib/orderDisplay';
 
 const transporter = nodemailer.createTransport({
     service: 'gmail',
@@ -18,6 +19,7 @@ interface OrderItem {
 interface SendPaymentEmailParams {
     to: string;
     orderId: string;
+    dailyNumber?: number | null;
     amount: number;
     method: 'cash' | 'qr';
     items: OrderItem[];
@@ -32,6 +34,7 @@ interface SendPaymentEmailParams {
 export async function sendPaymentEmail({
     to,
     orderId,
+    dailyNumber,
     method,
     items,
     subtotal,
@@ -40,6 +43,7 @@ export async function sendPaymentEmail({
     discountPercent = 0,
     change
 }: SendPaymentEmailParams) {
+    const orderLabel = formatShortOrderId(orderId, dailyNumber);
     const itemsHtml = items.map(item => `
         <tr>
             <td style="padding: 8px; border-bottom: 1px solid #ddd;">${item.quantity}x ${item.dish?.name}</td>
@@ -50,7 +54,7 @@ export async function sendPaymentEmail({
     const html = `
         <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
             <h2 style="color: #333;">¡Gracias por su compra!</h2>
-            <p><strong>Orden N°:</strong> ${orderId}</p>
+            <p><strong>Orden N°:</strong> ${orderLabel}</p>
             <p><strong>Fecha:</strong> ${new Date().toLocaleString('es-BO')}</p>
             <p><strong>Método de pago:</strong> ${method === 'cash' ? 'Efectivo' : 'QR'}</p>
             ${change !== undefined ? `<p><strong>Vuelto:</strong> ${formatCurrency(change)}</p>` : ''}
@@ -91,7 +95,7 @@ export async function sendPaymentEmail({
     await transporter.sendMail({
         from: process.env.EMAIL_USER,
         to,
-        subject: `Factura - Orden ${orderId}`,
+        subject: `Factura - Orden ${orderLabel}`,
         html,
     });
 }
