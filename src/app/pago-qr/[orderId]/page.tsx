@@ -195,13 +195,15 @@ function DiscountPreview({
                 {preview.discountAmount > 0 && (
                     <div style={discountRowStyle}>
                         <span style={discountLabelStyle}>
-                            <span>Descuento fidelizacion</span>
+                            <span>
+                                Descuento fidelizacion{preview.discountPercent > 0 ? ` (${preview.discountPercent}%)` : ''}
+                            </span>
                             {preview.loyaltyTierName && (
                                 <span style={discountMetaStyle}>{preview.loyaltyTierName}</span>
                             )}
                         </span>
                         <strong style={discountValueStyle}>
-                            -{formatCurrency(preview.discountAmount)} ({preview.discountPercent}%)
+                            -{formatCurrency(preview.discountAmount)}
                         </strong>
                     </div>
                 )}
