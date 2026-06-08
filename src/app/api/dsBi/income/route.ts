@@ -1,3 +1,4 @@
+// src/app/api/dsBi/income/route.ts
 import { NextRequest, NextResponse } from 'next/server';
 import { connectDB } from '@/lib/db';
 import Payment from '@/models/Payment';
@@ -17,34 +18,31 @@ export async function GET(req: NextRequest) {
         let compareEndDate: Date | null = null;
 
         if (type === 'day' && value) {
-            // CORREGIDO: Usar componentes de fecha local (no UTC)
             const [year, month, day] = value.split('-');
-            startDate = new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
-            startDate.setHours(0, 0, 0, 0);
-            endDate = new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
-            endDate.setHours(23, 59, 59, 999);
+            startDate = new Date(Date.UTC(parseInt(year), parseInt(month) - 1, parseInt(day), 0, 0, 0));
+            endDate = new Date(Date.UTC(parseInt(year), parseInt(month) - 1, parseInt(day), 23, 59, 59, 999));
         } else if (type === 'month' && value) {
             const [year, month] = value.split('-');
-            startDate = new Date(parseInt(year), parseInt(month) - 1, 1);
-            endDate = new Date(parseInt(year), parseInt(month), 0);
-            endDate.setHours(23, 59, 59, 999);
+            startDate = new Date(Date.UTC(parseInt(year), parseInt(month) - 1, 1, 0, 0, 0));
+            endDate = new Date(Date.UTC(parseInt(year), parseInt(month), 0, 23, 59, 59, 999));
 
-            // Comparación con mes anterior
             if (compare === 'previous_month') {
-                compareStartDate = new Date(parseInt(year), parseInt(month) - 2, 1);
-                compareEndDate = new Date(parseInt(year), parseInt(month) - 1, 0);
-                compareEndDate.setHours(23, 59, 59, 999);
+                compareStartDate = new Date(Date.UTC(parseInt(year), parseInt(month) - 2, 1, 0, 0, 0));
+                compareEndDate = new Date(Date.UTC(parseInt(year), parseInt(month) - 1, 0, 23, 59, 59, 999));
             }
         } else if (type === 'year' && value) {
-            startDate = new Date(parseInt(value), 0, 1);
-            endDate = new Date(parseInt(value), 11, 31);
-            endDate.setHours(23, 59, 59, 999);
+            const year = parseInt(value);
+            startDate = new Date(Date.UTC(year, 0, 1, 0, 0, 0));
+            endDate = new Date(Date.UTC(year, 11, 31, 23, 59, 59, 999));
+
+            console.log('Año:', value);
+            console.log('startDate:', startDate);
+            console.log('endDate:', endDate);
 
             // Comparación con año anterior
             if (compare === 'previous_year') {
-                compareStartDate = new Date(parseInt(value) - 1, 0, 1);
-                compareEndDate = new Date(parseInt(value) - 1, 11, 31);
-                compareEndDate.setHours(23, 59, 59, 999);
+                compareStartDate = new Date(Date.UTC(year - 1, 0, 1, 0, 0, 0));
+                compareEndDate = new Date(Date.UTC(year - 1, 11, 31, 23, 59, 59, 999));
             }
         } else {
             // Por defecto: hoy (usando fecha local)
@@ -110,6 +108,8 @@ export async function GET(req: NextRequest) {
             const monthKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
             monthlyIncome[monthKey] = (monthlyIncome[monthKey] || 0) + p.amount;
         });
+
+        console.log('monthlyIncome:', monthlyIncome);
 
         return NextResponse.json({
             totalSales,

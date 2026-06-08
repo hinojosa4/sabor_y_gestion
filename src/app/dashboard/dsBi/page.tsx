@@ -103,6 +103,18 @@ const formatDate = (date: string) => {
     return new Date(date).toLocaleDateString('es-BO');
 };
 
+const formatDateKey = (dateKey: string) => {
+    const [year, month, day] = dateKey.split('-');
+    return `${parseInt(day)}/${parseInt(month)}/${year}`;
+};
+
+const formatPeriodDate = (date: Date) => {
+    const year = date.getUTCFullYear();
+    const month = date.getUTCMonth() + 1;
+    const day = date.getUTCDate();
+    return `${day}/${month}/${year}`;
+};
+
 type ChartType = 'bar' | 'line' | 'area' | 'pie';
 
 const getLocalDate = () => {
@@ -138,8 +150,9 @@ export default function ReportesPage() {
         }
 
         try {
-            const res = await fetch(`/api/reports/income?${params}`);
+            const res = await fetch(`/api/dsBi/income?${params}`);
             const data = await res.json();
+            console.log('Periodo recibido:', data.period); //log
             setReport(data);
         } catch (error) {
             console.error('Error:', error);
@@ -157,24 +170,37 @@ export default function ReportesPage() {
         if (!report) return [];
 
         if (periodType === 'year') {
-            // Para año, mostrar por mes
             return Object.entries(report.monthlyIncome || {}).map(([month, amount]) => ({
                 name: month,
                 ingresos: amount,
             }));
         } else if (periodType === 'month') {
-            // Para mes, mostrar por día
-            const data = Object.entries(report.dailyIncome || {}).map(([date, amount]) => ({
-                name: formatDate(date),
-                ingresos: amount,
-            }));
+            const [year, month] = selectedMonth.split('-');
 
-            // Agregar datos comparativos si existen
+            const data = Object.entries(report.dailyIncome || {})
+                .filter(([date]) => {
+                    const [dateYear, dateMonth] = date.split('-');
+                    return dateYear === year && dateMonth === month;
+                })
+                .map(([date, amount]) => ({
+                    name: formatDateKey(date),
+                    ingresos: amount,
+                }));
+
+            // Ordenar por fecha (convertir a números)
+            data.sort((a, b) => {
+                const [dayA, monthA, yearA] = a.name.split('/');
+                const [dayB, monthB, yearB] = b.name.split('/');
+                const dateA = new Date(parseInt(yearA), parseInt(monthA) - 1, parseInt(dayA));
+                const dateB = new Date(parseInt(yearB), parseInt(monthB) - 1, parseInt(dayB));
+                return dateA.getTime() - dateB.getTime();
+            });
+
             if (report.compareDailyIncome && Object.keys(report.compareDailyIncome).length > 0) {
                 return data.map(item => ({
                     ...item,
                     comparativo: report.compareDailyIncome[Object.keys(report.dailyIncome).find(
-                        d => formatDate(d) === item.name
+                        d => formatDateKey(d) === item.name
                     ) || ''] || 0
                 }));
             }
@@ -265,9 +291,9 @@ export default function ReportesPage() {
                         <DollarSign size={22} color="white" />
                     </div>
                     <div>
-                        <h1 style={{ margin: 0, fontSize: "1.25rem", fontWeight: "bold" }}>Reporte de Ingresos</h1>
+                        <h1 style={{ margin: 0, fontSize: "1.25rem", fontWeight: "bold" }}>Dashboard BI</h1>
                         <p style={{ margin: 0, fontSize: "0.75rem", color: "var(--muted-foreground)" }}>
-                            Consulta y exporta reportes de ventas
+                            Análisis de ventas, tendencias y rendimiento del negocio
                         </p>
                     </div>
                 </div>
@@ -457,7 +483,7 @@ export default function ReportesPage() {
                                         {Object.entries(periodType === 'year' ? (report.monthlyIncome || {}) : (report.dailyIncome || {})).map(([key, amount]) => (
                                             <tr key={key}>
                                                 <td style={{ padding: "0.5rem 0.75rem", borderBottom: `1px solid var(--border)` }}>
-                                                    {periodType === 'year' ? key : formatDate(key)}
+                                                    {periodType === 'year' ? key : formatDateKey(key)}
                                                 </td>
                                                 <td style={{ textAlign: "right", padding: "0.5rem 0.75rem", borderBottom: `1px solid var(--border)` }}>
                                                     {formatCurrency(amount as number)}
@@ -471,7 +497,7 @@ export default function ReportesPage() {
 
                         <div style={{ ...cardStyle, textAlign: "center" }}>
                             <p style={{ fontSize: "0.875rem", color: "var(--muted-foreground)" }}>
-                                Período: {formatDate(report.period.startDate)} - {formatDate(report.period.endDate)}
+                                Período: {formatDateKey(report.period.startDate.split('T')[0])} - {formatDateKey(report.period.endDate.split('T')[0])}
                             </p>
                             <p style={{ fontSize: "0.875rem", color: "var(--muted-foreground)" }}>
                                 Total de pedidos: {report.ordersCount}
