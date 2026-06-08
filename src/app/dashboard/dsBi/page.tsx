@@ -322,7 +322,7 @@ export default function ReportesPage() {
                             <label style={{ display: "block", marginBottom: "0.25rem", fontSize: "0.875rem", fontWeight: "bold" }}>Período</label>
                             <select
                                 value={periodType}
-                                onChange={(e) => setPeriodType(e.target.value as any)}
+                                onChange={(e) => setPeriodType(e.target.value as 'day' | 'month' | 'year')}
                                 style={selectStyle}
                             >
                                 <option value="day">Día</option>
