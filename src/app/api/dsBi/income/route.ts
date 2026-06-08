@@ -35,10 +35,6 @@ export async function GET(req: NextRequest) {
             startDate = new Date(Date.UTC(year, 0, 1, 0, 0, 0));
             endDate = new Date(Date.UTC(year, 11, 31, 23, 59, 59, 999));
 
-            console.log('Año:', value);
-            console.log('startDate:', startDate);
-            console.log('endDate:', endDate);
-
             // Comparación con año anterior
             if (compare === 'previous_year') {
                 compareStartDate = new Date(Date.UTC(year - 1, 0, 1, 0, 0, 0));
@@ -60,7 +56,7 @@ export async function GET(req: NextRequest) {
         }).lean();
 
         // Pagos del período comparativo
-        let comparePayments: any[] = [];
+        let comparePayments: Array<{ amount: number; timestamp: Date }> = [];
         if (compareStartDate && compareEndDate) {
             comparePayments = await Payment.find({
                 status: 'completed',
@@ -108,8 +104,6 @@ export async function GET(req: NextRequest) {
             const monthKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
             monthlyIncome[monthKey] = (monthlyIncome[monthKey] || 0) + p.amount;
         });
-
-        console.log('monthlyIncome:', monthlyIncome);
 
         return NextResponse.json({
             totalSales,

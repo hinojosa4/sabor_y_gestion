@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/lib/useAuth';
 import { ADMIN } from '@/lib/roles';
-import { Printer, Calendar, DollarSign, CreditCard, Receipt, Users, BarChart3, LineChart, TrendingUp, TrendingDown } from 'lucide-react';
+import { Printer, Calendar, DollarSign, CreditCard, Users, BarChart3, LineChart, TrendingUp, TrendingDown } from 'lucide-react';
 import Link from 'next/link';
 import {
     BarChart,
@@ -95,24 +95,31 @@ const chartTypeButtonStyle = (active: boolean): React.CSSProperties => ({
     fontSize: "0.875rem",
 });
 
+interface IncomeReport {
+    totalSales: number;
+    cashTotal: number;
+    qrTotal: number;
+    ordersCount: number;
+    tablesServed: number;
+    dailyIncome: Record<string, number>;
+    compareTotal?: number;
+    compareDailyIncome: Record<string, number>;
+    monthlyIncome: Record<string, number>;
+    period: {
+        startDate: string;
+        endDate: string;
+        compareStartDate: string | null;
+        compareEndDate: string | null;
+    };
+}
+
 const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('es-BO', { style: 'currency', currency: 'BOB' }).format(amount);
-};
-
-const formatDate = (date: string) => {
-    return new Date(date).toLocaleDateString('es-BO');
 };
 
 const formatDateKey = (dateKey: string) => {
     const [year, month, day] = dateKey.split('-');
     return `${parseInt(day)}/${parseInt(month)}/${year}`;
-};
-
-const formatPeriodDate = (date: Date) => {
-    const year = date.getUTCFullYear();
-    const month = date.getUTCMonth() + 1;
-    const day = date.getUTCDate();
-    return `${day}/${month}/${year}`;
 };
 
 type ChartType = 'bar' | 'line' | 'area' | 'pie';
@@ -132,7 +139,7 @@ export default function ReportesPage() {
     const [selectedMonth, setSelectedMonth] = useState(`${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, '0')}`);
     const [selectedYear, setSelectedYear] = useState(new Date().getFullYear().toString());
     const [compare, setCompare] = useState<'none' | 'previous_month' | 'previous_year'>('none');
-    const [report, setReport] = useState<any>(null);
+    const [biData, setBiData] = useState<IncomeReport | null>(null);
     const [loading, setLoading] = useState(false);
     const [chartType, setChartType] = useState<ChartType>('bar');
 
@@ -153,7 +160,7 @@ export default function ReportesPage() {
             const res = await fetch(`/api/dsBi/income?${params}`);
             const data = await res.json();
             console.log('Periodo recibido:', data.period); //log
-            setReport(data);
+            setBiData(data);
         } catch (error) {
             console.error('Error:', error);
         } finally {
@@ -167,17 +174,17 @@ export default function ReportesPage() {
 
     // Preparar datos para el gráfico
     const getChartData = () => {
-        if (!report) return [];
+        if (!biData) return [];
 
         if (periodType === 'year') {
-            return Object.entries(report.monthlyIncome || {}).map(([month, amount]) => ({
+            return Object.entries(biData.monthlyIncome || {}).map(([month, amount]) => ({
                 name: month,
                 ingresos: amount,
             }));
         } else if (periodType === 'month') {
             const [year, month] = selectedMonth.split('-');
 
-            const data = Object.entries(report.dailyIncome || {})
+            const data = Object.entries(biData.dailyIncome || {})
                 .filter(([date]) => {
                     const [dateYear, dateMonth] = date.split('-');
                     return dateYear === year && dateMonth === month;
@@ -196,10 +203,10 @@ export default function ReportesPage() {
                 return dateA.getTime() - dateB.getTime();
             });
 
-            if (report.compareDailyIncome && Object.keys(report.compareDailyIncome).length > 0) {
+            if (biData.compareDailyIncome && Object.keys(biData.compareDailyIncome).length > 0) {
                 return data.map(item => ({
                     ...item,
-                    comparativo: report.compareDailyIncome[Object.keys(report.dailyIncome).find(
+                    comparativo: biData.compareDailyIncome[Object.keys(biData.dailyIncome).find(
                         d => formatDateKey(d) === item.name
                     ) || ''] || 0
                 }));
@@ -213,7 +220,7 @@ export default function ReportesPage() {
         const data = getChartData();
         if (data.length === 0) return <p>No hay datos para mostrar</p>;
 
-        const hasComparison = report?.compareTotal > 0;
+        const hasComparison = biData?.compareTotal !== undefined && biData.compareTotal > 0;
 
         switch (chartType) {
             case 'bar':
@@ -351,7 +358,7 @@ export default function ReportesPage() {
                                     <label style={{ display: "block", marginBottom: "0.25rem", fontSize: "0.875rem", fontWeight: "bold" }}>Comparar con</label>
                                     <select
                                         value={compare}
-                                        onChange={(e) => setCompare(e.target.value as any)}
+                                        onChange={(e) => setCompare(e.target.value as 'none' | 'previous_month')}
                                         style={selectStyle}
                                     >
                                         <option value="none">Sin comparación</option>
@@ -378,7 +385,7 @@ export default function ReportesPage() {
                                     <label style={{ display: "block", marginBottom: "0.25rem", fontSize: "0.875rem", fontWeight: "bold" }}>Comparar con</label>
                                     <select
                                         value={compare}
-                                        onChange={(e) => setCompare(e.target.value as any)}
+                                        onChange={(e) => setCompare(e.target.value as 'none' | 'previous_year')}
                                         style={selectStyle}
                                     >
                                         <option value="none">Sin comparación</option>
@@ -400,34 +407,34 @@ export default function ReportesPage() {
                     </div>
                 )}
 
-                {report && !loading && (
+                {biData && !loading && (
                     <>
                         {/* Stats */}
                         <div style={statsGridStyle}>
                             <div style={statCardStyle}>
                                 <DollarSign size={24} style={{ margin: "0 auto 0.5rem", color: "var(--primary)" }} />
-                                <h3 style={{ fontSize: "1.5rem", fontWeight: "bold", margin: 0 }}>{formatCurrency(report.totalSales)}</h3>
+                                <h3 style={{ fontSize: "1.5rem", fontWeight: "bold", margin: 0 }}>{formatCurrency(biData.totalSales)}</h3>
                                 <p style={{ fontSize: "0.75rem", color: "var(--muted-foreground)", margin: 0 }}>Ventas Totales</p>
-                                {report.compareTotal > 0 && (
-                                    <p style={{ fontSize: "0.7rem", marginTop: "0.25rem", color: report.totalSales >= report.compareTotal ? "#27ae60" : "#e85d26" }}>
-                                        {report.totalSales >= report.compareTotal ? <TrendingUp size={12} /> : <TrendingDown size={12} />}
-                                        {Math.abs(((report.totalSales - report.compareTotal) / report.compareTotal) * 100).toFixed(1)}% vs período anterior
+                                {biData.compareTotal !== undefined && biData.compareTotal > 0 && (
+                                    <p style={{ fontSize: "0.7rem", marginTop: "0.25rem", color: biData.totalSales >= biData.compareTotal ? "#27ae60" : "#e85d26" }}>
+                                        {biData.totalSales >= biData.compareTotal ? <TrendingUp size={12} /> : <TrendingDown size={12} />}
+                                        {Math.abs(((biData.totalSales - biData.compareTotal) / biData.compareTotal) * 100).toFixed(1)}% vs período anterior
                                     </p>
                                 )}
                             </div>
                             <div style={statCardStyle}>
                                 <CreditCard size={24} style={{ margin: "0 auto 0.5rem", color: "#27ae60" }} />
-                                <h3 style={{ fontSize: "1.5rem", fontWeight: "bold", margin: 0 }}>{formatCurrency(report.cashTotal)}</h3>
+                                <h3 style={{ fontSize: "1.5rem", fontWeight: "bold", margin: 0 }}>{formatCurrency(biData.cashTotal)}</h3>
                                 <p style={{ fontSize: "0.75rem", color: "var(--muted-foreground)", margin: 0 }}>Efectivo</p>
                             </div>
                             <div style={statCardStyle}>
                                 <CreditCard size={24} style={{ margin: "0 auto 0.5rem", color: "#1976d2" }} />
-                                <h3 style={{ fontSize: "1.5rem", fontWeight: "bold", margin: 0 }}>{formatCurrency(report.qrTotal)}</h3>
+                                <h3 style={{ fontSize: "1.5rem", fontWeight: "bold", margin: 0 }}>{formatCurrency(biData.qrTotal)}</h3>
                                 <p style={{ fontSize: "0.75rem", color: "var(--muted-foreground)", margin: 0 }}>QR / Digital</p>
                             </div>
                             <div style={statCardStyle}>
                                 <Users size={24} style={{ margin: "0 auto 0.5rem", color: "var(--primary)" }} />
-                                <h3 style={{ fontSize: "1.5rem", fontWeight: "bold", margin: 0 }}>{report.tablesServed}</h3>
+                                <h3 style={{ fontSize: "1.5rem", fontWeight: "bold", margin: 0 }}>{biData.tablesServed}</h3>
                                 <p style={{ fontSize: "0.75rem", color: "var(--muted-foreground)", margin: 0 }}>Mesas Atendidas</p>
                             </div>
                         </div>
@@ -480,7 +487,7 @@ export default function ReportesPage() {
                                         </tr>
                                     </thead>
                                     <tbody>
-                                        {Object.entries(periodType === 'year' ? (report.monthlyIncome || {}) : (report.dailyIncome || {})).map(([key, amount]) => (
+                                        {Object.entries(periodType === 'year' ? (biData.monthlyIncome || {}) : (biData.dailyIncome || {})).map(([key, amount]) => (
                                             <tr key={key}>
                                                 <td style={{ padding: "0.5rem 0.75rem", borderBottom: `1px solid var(--border)` }}>
                                                     {periodType === 'year' ? key : formatDateKey(key)}
@@ -497,10 +504,10 @@ export default function ReportesPage() {
 
                         <div style={{ ...cardStyle, textAlign: "center" }}>
                             <p style={{ fontSize: "0.875rem", color: "var(--muted-foreground)" }}>
-                                Período: {formatDateKey(report.period.startDate.split('T')[0])} - {formatDateKey(report.period.endDate.split('T')[0])}
+                                Período: {formatDateKey(biData.period.startDate.split('T')[0])} - {formatDateKey(biData.period.endDate.split('T')[0])}
                             </p>
                             <p style={{ fontSize: "0.875rem", color: "var(--muted-foreground)" }}>
-                                Total de pedidos: {report.ordersCount}
+                                Total de pedidos: {biData.ordersCount}
                             </p>
                         </div>
                     </>
