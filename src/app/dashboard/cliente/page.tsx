@@ -62,6 +62,8 @@ interface RawOrder {
   total_amount: number;
   table_id?: string;
   delivery_address?: string;
+  delivery_coords?: { lat?: number | null; lng?: number | null };
+  driver_location?: { lat?: number | null; lng?: number | null; updatedAt?: string | Date | null };
   payment_method?: string;
   notes?: string;
   createdAt: string;
@@ -124,6 +126,7 @@ function toFrontendOrder(raw: RawOrder, index: number): Order {
   return {
     id: raw.daily_number ? String(raw.daily_number) : String(index + 1001),
     _id: raw._id,
+    serviceType: raw.service_type,
     date: formatDate(raw.createdAt),
     time: formatTime(raw.createdAt),
     location: mapLocation(raw),
@@ -136,6 +139,20 @@ function toFrontendOrder(raw: RawOrder, index: number): Order {
       unitPrice: it.unit_price,
     })),
     total: raw.total_amount,
+    deliveryCoords:
+      raw.delivery_coords?.lat != null && raw.delivery_coords?.lng != null
+        ? { lat: raw.delivery_coords.lat, lng: raw.delivery_coords.lng }
+        : null,
+    driverLocation:
+      raw.driver_location?.lat != null && raw.driver_location?.lng != null
+        ? {
+            lat: raw.driver_location.lat,
+            lng: raw.driver_location.lng,
+            updatedAt: raw.driver_location.updatedAt
+              ? new Date(raw.driver_location.updatedAt).toISOString()
+              : undefined,
+          }
+        : null,
   };
 }
 

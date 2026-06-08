@@ -7,6 +7,11 @@ export interface IOrder extends Document {
   customer_id?: Types.ObjectId | null;
   mesero_id: string;
   driver_id?: string;
+  driver_location?: {
+    lat: number | null;
+    lng: number | null;
+    updatedAt: Date | null;
+  };
   service_type: 'dine_in' | 'delivery' | 'pick_up';
   status: 'pending' | 'in_kitchen' | 'ready' | 'picked_up' | 'in_transit' | 'delivered' | 'paid' | 'cancelled';
   total_amount: number;
@@ -34,6 +39,11 @@ const OrderSchema = new Schema<IOrder>({
   },
   mesero_id:    { type: String, required: true },
   driver_id:    { type: String },
+  driver_location: {
+    lat: { type: Number, default: null },
+    lng: { type: Number, default: null },
+    updatedAt: { type: Date, default: null },
+  },
   service_type: {
     type: String,
     enum: ['dine_in', 'delivery', 'pick_up'],

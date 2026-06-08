@@ -15,6 +15,7 @@ export interface Order {
   id: string;
   /** ID real del backend (_id de MongoDB) */
   _id?: string;
+  serviceType?: "dine_in" | "delivery" | "pick_up";
   date: string;
   time: string;
   location: string;
@@ -23,6 +24,8 @@ export interface Order {
   items: OrderItem[];
   total: number;
   status: "Pendiente" | "En cocina" | "Listo" | "En camino" | "Completado" | "Cancelado";
+  deliveryCoords?: { lat: number; lng: number } | null;
+  driverLocation?: { lat: number; lng: number; updatedAt?: string } | null;
 }
 
 interface OrderCardProps {

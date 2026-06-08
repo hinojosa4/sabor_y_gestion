@@ -1,6 +1,8 @@
 // src/components/clientScreen/OrderModal.tsx
-import React from "react";
+import React, { useEffect, useState } from "react";
 import { Receipt, Clock, MapPin, User, CreditCard, Wallet, Banknote, X } from "lucide-react";
+import { getPusherClient } from "@/lib/pusherClient";
+import { DeliveryTrackingMap } from "@/components/clientScreen/delivery/DeliveryTrackingMap";
 import { Order, PaymentMethod } from "./OrderCard";
 
 interface OrderModalProps {
@@ -22,7 +24,87 @@ function getPaymentIcon(method: PaymentMethod) {
 }
 
 export function OrderModal({ order, open, onClose, onReorder }: OrderModalProps) {
+    const [liveDriverCoords, setLiveDriverCoords] = useState<{
+        orderId: string;
+        coords: NonNullable<Order["driverLocation"]>;
+    } | null>(null);
+
+    useEffect(() => {
+        if (!open || !order?._id) return;
+
+        const orderId = order._id;
+        const token = localStorage.getItem("token");
+        let cancelled = false;
+
+        const applyDriverLocation = (location: {
+            lat?: number | null;
+            lng?: number | null;
+            updatedAt?: string | Date | null;
+        }) => {
+            if (cancelled || location?.lat == null || location?.lng == null) return;
+            setLiveDriverCoords({
+                orderId,
+                coords: {
+                    lat: location.lat,
+                    lng: location.lng,
+                    updatedAt: location.updatedAt
+                        ? new Date(location.updatedAt).toISOString()
+                        : new Date().toISOString(),
+                },
+            });
+        };
+
+        const refreshDriverLocation = () => {
+            if (!token) return;
+            fetch(`/api/orders/cliente/${orderId}`, {
+                headers: { Authorization: `Bearer ${token}` },
+            })
+                .then((res) => res.json())
+                .then((json) => {
+                    if (json?.ok) applyDriverLocation(json.data?.driver_location);
+                })
+                .catch(() => {
+                    // Pusher seguira intentando actualizar en vivo.
+                });
+        };
+
+        refreshDriverLocation();
+        const pollId = window.setInterval(refreshDriverLocation, 3000);
+
+        getPusherClient().then((client) => {
+            if (cancelled) return;
+            const channel = client.subscribe(`order-${orderId}`);
+            channel.bind("driver:location", (data: {
+                orderId: string;
+                lat: number;
+                lng: number;
+                updatedAt: string;
+            }) => {
+                if (data.orderId !== orderId) return;
+                applyDriverLocation(data);
+            });
+        });
+
+        return () => {
+            cancelled = true;
+            window.clearInterval(pollId);
+            getPusherClient().then((client) => {
+                client.unsubscribe(`order-${orderId}`);
+            });
+        };
+    }, [open, order?._id]);
+
     if (!open || !order) return null;
+
+    const showTracking =
+        order.serviceType === "delivery" &&
+        !!order.deliveryCoords &&
+        order.status !== "Completado" &&
+        order.status !== "Cancelado";
+    const driverCoords =
+        liveDriverCoords && liveDriverCoords.orderId === order._id
+            ? liveDriverCoords.coords
+            : order.driverLocation ?? null;
 
     return (
         <div style={styles.overlay} onClick={onClose}>
@@ -61,6 +143,40 @@ export function OrderModal({ order, open, onClose, onReorder }: OrderModalProps)
                         />
                     </div>
                 </div>
+
+                {showTracking && order.deliveryCoords && (
+                    <div style={styles.trackingCard}>
+                        <div style={styles.trackingHeader}>
+                            <div>
+                                <h3 style={styles.trackingTitle}>Seguimiento del delivery</h3>
+                                <p style={styles.trackingSubtitle}>Estado actual: {order.status}</p>
+                            </div>
+                        </div>
+                        <DeliveryTrackingMap
+                            customerCoords={order.deliveryCoords}
+                            driverCoords={driverCoords}
+                        />
+                        <div style={styles.trackingLegend}>
+                            <span>R: restaurante</span>
+                            <span>C: entrega</span>
+                            <span>D: repartidor</span>
+                        </div>
+                        {driverCoords?.updatedAt && (
+                            <p style={styles.trackingUpdated}>
+                                Ultima actualizacion: {new Date(driverCoords.updatedAt).toLocaleTimeString("es-BO", {
+                                    hour: "2-digit",
+                                    minute: "2-digit",
+                                    second: "2-digit",
+                                })}
+                            </p>
+                        )}
+                        {!driverCoords && (
+                            <p style={styles.trackingWaiting}>
+                                El repartidor aparecera cuando recoja el pedido y active su ubicacion.
+                            </p>
+                        )}
+                    </div>
+                )}
 
                 <div style={styles.productsCard}>
                     <h3 style={styles.productsTitle}>Productos</h3>
@@ -249,6 +365,56 @@ const styles: { [key: string]: React.CSSProperties } = {
         borderRadius: 12,
         padding: "1.1rem 1.25rem",
         flexShrink: 0,
+    },
+    trackingCard: {
+        border: "1px solid #e5e7eb",
+        borderRadius: 12,
+        padding: "1rem",
+        backgroundColor: "#ffffff",
+        display: "flex",
+        flexDirection: "column",
+        gap: "0.75rem",
+        flexShrink: 0,
+    },
+    trackingHeader: {
+        display: "flex",
+        justifyContent: "space-between",
+        alignItems: "flex-start",
+        gap: "1rem",
+    },
+    trackingTitle: {
+        margin: 0,
+        fontSize: "1rem",
+        fontWeight: 700,
+        color: "#111827",
+    },
+    trackingSubtitle: {
+        margin: "0.25rem 0 0",
+        fontSize: "0.85rem",
+        color: "#6b7280",
+    },
+    trackingLegend: {
+        display: "flex",
+        gap: "0.75rem",
+        flexWrap: "wrap",
+        color: "#6b7280",
+        fontSize: "0.75rem",
+        fontWeight: 600,
+    },
+    trackingUpdated: {
+        margin: 0,
+        color: "#4b5563",
+        fontSize: "0.78rem",
+        fontWeight: 600,
+    },
+    trackingWaiting: {
+        margin: 0,
+        color: "#92400e",
+        backgroundColor: "#fffbeb",
+        border: "1px solid #fde68a",
+        borderRadius: 8,
+        padding: "0.65rem 0.75rem",
+        fontSize: "0.85rem",
     },
     productsTitle: {
         margin: 0,

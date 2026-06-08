@@ -35,6 +35,7 @@ interface RawItem {
 interface RawOrder {
   _id: string;
   status: BackendStatus;
+  driver_id?: string;
   total_amount: number;
   delivery_fee?: number;              // ← costo de envío
   delivery_distance_km?: number | null; // ← distancia en km
@@ -339,6 +340,7 @@ export default function DeliveryPage() {
   const [actionLoading, setActionLoading]     = useState(false);
   const [error, setError]                     = useState<string | null>(null);
   const [newOrderAlert, setNewOrderAlert]     = useState(false);
+  const [trackingInfo, setTrackingInfo]       = useState<string | null>(null);
 
   // ── Carga ─────────────────────────────────────────────────────────────────
   const loadOrders = useCallback(async () => {
@@ -416,6 +418,83 @@ export default function DeliveryPage() {
     };
   }, [user]);
 
+  useEffect(() => {
+    if (!user) return;
+    const token = getToken();
+    if (!token || !navigator.geolocation) return;
+
+    const trackedOrder = activeOrders.find((order) =>
+      ["picked_up", "in_transit"].includes(order.status) &&
+      String(order.driver_id ?? "") === user._id
+    );
+
+    if (!trackedOrder) {
+      setTrackingInfo(null);
+      return;
+    }
+    setTrackingInfo("Tracking activo: obteniendo GPS...");
+
+    let lastSentAt = 0;
+    let latestCoords: { lat: number; lng: number } | null = null;
+
+    const sendLocation = async (lat: number, lng: number) => {
+      const now = Date.now();
+      if (now - lastSentAt < 3000) return;
+
+      lastSentAt = now;
+      latestCoords = { lat, lng };
+
+      try {
+        await fetch(`/api/orders/${trackedOrder._id}/driver-location`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+          body: JSON.stringify({ lat, lng }),
+        });
+        setTrackingInfo(`Tracking activo: ubicacion enviada ${new Date().toLocaleTimeString("es-BO", {
+          hour: "2-digit",
+          minute: "2-digit",
+          second: "2-digit",
+        })}`);
+      } catch {
+        // El tracking no debe bloquear la gestion del pedido.
+      }
+    };
+
+    const requestAndSendLocation = () => {
+      navigator.geolocation.getCurrentPosition(
+        (pos) => {
+          sendLocation(pos.coords.latitude, pos.coords.longitude);
+        },
+        () => {
+          setTrackingInfo("Tracking activo: no se pudo refrescar el GPS");
+          if (latestCoords) {
+            sendLocation(latestCoords.lat, latestCoords.lng);
+          }
+        },
+        { enableHighAccuracy: true, maximumAge: 0, timeout: 12000 }
+      );
+    };
+
+    const watchId = navigator.geolocation.watchPosition(
+      (pos) => {
+        sendLocation(pos.coords.latitude, pos.coords.longitude);
+      },
+      () => {
+        setTrackingInfo("Tracking activo: permiso GPS pendiente o bloqueado");
+        // Si el permiso falla, el repartidor puede seguir usando el panel.
+      },
+      { enableHighAccuracy: true, maximumAge: 10000, timeout: 15000 }
+    );
+    requestAndSendLocation();
+    const intervalId = window.setInterval(requestAndSendLocation, 3000);
+
+    return () => {
+      navigator.geolocation.clearWatch(watchId);
+      window.clearInterval(intervalId);
+      setTrackingInfo(null);
+    };
+  }, [activeOrders, user]);
+
   // ── Acciones ───────────────────────────────────────────────────────────────
   const handleAdvance = async (orderId: string, nextStatus: BackendStatus) => {
     const token = getToken();
@@ -443,7 +522,17 @@ export default function DeliveryPage() {
         setActiveOrders((prev) => prev.filter((o) => o._id !== orderId));
       } else {
         setActiveOrders((prev) =>
-          prev.map((o) => o._id === orderId ? { ...o, status: nextStatus } : o)
+          prev.map((o) =>
+            o._id === orderId
+              ? {
+                  ...o,
+                  status: nextStatus,
+                  driver_id: ["picked_up", "in_transit"].includes(nextStatus)
+                    ? user?._id ?? o.driver_id
+                    : o.driver_id,
+                }
+              : o
+          )
         );
       }
     } catch (e) {
@@ -523,6 +612,20 @@ export default function DeliveryPage() {
       <main className={styles.main}>
         {newOrderAlert && (
           <div className={styles.newOrderAlert}>🛵 ¡Nueva orden de delivery recibida!</div>
+        )}
+        {trackingInfo && (
+          <div style={{
+            marginBottom: "1rem",
+            backgroundColor: "#eff6ff",
+            border: "1px solid #bfdbfe",
+            color: "#1d4ed8",
+            borderRadius: 10,
+            padding: "0.75rem 1rem",
+            fontSize: "0.9rem",
+            fontWeight: 700,
+          }}>
+            {trackingInfo}
+          </div>
         )}
         {error && (
           <div className={styles.errorBanner}>

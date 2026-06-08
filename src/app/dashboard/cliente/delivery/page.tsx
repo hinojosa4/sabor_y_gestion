@@ -22,6 +22,11 @@ const DeliveryMap = dynamic(
   { ssr: false, loading: () => <div style={{ height: 240, background: "#f3f4f6", borderRadius: 10, display: "flex", alignItems: "center", justifyContent: "center", color: "#9ca3af", fontSize: "0.85rem" }}>Cargando mapa…</div> }
 );
 
+const DeliveryTrackingMap = dynamic(
+  () => import("@/components/clientScreen/delivery/DeliveryTrackingMap").then(m => m.DeliveryTrackingMap),
+  { ssr: false, loading: () => <div style={{ height: 260, background: "#f3f4f6", borderRadius: 10, display: "flex", alignItems: "center", justifyContent: "center", color: "#9ca3af", fontSize: "0.85rem" }}>Cargando seguimiento...</div> }
+);
+
 interface ApiCategory { _id: string; name: string; isActive: boolean; }
 interface ApiDish {
   _id: string; name: string; description?: string; price: number;
@@ -97,6 +102,9 @@ export default function DeliveryPage() {
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("Efectivo");
   const [notes, setNotes]                 = useState("");
   const [lastOrderId, setLastOrderId]     = useState<string | null>(null);
+  const [trackingStatus, setTrackingStatus] = useState<string>("pending");
+  const [trackingCustomerCoords, setTrackingCustomerCoords] = useState<{ lat: number; lng: number } | null>(null);
+  const [driverCoords, setDriverCoords] = useState<{ lat: number; lng: number; updatedAt: string } | null>(null);
 
   // ── Estado de geolocalización ─────────────────────────────────────────────
   const [geoStatus, setGeoStatus]       = useState<GeoStatus>("idle");
@@ -239,6 +247,40 @@ export default function DeliveryPage() {
   useEffect(() => {
     if (!lastOrderId) return;
 
+    let cancelled = false;
+    const token = localStorage.getItem("token");
+    const applyDriverLocation = (location: {
+      lat?: number | null;
+      lng?: number | null;
+      updatedAt?: string | Date | null;
+    }) => {
+      if (cancelled || location?.lat == null || location?.lng == null) return;
+      setDriverCoords({
+        lat: location.lat,
+        lng: location.lng,
+        updatedAt: location.updatedAt
+          ? new Date(location.updatedAt).toISOString()
+          : new Date().toISOString(),
+      });
+    };
+
+    const refreshDriverLocation = () => {
+      if (!token) return;
+      fetch(`/api/orders/cliente/${lastOrderId}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      })
+        .then((res) => res.json())
+        .then((json) => {
+          if (json?.ok) applyDriverLocation(json.data?.driver_location);
+        })
+        .catch(() => {
+          // Pusher seguira entregando actualizaciones en vivo.
+        });
+    };
+
+    refreshDriverLocation();
+    const pollId = window.setInterval(refreshDriverLocation, 3000);
+
     const STATUS_LABELS: Record<string, string> = {
       in_kitchen: "🍳 Tu pedido está en cocina",
       ready:      "✅ Tu pedido está listo",
@@ -250,6 +292,7 @@ export default function DeliveryPage() {
 
     const handleStatusUpdate = (data: { orderId: string; status: string }) => {
       if (data.orderId !== lastOrderId) return;
+      setTrackingStatus(data.status);
       const label = STATUS_LABELS[data.status];
       if (label) {
         setToastMsg(label);
@@ -257,7 +300,11 @@ export default function DeliveryPage() {
         setTimeout(() => setToastMsg(null), 5000);
       }
       if (data.status === "delivered" || data.status === "cancelled") {
-        setTimeout(() => setLastOrderId(null), 6000);
+        setTimeout(() => {
+          setLastOrderId(null);
+          setTrackingCustomerCoords(null);
+          setDriverCoords(null);
+        }, 6000);
       }
     };
 
@@ -265,22 +312,33 @@ export default function DeliveryPage() {
       handleStatusUpdate({ orderId: data.orderId, status: data.newStatus });
     };
 
-    let cancelled = false;
     getPusherClient().then((client) => {
       if (cancelled) return;
       const channel = client.subscribe("restaurant");
       const deliveryChannel = client.subscribe("delivery");
+      const orderChannel = client.subscribe(`order-${lastOrderId}`);
       channel.bind("order:status_updated", handleStatusUpdate);
       channel.bind("order:updated", handleKitchenUpdate);
       deliveryChannel.bind("order:status_updated", handleStatusUpdate);
       deliveryChannel.bind("order:updated", handleKitchenUpdate);
+      orderChannel.bind("driver:location", (data: {
+        orderId: string;
+        lat: number;
+        lng: number;
+        updatedAt: string;
+      }) => {
+        if (data.orderId !== lastOrderId) return;
+        applyDriverLocation(data);
+      });
     });
 
     return () => {
       cancelled = true;
+      window.clearInterval(pollId);
       getPusherClient().then((client) => {
         client.unsubscribe("restaurant");
         client.unsubscribe("delivery");
+        client.unsubscribe(`order-${lastOrderId}`);
       });
     };
   }, [lastOrderId]);
@@ -359,6 +417,9 @@ export default function DeliveryPage() {
 
       const orderId: string = json.data.order._id;
       setLastOrderId(orderId);
+      setTrackingStatus(json.data.order.status ?? "pending");
+      setTrackingCustomerCoords(clientCoords);
+      setDriverCoords(null);
 
       // Limpiar carrito y cerrar modal
       const cartSnapshot = [...cart];
@@ -410,6 +471,16 @@ export default function DeliveryPage() {
       ? cartSubtotalAfterDiscount + deliveryFee
       : cartSubtotalAfterDiscount;
 
+  const trackingLabel: Record<string, string> = {
+    pending: "Pedido recibido",
+    in_kitchen: "En cocina",
+    ready: "Listo para recoger",
+    picked_up: "Recogido por el repartidor",
+    in_transit: "En camino",
+    delivered: "Entregado",
+    cancelled: "Cancelado",
+  };
+
   if (authLoading) return <main style={s.main}><div style={s.centered}>Verificando sesión…</div></main>;
 
   return (
@@ -420,6 +491,40 @@ export default function DeliveryPage() {
         <div style={{ ...s.toast, ...(toastType === "info" ? s.toastInfo : {}) }}>
           {toastMsg}
         </div>
+      )}
+
+      {lastOrderId && trackingCustomerCoords && (
+        <section style={s.trackingPanel}>
+          <div style={s.trackingHeader}>
+            <div>
+              <h2 style={s.trackingTitle}>Seguimiento del pedido</h2>
+              <p style={s.trackingSubtitle}>
+                Estado: {trackingLabel[trackingStatus] ?? "Pedido activo"}
+              </p>
+            </div>
+            <span style={s.trackingBadge}>#{lastOrderId.slice(-6).toUpperCase()}</span>
+          </div>
+          <DeliveryTrackingMap customerCoords={trackingCustomerCoords} driverCoords={driverCoords} />
+          <div style={s.trackingFooter}>
+            <span>R: restaurante</span>
+            <span>C: entrega</span>
+            <span>D: repartidor</span>
+          </div>
+          {driverCoords?.updatedAt && (
+            <p style={s.trackingUpdated}>
+              Ultima actualizacion: {new Date(driverCoords.updatedAt).toLocaleTimeString("es-BO", {
+                hour: "2-digit",
+                minute: "2-digit",
+                second: "2-digit",
+              })}
+            </p>
+          )}
+          {!driverCoords && (
+            <p style={s.trackingWaiting}>
+              El mapa mostrara al repartidor cuando recoja el pedido y active su ubicacion.
+            </p>
+          )}
+        </section>
       )}
 
       <div style={s.layout}>
@@ -685,6 +790,14 @@ const s: { [k: string]: React.CSSProperties } = {
   retryBtn:    { backgroundColor: "#f97316", color: "#fff", border: "none", borderRadius: 8, padding: "0.5rem 1.25rem", fontWeight: 600, cursor: "pointer" },
   toast:       { margin: "1rem 2rem 0", padding: "0.85rem 1.25rem", backgroundColor: "#ecfdf5", border: "1px solid #6ee7b7", borderRadius: 10, color: "#065f46", fontWeight: 600, fontSize: "0.95rem" },
   toastInfo:   { backgroundColor: "#fef3c7", border: "1px solid #fcd34d", color: "#92400e" },
+  trackingPanel: { margin: "1rem 2rem 0", backgroundColor: "#fff", border: "1px solid #e5e7eb", borderRadius: 10, padding: "1rem", display: "flex", flexDirection: "column", gap: "0.75rem", boxShadow: "0 6px 18px rgba(15,23,42,0.06)" },
+  trackingHeader: { display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: "1rem" },
+  trackingTitle: { margin: 0, fontSize: "1rem", fontWeight: 700, color: "#111827" },
+  trackingSubtitle: { margin: "0.25rem 0 0", fontSize: "0.85rem", color: "#4b5563" },
+  trackingBadge: { backgroundColor: "#eff6ff", border: "1px solid #bfdbfe", color: "#1d4ed8", borderRadius: 999, padding: "0.25rem 0.65rem", fontSize: "0.75rem", fontWeight: 700, whiteSpace: "nowrap" },
+  trackingFooter: { display: "flex", gap: "0.75rem", flexWrap: "wrap", color: "#6b7280", fontSize: "0.75rem", fontWeight: 600 },
+  trackingUpdated: { margin: 0, color: "#4b5563", fontSize: "0.78rem", fontWeight: 600 },
+  trackingWaiting: { margin: 0, color: "#92400e", backgroundColor: "#fffbeb", border: "1px solid #fde68a", borderRadius: 8, padding: "0.65rem 0.75rem", fontSize: "0.85rem" },
 
   // ── Modal ──────────────────────────────────────────────────────────────────
   overlay:     { position: "fixed", inset: 0, backgroundColor: "rgba(17,24,39,0.55)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000, padding: "1rem" },
