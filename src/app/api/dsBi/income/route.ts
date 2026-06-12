@@ -1,4 +1,3 @@
-// src/app/api/dsBi/income/route.ts
 import { NextRequest, NextResponse } from 'next/server';
 import { connectDB } from '@/lib/db';
 import Payment from '@/models/Payment';
@@ -8,15 +7,16 @@ export async function GET(req: NextRequest) {
     try {
         await connectDB();
         const { searchParams } = new URL(req.url);
-        const type = searchParams.get('type'); // 'day', 'month', 'year'
+        const type = searchParams.get('type');
         const value = searchParams.get('value');
-        const compare = searchParams.get('compare'); // 'month' o 'year' para comparar
+        const compare = searchParams.get('compare');
 
         let startDate: Date;
         let endDate: Date;
         let compareStartDate: Date | null = null;
         let compareEndDate: Date | null = null;
 
+        // Misma lógica que metrics (UTC puro)
         if (type === 'day' && value) {
             const [year, month, day] = value.split('-');
             startDate = new Date(Date.UTC(parseInt(year), parseInt(month) - 1, parseInt(day), 0, 0, 0));
@@ -35,18 +35,14 @@ export async function GET(req: NextRequest) {
             startDate = new Date(Date.UTC(year, 0, 1, 0, 0, 0));
             endDate = new Date(Date.UTC(year, 11, 31, 23, 59, 59, 999));
 
-            // Comparación con año anterior
             if (compare === 'previous_year') {
                 compareStartDate = new Date(Date.UTC(year - 1, 0, 1, 0, 0, 0));
                 compareEndDate = new Date(Date.UTC(year - 1, 11, 31, 23, 59, 59, 999));
             }
         } else {
-            // Por defecto: hoy (usando fecha local)
             const today = new Date();
-            startDate = new Date(today.getFullYear(), today.getMonth(), today.getDate());
-            startDate.setHours(0, 0, 0, 0);
-            endDate = new Date(today.getFullYear(), today.getMonth(), today.getDate());
-            endDate.setHours(23, 59, 59, 999);
+            startDate = new Date(Date.UTC(today.getFullYear(), today.getMonth(), today.getDate(), 0, 0, 0));
+            endDate = new Date(Date.UTC(today.getFullYear(), today.getMonth(), today.getDate(), 23, 59, 59, 999));
         }
 
         // Pagos completados en el período
@@ -81,11 +77,11 @@ export async function GET(req: NextRequest) {
 
         const tablesServed = new Set(orders.filter(o => o.table_id).map(o => o.table_id.toString())).size;
 
-        // Ingresos agrupados por día
+        // Ingresos agrupados por día (UTC)
         const dailyIncome: Record<string, number> = {};
         payments.forEach(p => {
             const date = p.timestamp;
-            const dateKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+            const dateKey = `${date.getUTCFullYear()}-${String(date.getUTCMonth() + 1).padStart(2, '0')}-${String(date.getUTCDate()).padStart(2, '0')}`;
             dailyIncome[dateKey] = (dailyIncome[dateKey] || 0) + p.amount;
         });
 
@@ -93,7 +89,7 @@ export async function GET(req: NextRequest) {
         const compareDailyIncome: Record<string, number> = {};
         comparePayments.forEach(p => {
             const date = p.timestamp;
-            const dateKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+            const dateKey = `${date.getUTCFullYear()}-${String(date.getUTCMonth() + 1).padStart(2, '0')}-${String(date.getUTCDate()).padStart(2, '0')}`;
             compareDailyIncome[dateKey] = (compareDailyIncome[dateKey] || 0) + p.amount;
         });
 
@@ -101,7 +97,7 @@ export async function GET(req: NextRequest) {
         const monthlyIncome: Record<string, number> = {};
         payments.forEach(p => {
             const date = p.timestamp;
-            const monthKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+            const monthKey = `${date.getUTCFullYear()}-${String(date.getUTCMonth() + 1).padStart(2, '0')}`;
             monthlyIncome[monthKey] = (monthlyIncome[monthKey] || 0) + p.amount;
         });
 
@@ -115,7 +111,12 @@ export async function GET(req: NextRequest) {
             compareTotal,
             compareDailyIncome,
             monthlyIncome,
-            period: { startDate, endDate, compareStartDate, compareEndDate }
+            period: {
+                startDate: type === 'day' ? value : startDate.toISOString().split('T')[0],
+                endDate: type === 'day' ? value : endDate.toISOString().split('T')[0],
+                compareStartDate: compareStartDate ? (type === 'day' ? value : compareStartDate.toISOString().split('T')[0]) : null,
+                compareEndDate: compareEndDate ? (type === 'day' ? value : compareEndDate.toISOString().split('T')[0]) : null
+            }
         });
     } catch (error) {
         console.error('Error en reporte de ingresos:', error);

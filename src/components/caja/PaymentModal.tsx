@@ -266,8 +266,8 @@ export function PaymentModal({ isOpen, onClose, orderId, tableId, tableNumber, t
     
     // Estados para la factura final
     const [showFactura, setShowFactura] = useState(false);
-    const [orderItems, setOrderItems] = useState<OrderItemType[]>([]);
-    const [orderIva, setOrderIva] = useState(0);
+    const [orderItems] = useState<OrderItemType[]>([]);
+    const [orderIva] = useState(0);
     const [receipt, setReceipt] = useState<PaymentReceipt | null>(null);
 
     useEffect(() => {
