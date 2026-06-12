@@ -1,4 +1,3 @@
-// src/app/dashboard/cajero/page.tsx
 "use client";
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useAuth } from '@/lib/useAuth';
@@ -249,18 +248,18 @@ export default function CajeroDashboard() {
         }
     }, []);
 
-     const fetchActiveOrders = useCallback(async () => {
+    const fetchActiveOrders = useCallback(async () => {
         try {
             const token = localStorage.getItem("token");
             const headers: Record<string, string> = token
                 ? { Authorization: `Bearer ${token}` }
                 : {};
- 
+
             const res = await fetch('/api/orders/active', { headers });
             const data = await res.json();
- 
+
             const nextOrderIdsByTable: Record<string, OrderIdentifier> = {};
- 
+
             if (!res.ok || !data?.ok || !Array.isArray(data.data)) {
                 console.warn('No se pudieron cargar las ordenes activas:', data);
             } else {
@@ -274,11 +273,11 @@ export default function CajeroDashboard() {
                     }
                 });
             }
- 
+
             const tablesNeedingFallback = tables.filter((table) =>
                 table.status !== 'Libre' && !nextOrderIdsByTable[table._id]
             );
- 
+
             const fallbackOrderIds = await Promise.all(
                 tablesNeedingFallback.map(async (table) => {
                     try {
@@ -298,13 +297,13 @@ export default function CajeroDashboard() {
                     }
                 })
             );
- 
+
             fallbackOrderIds.forEach((entry) => {
                 if (!entry) return;
                 const [tableId, orderIdentifier] = entry;
                 nextOrderIdsByTable[tableId] = orderIdentifier;
             });
- 
+
             setOrderIdsByTable(nextOrderIdsByTable);
         } catch (error) {
             console.warn('No se pudieron cargar las ordenes activas:', error);
@@ -369,7 +368,7 @@ export default function CajeroDashboard() {
     const fetchActiveOrdersRef = useRef(fetchActiveOrders);
     const fetchCashRegisterStatusRef = useRef(fetchCashRegisterStatus);
     useEffect(() => {
-    refreshTablesRef.current = refreshTables;
+        refreshTablesRef.current = refreshTables;
     }, [refreshTables]);
 
     useEffect(() => {
@@ -403,54 +402,54 @@ export default function CajeroDashboard() {
     }, [cashNotice]);
 
     useEffect(() => {
-    let pusherInstance: InstanceType<typeof import("pusher-js")["default"]> | null = null;
-    let mounted = true;
+        let pusherInstance: InstanceType<typeof import("pusher-js")["default"]> | null = null;
+        let mounted = true;
 
-    const setup = async () => {
-        const { default: Pusher } = await import("pusher-js");
-        if (!mounted) return;
+        const setup = async () => {
+            const { default: Pusher } = await import("pusher-js");
+            if (!mounted) return;
 
-        pusherInstance = new Pusher(process.env.NEXT_PUBLIC_PUSHER_KEY!, {
-        cluster: process.env.NEXT_PUBLIC_PUSHER_CLUSTER!,
-        });
+            pusherInstance = new Pusher(process.env.NEXT_PUBLIC_PUSHER_KEY!, {
+                cluster: process.env.NEXT_PUBLIC_PUSHER_CLUSTER!,
+            });
 
-        const channel = pusherInstance.subscribe("restaurant");
+            const channel = pusherInstance.subscribe("restaurant");
 
-        // Nueva orden creada → puede cambiar estado de mesa
-        channel.bind("order:new", () => {
-        if (mounted) {
-            refreshTablesRef.current();
-            fetchActiveOrdersRef.current();
-        }
-        });
+            // Nueva orden creada → puede cambiar estado de mesa
+            channel.bind("order:new", () => {
+                if (mounted) {
+                    refreshTablesRef.current();
+                    fetchActiveOrdersRef.current();
+                }
+            });
 
-        // Mesa actualizada (pagado, cuenta solicitada)
-        channel.bind("table:updated", () => {
-        if (mounted) {
-            refreshTablesRef.current();
-            fetchActiveOrdersRef.current();
-            fetchCashRegisterStatusRef.current();
-        }
-        });
+            // Mesa actualizada (pagado, cuenta solicitada)
+            channel.bind("table:updated", () => {
+                if (mounted) {
+                    refreshTablesRef.current();
+                    fetchActiveOrdersRef.current();
+                    fetchCashRegisterStatusRef.current();
+                }
+            });
 
-        // Mesero pide cuenta
-        channel.bind("table:bill_requested", () => {
-        if (mounted) {
-            refreshTablesRef.current();
-            fetchActiveOrdersRef.current();
-        }
-        });
-    };
+            // Mesero pide cuenta
+            channel.bind("table:bill_requested", () => {
+                if (mounted) {
+                    refreshTablesRef.current();
+                    fetchActiveOrdersRef.current();
+                }
+            });
+        };
 
-    setup();
+        setup();
 
-    return () => {
-        mounted = false;
-        pusherInstance?.unsubscribe("restaurant");
-        pusherInstance?.disconnect();
-    };
+        return () => {
+            mounted = false;
+            pusherInstance?.unsubscribe("restaurant");
+            pusherInstance?.disconnect();
+        };
     }, []); // solo al montar
-    
+
     if (userLoading || loading) {
         return (
             <div style={loadingContainerStyle}>
@@ -570,17 +569,33 @@ export default function CajeroDashboard() {
                     {cashRegisterStatus?.status === 'cerrado' ? (
                         <button
                             type="button"
-                            onClick={() => setCashNotice(
-                                cashRegisterStatus.message ||
-                                `La caja${cashRegisterStatus.shiftName ? ` de ${cashRegisterStatus.shiftName}` : ''} ya está cerrada. No se pueden registrar pagos.`
-                            )}
+                            onClick={async () => {
+                                try {
+                                    const token = localStorage.getItem("token");
+                                    const res = await fetch('/api/cash-register/open', {
+                                        method: 'POST',
+                                        headers: token ? { Authorization: `Bearer ${token}` } : {},
+                                        body: JSON.stringify({ openingBalance: 0 }),
+                                    });
+                                    const data = await res.json();
+                                    if (res.ok) {
+                                        fetchCashRegisterStatus();
+                                        setSuccessToast('Caja abierta correctamente');
+                                    } else {
+                                        setCashNotice(data.error || 'Error al abrir caja');
+                                    }
+                                } catch (error) {
+                                    console.error('Error al abrir caja:', error);
+                                    setCashNotice('Error al abrir caja');
+                                }
+                            }}
                             style={{
-                                backgroundColor: "var(--muted)",
-                                color: "var(--muted-foreground)",
-                                border: `1px solid var(--border)`,
+                                backgroundColor: "var(--primary)",
+                                color: "var(--primary-foreground)",
+                                border: "none",
                                 borderRadius: "var(--radius-md)",
                                 padding: isMobile ? "10px 16px" : "11px 22px",
-                                cursor: "not-allowed",
+                                cursor: "pointer",
                                 display: "inline-flex",
                                 alignItems: "center",
                                 gap: 6,
@@ -588,7 +603,7 @@ export default function CajeroDashboard() {
                             }}
                         >
                             <Receipt size={16} />
-                            Caja Cerrada
+                            Abrir Caja
                         </button>
                     ) : (
                         <Link href="/dashboard/cajero/cierre-caja" style={{
