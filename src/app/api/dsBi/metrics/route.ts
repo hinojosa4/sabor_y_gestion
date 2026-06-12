@@ -48,8 +48,6 @@ export async function GET(req: NextRequest) {
             updatedAt: { $gte: startDate, $lte: endDate }
         }).lean();
 
-        const orderIds = orders.map(o => o._id);
-
         // 1. Top Meseros (usando agregación)
         const topWaitersAgg = await Order.aggregate([
             { $match: { status: 'paid', updatedAt: { $gte: startDate, $lte: endDate }, waiter_id: { $exists: true, $ne: null } } },
@@ -109,7 +107,7 @@ export async function GET(req: NextRequest) {
         const bestDay = Object.entries(daySales).sort((a, b) => b[1] - a[1])[0];
         let peakHour = Object.entries(hourSales).sort((a, b) => b[1] - a[1])[0];
         if (peakHour) {
-            let hourUTC = parseInt(peakHour[0].split(':')[0]);
+            const hourUTC = parseInt(peakHour[0].split(':')[0]);
             let hourBolivia = hourUTC - 4;
             if (hourBolivia < 0) hourBolivia += 24;
             peakHour = [`${hourBolivia}:00`, peakHour[1]];

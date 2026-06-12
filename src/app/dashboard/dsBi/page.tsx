@@ -1,5 +1,5 @@
 "use client";
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '@/lib/useAuth';
 import { ADMIN } from '@/lib/roles';
 import { Printer, Calendar, DollarSign, CreditCard, Users, BarChart3, LineChart, TrendingUp, TrendingDown } from 'lucide-react';
@@ -134,12 +134,6 @@ const formatDateKey = (dateKey: string) => {
     return `${parseInt(day)}/${parseInt(month)}/${year}`;
 };
 
-const formatDateKeySimple = (dateKey: string) => {
-    // Recibe "2026-06-06" y devuelve "6/6/2026" sin conversión de zona horaria
-    const [year, month, day] = dateKey.split('-');
-    return `${parseInt(day)}/${parseInt(month)}/${year}`;
-};
-
 type ChartType = 'bar' | 'line' | 'area' | 'pie';
 
 const getLocalDate = () => {
@@ -163,7 +157,7 @@ export default function ReportesPage() {
     const [metrics, setMetrics] = useState<MetricsData | null>(null);
     const [metricsLoading, setMetricsLoading] = useState(false);
 
-    const fetchReport = async () => {
+    const fetchReport = useCallback(async () => {
         setLoading(true);
         let params = '';
         if (periodType === 'day') params = `type=day&value=${selectedDay}`;
@@ -186,9 +180,9 @@ export default function ReportesPage() {
         } finally {
             setLoading(false);
         }
-    };
+    }, [periodType, selectedDay, selectedMonth, selectedYear, compare]);
 
-    const fetchMetrics = async () => {
+    const fetchMetrics = useCallback(async () => {
         setMetricsLoading(true);
         let params = '';
         if (periodType === 'day') params = `type=day&value=${selectedDay}`;
@@ -204,7 +198,7 @@ export default function ReportesPage() {
         } finally {
             setMetricsLoading(false);
         }
-    };
+    }, [periodType, selectedDay, selectedMonth, selectedYear, compare]);
 
     const handlePrint = () => {
         window.print();
@@ -317,7 +311,7 @@ export default function ReportesPage() {
     useEffect(() => {
         fetchReport();
         fetchMetrics();
-    }, [periodType, selectedDay, selectedMonth, selectedYear, compare]);
+    }, [periodType, selectedDay, selectedMonth, selectedYear, compare, fetchReport, fetchMetrics]);
 
     if (userLoading || !user) return null;
 
