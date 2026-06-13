@@ -21,7 +21,7 @@ export function ConsumoHistory({ orders, onViewOrder }: ConsumoHistoryProps) {
 
             <div style={styles.grid}>
                 {orders.map((o) => (
-                    <OrderCard key={o.id} order={o} onView={onViewOrder} />
+                    <OrderCard key={o._id || o.id} order={o} onView={onViewOrder} />
                 ))}
             </div>
         </section>
