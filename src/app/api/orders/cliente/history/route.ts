@@ -44,7 +44,7 @@ export async function GET(req: NextRequest) {
       itemsByOrder[key].push(item);
     }
 
-    const paymentsByOrder: Record<string, any> = {};
+    const paymentsByOrder: Record<string, unknown> = {};
     for (const p of payments) {
         paymentsByOrder[p.order_id] = p;
     }

@@ -132,19 +132,6 @@ const RESERVATION_STATUS_COLORS: Record<string, { bg: string; text: string; bord
 
 // ── Helpers de conversión ──────────────────────────────────────────────────────
 
-interface CustomerLoyalty {
-  totalPaidOrders: number;
-  totalSpent: number;
-  averageTicket: number;
-  points: number;
-  discountPercent: number;
-  benefits: string[];
-  tier: {
-    name: string;
-    slug: string;
-  };
-}
-
 function toFrontendOrder(raw: RawOrder, index: number): Order {
   return {
     id: raw.daily_number ? String(raw.daily_number) : String(index + 1001),
@@ -264,7 +251,6 @@ export default function ClientePage() {
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
   const [reservaOpen, setReservaOpen] = useState(false);
-  const [loyalty, setLoyalty] = useState<CustomerLoyalty | null>(null);
 
   // ── Estado de reservas ─────────────────────────────────────────────────────
   const [reservations, setReservations] = useState<ClientReservation[]>([]);
@@ -430,7 +416,6 @@ export default function ClientePage() {
   const average     = totalVisits > 0 ? totalSpent / totalVisits : 0;
   const points      = Math.floor(totalSpent);
   const isNew       = totalVisits <= 2;
-  const benefits    = loyalty?.benefits.length ? loyalty.benefits : getBenefits(totalVisits, isNew);
 
   const rawUser = (() => {
     try { return JSON.parse(localStorage.getItem("user") ?? "{}"); }

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef } from "react";
 import { DELIVERY_CONFIG } from "@/lib/deliveryConfig";
 
 interface DeliveryTrackingMapProps {

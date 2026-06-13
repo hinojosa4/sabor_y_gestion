@@ -1,6 +1,6 @@
 // src/components/clientScreen/OrderModal.tsx
 import React, { useEffect, useState } from "react";
-import { Receipt, Clock, MapPin, User, CreditCard, Wallet, Banknote, X } from "lucide-react";
+import { Receipt, Clock, MapPin, CreditCard, Wallet, Banknote, X } from "lucide-react";
 import { getPusherClient } from "@/lib/pusherClient";
 import { DeliveryTrackingMap } from "@/components/clientScreen/delivery/DeliveryTrackingMap";
 import { Order, PaymentMethod } from "./OrderCard";

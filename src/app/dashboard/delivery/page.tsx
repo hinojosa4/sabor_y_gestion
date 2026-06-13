@@ -10,7 +10,27 @@ import {
 import { useAuth } from "@/lib/useAuth";
 import { DELIVERY } from "@/lib/roles";
 import { getPusherClient } from "@/lib/pusherClient";
+import { Capacitor, registerPlugin } from "@capacitor/core";
 import styles from "./page.module.css";
+
+// ── Capacitor Plugins ──────────────────────────────────────────────────────────
+
+interface BackgroundGeolocationPlugin {
+  addWatcher(
+    options: {
+      backgroundMessage?: string;
+      backgroundTitle?: string;
+      requestPermissions?: boolean;
+      stale?: boolean;
+      distanceFilter?: number;
+    },
+    callback: (location: { latitude: number; longitude: number } | null, error: unknown) => void
+  ): Promise<string>;
+  removeWatcher(options: { id: string }): Promise<void>;
+}
+
+// Registramos el plugin de geolocalización de fondo
+const BackgroundGeolocation = registerPlugin<BackgroundGeolocationPlugin>("BackgroundGeolocation");
 
 // ── Tipos ──────────────────────────────────────────────────────────────────────
 
@@ -421,7 +441,7 @@ export default function DeliveryPage() {
   useEffect(() => {
     if (!user) return;
     const token = getToken();
-    if (!token || !navigator.geolocation) return;
+    if (!token) return;
 
     const trackedOrder = activeOrders.find((order) =>
       ["picked_up", "in_transit"].includes(order.status) &&
@@ -435,56 +455,81 @@ export default function DeliveryPage() {
     setTrackingInfo("Tracking activo: obteniendo GPS...");
 
     let lastSentAt = 0;
-    let latestCoords: { lat: number; lng: number } | null = null;
-
     const sendLocation = async (lat: number, lng: number) => {
       const now = Date.now();
       if (now - lastSentAt < 3000) return;
-
       lastSentAt = now;
-      latestCoords = { lat, lng };
-
       try {
         await fetch(`/api/orders/${trackedOrder._id}/driver-location`, {
           method: "PATCH",
           headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
           body: JSON.stringify({ lat, lng }),
         });
-        setTrackingInfo(`Tracking activo: ubicacion enviada ${new Date().toLocaleTimeString("es-BO", {
-          hour: "2-digit",
-          minute: "2-digit",
-          second: "2-digit",
+        setTrackingInfo(`Tracking activo: ubicación enviada ${new Date().toLocaleTimeString("es-BO", {
+          hour: "2-digit", minute: "2-digit", second: "2-digit",
         })}`);
       } catch {
-        // El tracking no debe bloquear la gestion del pedido.
+        // Error silencioso
       }
     };
 
+    // ── Lógica NATIVA (Capacitor) ──────────────────────────────────────────────
+    if (Capacitor.isNativePlatform()) {
+      let watcherId: string | null = null;
+      
+      const startNativeTracking = async () => {
+        try {
+          // Solicitar permisos explícitamente (algunos plugins lo requieren)
+          // El plugin @capacitor-community/background-geolocation usa addWatcher
+          watcherId = await BackgroundGeolocation.addWatcher(
+            {
+              backgroundMessage: "Tu ubicación se está compartiendo con el cliente.",
+              backgroundTitle: "Reparto en curso",
+              requestPermissions: true,
+              stale: false,
+              distanceFilter: 5 // metros
+            },
+            (location, error) => {
+              if (error) {
+                console.error("Background Geolocation Error:", error);
+                return;
+              }
+              if (location) {
+                sendLocation(location.latitude, location.longitude);
+              }
+            }
+          );
+        } catch {
+          setTrackingInfo("Error al iniciar GPS nativo");
+        }
+      };
+
+      startNativeTracking();
+      return () => {
+        if (watcherId) BackgroundGeolocation.removeWatcher({ id: watcherId });
+      };
+    }
+
+    // ── Lógica WEB (Navegador) ────────────────────────────────────────────────
+    if (!navigator.geolocation) {
+      setTrackingInfo("GPS no soportado en este navegador");
+      return;
+    }
+
     const requestAndSendLocation = () => {
       navigator.geolocation.getCurrentPosition(
-        (pos) => {
-          sendLocation(pos.coords.latitude, pos.coords.longitude);
-        },
-        () => {
-          setTrackingInfo("Tracking activo: no se pudo refrescar el GPS");
-          if (latestCoords) {
-            sendLocation(latestCoords.lat, latestCoords.lng);
-          }
-        },
+        (pos) => sendLocation(pos.coords.latitude, pos.coords.longitude),
+        () => setTrackingInfo("Tracking activo: no se pudo refrescar el GPS"),
         { enableHighAccuracy: true, maximumAge: 0, timeout: 12000 }
       );
     };
 
     const watchId = navigator.geolocation.watchPosition(
-      (pos) => {
-        sendLocation(pos.coords.latitude, pos.coords.longitude);
-      },
-      () => {
-        setTrackingInfo("Tracking activo: permiso GPS pendiente o bloqueado");
-        // Si el permiso falla, el repartidor puede seguir usando el panel.
-      },
+      (pos) => sendLocation(pos.coords.latitude, pos.coords.longitude),
+      () => setTrackingInfo("Tracking activo: permiso GPS pendiente o bloqueado"),
       { enableHighAccuracy: true, maximumAge: 10000, timeout: 15000 }
     );
+    
     requestAndSendLocation();
     const intervalId = window.setInterval(requestAndSendLocation, 3000);
 
