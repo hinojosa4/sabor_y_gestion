@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Sabor y Gestion</string>
+    <string name="title_activity_main">Sabor y Gestion</string>
+    <string name="package_name">com.saborygestion.app</string>
+    <string name="custom_url_scheme">com.saborygestion.app</string>
+</resources>

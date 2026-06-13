@@ -6,7 +6,6 @@ import React, { useMemo, useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/useAuth";
 import { CLIENTE } from "@/lib/roles";
-import { getPusherClient } from "@/lib/pusherClient";
 import { DeliveryHeader } from "@/components/clientScreen/delivery/DeliveryHeader";
 import { DeliveryEstimateBanner } from "@/components/clientScreen/delivery/DeliveryEstimateBanner";
 import { CategoryTabs } from "@/components/clientScreen/delivery/CategoryTabs";
@@ -14,17 +13,11 @@ import { DishCard, Dish } from "@/components/clientScreen/delivery/DishCard";
 import { OrderCart, CartItem } from "@/components/clientScreen/delivery/OrderCart";
 import { haversineKm, calcDeliveryFee, DELIVERY_CONFIG } from "@/lib/deliveryConfig";
 import dynamic from "next/dynamic";
-import { FacturaFinal } from "@/components/caja/FacturaFinal";
 
 // ── Tipos ──────────────────────────────────────────────────────────────────────
 const DeliveryMap = dynamic(
   () => import("@/components/clientScreen/delivery/DeliveryMap").then(m => m.DeliveryMap),
   { ssr: false, loading: () => <div style={{ height: 240, background: "#f3f4f6", borderRadius: 10, display: "flex", alignItems: "center", justifyContent: "center", color: "#9ca3af", fontSize: "0.85rem" }}>Cargando mapa…</div> }
-);
-
-const DeliveryTrackingMap = dynamic(
-  () => import("@/components/clientScreen/delivery/DeliveryTrackingMap").then(m => m.DeliveryTrackingMap),
-  { ssr: false, loading: () => <div style={{ height: 260, background: "#f3f4f6", borderRadius: 10, display: "flex", alignItems: "center", justifyContent: "center", color: "#9ca3af", fontSize: "0.85rem" }}>Cargando seguimiento...</div> }
 );
 
 interface ApiCategory { _id: string; name: string; isActive: boolean; }
@@ -72,17 +65,6 @@ export default function DeliveryPage() {
   const router = useRouter();
   const { loading: authLoading, logout } = useAuth(CLIENTE);
 
-  const [showFactura, setShowFactura]     = useState(false);
-  const [facturaData, setFacturaData]     = useState<{
-    orderId: string;
-    items: { dish: { name: string; price: number }; quantity: number; subtotal: number }[];
-    total: number;
-    subtotal: number;
-    discountAmount: number;
-    discountPercent: number;
-    loyaltyTierName: string | null;
-    deliveryFeeAmount: number;
-  } | null>(null);
   const [categories, setCategories]   = useState<ApiCategory[]>([]);
   const [apiDishes, setApiDishes]     = useState<ApiDish[]>([]);
   const [loadingData, setLoadingData] = useState(true);
@@ -101,10 +83,6 @@ export default function DeliveryPage() {
   const [phone, setPhone]                 = useState("");
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("Efectivo");
   const [notes, setNotes]                 = useState("");
-  const [lastOrderId, setLastOrderId]     = useState<string | null>(null);
-  const [trackingStatus, setTrackingStatus] = useState<string>("pending");
-  const [trackingCustomerCoords, setTrackingCustomerCoords] = useState<{ lat: number; lng: number } | null>(null);
-  const [driverCoords, setDriverCoords] = useState<{ lat: number; lng: number; updatedAt: string } | null>(null);
 
   // ── Estado de geolocalización ─────────────────────────────────────────────
   const [geoStatus, setGeoStatus]       = useState<GeoStatus>("idle");
@@ -243,105 +221,7 @@ export default function DeliveryPage() {
     }
   }, []);
 
-  // ── Pusher ─────────────────────────────────────────────────────────────────
-  useEffect(() => {
-    if (!lastOrderId) return;
 
-    let cancelled = false;
-    const token = localStorage.getItem("token");
-    const applyDriverLocation = (location: {
-      lat?: number | null;
-      lng?: number | null;
-      updatedAt?: string | Date | null;
-    }) => {
-      if (cancelled || location?.lat == null || location?.lng == null) return;
-      setDriverCoords({
-        lat: location.lat,
-        lng: location.lng,
-        updatedAt: location.updatedAt
-          ? new Date(location.updatedAt).toISOString()
-          : new Date().toISOString(),
-      });
-    };
-
-    const refreshDriverLocation = () => {
-      if (!token) return;
-      fetch(`/api/orders/cliente/${lastOrderId}`, {
-        headers: { Authorization: `Bearer ${token}` },
-      })
-        .then((res) => res.json())
-        .then((json) => {
-          if (json?.ok) applyDriverLocation(json.data?.driver_location);
-        })
-        .catch(() => {
-          // Pusher seguira entregando actualizaciones en vivo.
-        });
-    };
-
-    refreshDriverLocation();
-    const pollId = window.setInterval(refreshDriverLocation, 3000);
-
-    const STATUS_LABELS: Record<string, string> = {
-      in_kitchen: "🍳 Tu pedido está en cocina",
-      ready:      "✅ Tu pedido está listo",
-      picked_up:  "🛵 El repartidor recogió tu pedido",
-      in_transit: "🚗 Tu pedido está en camino",
-      delivered:  "🎉 ¡Tu pedido fue entregado!",
-      cancelled:  "❌ Tu pedido fue cancelado",
-    };
-
-    const handleStatusUpdate = (data: { orderId: string; status: string }) => {
-      if (data.orderId !== lastOrderId) return;
-      setTrackingStatus(data.status);
-      const label = STATUS_LABELS[data.status];
-      if (label) {
-        setToastMsg(label);
-        setToastType(data.status === "cancelled" ? "info" : "success");
-        setTimeout(() => setToastMsg(null), 5000);
-      }
-      if (data.status === "delivered" || data.status === "cancelled") {
-        setTimeout(() => {
-          setLastOrderId(null);
-          setTrackingCustomerCoords(null);
-          setDriverCoords(null);
-        }, 6000);
-      }
-    };
-
-    const handleKitchenUpdate = (data: { orderId: string; newStatus: string }) => {
-      handleStatusUpdate({ orderId: data.orderId, status: data.newStatus });
-    };
-
-    getPusherClient().then((client) => {
-      if (cancelled) return;
-      const channel = client.subscribe("restaurant");
-      const deliveryChannel = client.subscribe("delivery");
-      const orderChannel = client.subscribe(`order-${lastOrderId}`);
-      channel.bind("order:status_updated", handleStatusUpdate);
-      channel.bind("order:updated", handleKitchenUpdate);
-      deliveryChannel.bind("order:status_updated", handleStatusUpdate);
-      deliveryChannel.bind("order:updated", handleKitchenUpdate);
-      orderChannel.bind("driver:location", (data: {
-        orderId: string;
-        lat: number;
-        lng: number;
-        updatedAt: string;
-      }) => {
-        if (data.orderId !== lastOrderId) return;
-        applyDriverLocation(data);
-      });
-    });
-
-    return () => {
-      cancelled = true;
-      window.clearInterval(pollId);
-      getPusherClient().then((client) => {
-        client.unsubscribe("restaurant");
-        client.unsubscribe("delivery");
-        client.unsubscribe(`order-${lastOrderId}`);
-      });
-    };
-  }, [lastOrderId]);
 
   // ── Mapeos ─────────────────────────────────────────────────────────────────
   const dishes: Dish[] = useMemo(() =>
@@ -416,13 +296,8 @@ export default function DeliveryPage() {
       if (!json.ok) throw new Error(json.message ?? "Error al crear orden");
 
       const orderId: string = json.data.order._id;
-      setLastOrderId(orderId);
-      setTrackingStatus(json.data.order.status ?? "pending");
-      setTrackingCustomerCoords(clientCoords);
-      setDriverCoords(null);
 
       // Limpiar carrito y cerrar modal
-      const cartSnapshot = [...cart];
       setCart([]);
       setAddress(""); setPhone(""); setNotes(""); setPaymentMethod("Efectivo");
       handleCloseModal();
@@ -431,25 +306,8 @@ export default function DeliveryPage() {
         // Redirigir a la página de pago QR existente
         router.push(`/pago-qr/${orderId}`);
       } else {
-        // Efectivo: mostrar factura de confirmación
-        setFacturaData({
-          orderId,
-          items: cartSnapshot.map((it) => ({
-            dish: { name: it.dish.name, price: it.dish.price },
-            quantity: it.quantity,
-            subtotal: it.dish.price * it.quantity,
-          })),
-          total: Number(json.data.total ?? totalConEnvio),
-          subtotal: Number(json.data.subtotal ?? cartSubtotal),
-          discountAmount: Number(json.data.discountAmount ?? loyaltyDiscountAmount),
-          discountPercent: Number(json.data.discountPercent ?? loyaltyDiscountPercent),
-          loyaltyTierName: json.data.loyaltyTierName ?? loyalty?.tier.name ?? null,
-          deliveryFeeAmount: Number(json.data.deliveryFee ?? deliveryFee ?? 0),
-        });
-        setShowFactura(true);
-        setToastMsg("✅ ¡Pedido enviado! El repartidor cobrará al entregar.");
-        setToastType("success");
-        setTimeout(() => setToastMsg(null), 6000);
+        // Efectivo: redireccionar al dashboard de cliente
+        router.push("/dashboard/cliente");
       }
     } catch (e) {
       alert(e instanceof Error ? e.message : "Error al enviar la orden");
@@ -471,16 +329,6 @@ export default function DeliveryPage() {
       ? cartSubtotalAfterDiscount + deliveryFee
       : cartSubtotalAfterDiscount;
 
-  const trackingLabel: Record<string, string> = {
-    pending: "Pedido recibido",
-    in_kitchen: "En cocina",
-    ready: "Listo para recoger",
-    picked_up: "Recogido por el repartidor",
-    in_transit: "En camino",
-    delivered: "Entregado",
-    cancelled: "Cancelado",
-  };
-
   if (authLoading) return <main style={s.main}><div style={s.centered}>Verificando sesión…</div></main>;
 
   return (
@@ -491,40 +339,6 @@ export default function DeliveryPage() {
         <div style={{ ...s.toast, ...(toastType === "info" ? s.toastInfo : {}) }}>
           {toastMsg}
         </div>
-      )}
-
-      {lastOrderId && trackingCustomerCoords && (
-        <section style={s.trackingPanel}>
-          <div style={s.trackingHeader}>
-            <div>
-              <h2 style={s.trackingTitle}>Seguimiento del pedido</h2>
-              <p style={s.trackingSubtitle}>
-                Estado: {trackingLabel[trackingStatus] ?? "Pedido activo"}
-              </p>
-            </div>
-            <span style={s.trackingBadge}>#{lastOrderId.slice(-6).toUpperCase()}</span>
-          </div>
-          <DeliveryTrackingMap customerCoords={trackingCustomerCoords} driverCoords={driverCoords} />
-          <div style={s.trackingFooter}>
-            <span>R: restaurante</span>
-            <span>C: entrega</span>
-            <span>D: repartidor</span>
-          </div>
-          {driverCoords?.updatedAt && (
-            <p style={s.trackingUpdated}>
-              Ultima actualizacion: {new Date(driverCoords.updatedAt).toLocaleTimeString("es-BO", {
-                hour: "2-digit",
-                minute: "2-digit",
-                second: "2-digit",
-              })}
-            </p>
-          )}
-          {!driverCoords && (
-            <p style={s.trackingWaiting}>
-              El mapa mostrara al repartidor cuando recoja el pedido y active su ubicacion.
-            </p>
-          )}
-        </section>
       )}
 
       <div style={s.layout}>
@@ -751,25 +565,6 @@ export default function DeliveryPage() {
                 {submitting ? "Enviando…" : "Confirmar pedido"}
               </button>
             </div>
-            {/* ── Factura post-orden (solo efectivo) ───────────────────────── */}
-              {showFactura && facturaData && (
-                <FacturaFinal
-                  isOpen={showFactura}
-                  onClose={() => { setShowFactura(false); setFacturaData(null); router.push('/dashboard/cliente'); }}
-                  orderId={facturaData.orderId}
-                  tableNumber={null}
-                  items={facturaData.items}
-                  iva={0}
-                  total={facturaData.total}
-                  subtotal={facturaData.subtotal}
-                  discountAmount={facturaData.discountAmount}
-                  discountPercent={facturaData.discountPercent}
-                  loyaltyTierName={facturaData.loyaltyTierName}
-                  deliveryFee={facturaData.deliveryFeeAmount}
-                  paymentMethod="cash"
-                  paymentDate={new Date()}
-                />
-              )}
           </div>
         </div>
       )}

@@ -6,7 +6,7 @@ const config: CapacitorConfig = {
   webDir: 'out',
   server: {
     // Descomenta la siguiente línea y pon tu URL para que la App cargue tu web en vivo
-    // url: 'https://tu-dominio.com/dashboard/delivery',
+    url: 'https://sabor-y-gestion-847q2uvsr-stackbridgesystems-1583s-projects.vercel.app',
     cleartext: true
   }
 };
