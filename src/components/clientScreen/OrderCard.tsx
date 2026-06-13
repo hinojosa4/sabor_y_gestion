@@ -21,9 +21,14 @@ export interface Order {
   location: string;
   waiter: string;
   paymentMethod: PaymentMethod;
+  payment?: {
+    status: "pending" | "completed";
+    method: string;
+  } | null;
   items: OrderItem[];
   total: number;
   status: "Pendiente" | "En cocina" | "Listo" | "En camino" | "Completado" | "Cancelado";
+  rawStatus?: string;
   deliveryCoords?: { lat: number; lng: number } | null;
   driverLocation?: { lat: number; lng: number; updatedAt?: string } | null;
 }
@@ -78,11 +83,17 @@ export function OrderCard({ order, onView }: OrderCardProps) {
 
         <div style={styles.totalRow}>
           <span style={styles.totalLabel}>Total</span>
-          <span style={styles.totalValue}>${order.total.toFixed(2)}</span>
+          <span style={styles.totalValue}>Bs. {order.total.toFixed(2)}</span>
         </div>
 
         <button style={styles.viewBtn} onClick={() => onView(order)}>
-          <span>Ver comanda completa</span>
+          <span>
+            {order.status === "En camino"
+              ? "Seguir delivery"
+              : ["Pendiente", "En cocina", "Listo"].includes(order.status)
+              ? "Ver pedido"
+              : "Ver detalle"}
+          </span>
           <ChevronRight size={16} />
         </button>
       </div>

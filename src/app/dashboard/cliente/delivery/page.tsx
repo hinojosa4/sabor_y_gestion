@@ -755,7 +755,7 @@ export default function DeliveryPage() {
               {showFactura && facturaData && (
                 <FacturaFinal
                   isOpen={showFactura}
-                  onClose={() => { setShowFactura(false); setFacturaData(null); }}
+                  onClose={() => { setShowFactura(false); setFacturaData(null); router.push('/dashboard/cliente'); }}
                   orderId={facturaData.orderId}
                   tableNumber={null}
                   items={facturaData.items}

@@ -23,6 +23,65 @@ function getPaymentIcon(method: PaymentMethod) {
     }
 }
 
+// ── Status Progress Component ──────────────────────────────────────────────────
+
+function StatusProgress({ status }: { status: Order["status"] }) {
+    const steps = ["Pedido recibido", "Preparando", "En camino", "Entregado"];
+    const currentStepIndex = (() => {
+        if (status === "Pendiente") return 0;
+        if (status === "En cocina" || status === "Listo") return 1;
+        if (status === "En camino") return 2;
+        if (status === "Completado") return 3;
+        return -1;
+    })();
+
+    return (
+        <div style={spStyles.container}>
+            <div style={spStyles.lineBackground} />
+            <div style={{
+                ...spStyles.lineForeground,
+                width: `${(Math.max(0, currentStepIndex) / (steps.length - 1)) * 100}%`
+            }} />
+            
+            <div style={spStyles.stepsRow}>
+                {steps.map((step, i) => {
+                    const isCompleted = i < currentStepIndex;
+                    const isCurrent = i === currentStepIndex;
+                    return (
+                        <div key={step} style={spStyles.stepItem}>
+                            <div style={{
+                                ...spStyles.dot,
+                                backgroundColor: isCompleted || isCurrent ? "#f97316" : "#fff",
+                                borderColor: isCompleted || isCurrent ? "#f97316" : "#e5e7eb",
+                            }}>
+                                {isCompleted && <span style={spStyles.check}>✓</span>}
+                                {isCurrent && <div style={spStyles.pulseDot} />}
+                            </div>
+                            <span style={{
+                                ...spStyles.label,
+                                color: isCurrent ? "#f97316" : isCompleted ? "#111827" : "#9ca3af",
+                                fontWeight: isCurrent || isCompleted ? 700 : 500
+                            }}>{step}</span>
+                        </div>
+                    );
+                })}
+            </div>
+        </div>
+    );
+}
+
+const spStyles: { [key: string]: React.CSSProperties } = {
+    container: { position: "relative", padding: "10px 0 25px", marginTop: 10 },
+    lineBackground: { position: "absolute", top: 22, left: "12%", right: "12%", height: 3, backgroundColor: "#f3f4f6", borderRadius: 2 },
+    lineForeground: { position: "absolute", top: 22, left: "12%", height: 3, backgroundColor: "#f97316", borderRadius: 2, transition: "width 0.5s ease" },
+    stepsRow: { display: "flex", justifyContent: "space-between", position: "relative", zIndex: 1 },
+    stepItem: { display: "flex", flexDirection: "column", alignItems: "center", gap: 8, width: "25%" },
+    dot: { width: 24, height: 24, borderRadius: "50%", border: "2px solid", display: "flex", alignItems: "center", justifyContent: "center", backgroundColor: "#fff", transition: "all 0.3s ease" },
+    check: { color: "#fff", fontSize: 12, fontWeight: 900 },
+    pulseDot: { width: 8, height: 8, borderRadius: "50%", backgroundColor: "#fff" },
+    label: { fontSize: 11, textAlign: "center", lineHeight: 1.2 },
+};
+
 export function OrderModal({ order, open, onClose, onReorder }: OrderModalProps) {
     const [liveDriverCoords, setLiveDriverCoords] = useState<{
         orderId: string;
@@ -96,15 +155,32 @@ export function OrderModal({ order, open, onClose, onReorder }: OrderModalProps)
 
     if (!open || !order) return null;
 
-    const showTracking =
-        order.serviceType === "delivery" &&
-        !!order.deliveryCoords &&
-        order.status !== "Completado" &&
-        order.status !== "Cancelado";
     const driverCoords =
         liveDriverCoords && liveDriverCoords.orderId === order._id
             ? liveDriverCoords.coords
             : order.driverLocation ?? null;
+
+    const showTrackingMap =
+        order.serviceType === "delivery" &&
+        !!order.deliveryCoords &&
+        order.rawStatus === "in_transit";
+
+    const showTrackingSection = 
+        order.serviceType === "delivery" &&
+        order.status !== "Completado" &&
+        order.status !== "Cancelado";
+
+    const getPaymentStatus = () => {
+        if (order.paymentMethod === "Efectivo") return "Pago al recibir";
+        if (order.payment?.status === "completed") return "Pago confirmado";
+        return "Pago pendiente de verificación";
+    };
+
+    const getTrackingSubtitle = () => {
+        if (order.rawStatus === "in_transit") return "Tu pedido está en camino a tu ubicación";
+        if (order.rawStatus === "picked_up") return "El repartidor ha recogido tu pedido y está por iniciar el viaje";
+        return "El seguimiento estará disponible cuando el repartidor recoja tu pedido";
+    };
 
     return (
         <div style={styles.overlay} onClick={onClose}>
@@ -126,55 +202,73 @@ export function OrderModal({ order, open, onClose, onReorder }: OrderModalProps)
                 <div style={styles.infoCard}>
                     <div style={styles.infoHeader}>
                         <div>
-                            <h3 style={styles.infoTitle}>Información de la Orden</h3>
+                            <h3 style={styles.infoTitle}>Estado del Pedido</h3>
                             <p style={styles.infoDate}>{order.date}</p>
                         </div>
                         <span style={styles.statusBadge}>{order.status}</span>
+                    </div>
+                    
+                    <div style={{ padding: "0 1.5rem" }}>
+                        <StatusProgress status={order.status} />
                     </div>
 
                     <div style={styles.infoGrid}>
                         <InfoItem icon={<Clock size={18} color="#6b7280" />} label="Hora" value={order.time} />
                         <InfoItem icon={<MapPin size={18} color="#6b7280" />} label="Ubicación" value={order.location} />
-                        <InfoItem icon={<User size={18} color="#6b7280" />} label="Mesero" value={order.waiter} />
                         <InfoItem
                             icon={getPaymentIcon(order.paymentMethod)}
                             label="Método de Pago"
                             value={order.paymentMethod}
                         />
+                         <InfoItem 
+                            icon={<CreditCard size={18} color="#6b7280" />} 
+                            label="Estado de Pago" 
+                            value={getPaymentStatus()} 
+                        />
                     </div>
                 </div>
 
-                {showTracking && order.deliveryCoords && (
+                {showTrackingSection && (
                     <div style={styles.trackingCard}>
                         <div style={styles.trackingHeader}>
                             <div>
                                 <h3 style={styles.trackingTitle}>Seguimiento del delivery</h3>
-                                <p style={styles.trackingSubtitle}>Estado actual: {order.status}</p>
+                                <p style={styles.trackingSubtitle}>
+                                    {getTrackingSubtitle()}
+                                </p>
                             </div>
                         </div>
-                        <DeliveryTrackingMap
-                            customerCoords={order.deliveryCoords}
-                            driverCoords={driverCoords}
-                        />
-                        <div style={styles.trackingLegend}>
-                            <span>R: restaurante</span>
-                            <span>C: entrega</span>
-                            <span>D: repartidor</span>
-                        </div>
-                        {driverCoords?.updatedAt && (
-                            <p style={styles.trackingUpdated}>
-                                Ultima actualizacion: {new Date(driverCoords.updatedAt).toLocaleTimeString("es-BO", {
-                                    hour: "2-digit",
-                                    minute: "2-digit",
-                                    second: "2-digit",
-                                })}
-                            </p>
-                        )}
-                        {!driverCoords && (
+                        
+                        {showTrackingMap ? (
+                            <>
+                                <DeliveryTrackingMap
+                                    customerCoords={order.deliveryCoords!}
+                                    driverCoords={driverCoords}
+                                />
+                                <div style={styles.trackingLegend}>
+                                    <span>R: restaurante</span>
+                                    <span>C: entrega</span>
+                                    <span>D: repartidor</span>
+                                </div>
+                                {driverCoords?.updatedAt && (
+                                    <p style={styles.trackingUpdated}>
+                                        Ultima actualizacion: {new Date(driverCoords.updatedAt).toLocaleTimeString("es-BO", {
+                                            hour: "2-digit",
+                                            minute: "2-digit",
+                                            second: "2-digit",
+                                        })}
+                                    </p>
+                                )}
+                            </>
+                        ) : order.rawStatus === "in_transit" && !driverCoords ? (
                             <p style={styles.trackingWaiting}>
-                                El repartidor aparecera cuando recoja el pedido y active su ubicacion.
+                                El repartidor ha iniciado la entrega. Esperando señal de ubicación...
                             </p>
-                        )}
+                        ) : order.rawStatus === "picked_up" ? (
+                             <p style={styles.trackingWaiting}>
+                                El repartidor ya tiene tu pedido. El mapa aparecerá cuando inicie el viaje.
+                            </p>
+                        ) : null}
                     </div>
                 )}
 
@@ -187,11 +281,11 @@ export function OrderModal({ order, open, onClose, onReorder }: OrderModalProps)
                                 <div>
                                     <p style={styles.productName}>{item.name}</p>
                                     <p style={styles.productMeta}>
-                                        Cantidad: {item.quantity} × ${item.unitPrice.toFixed(2)}
+                                        Cantidad: {item.quantity} × Bs. {item.unitPrice.toFixed(2)}
                                     </p>
                                 </div>
                                 <span style={styles.productPrice}>
-                                    ${(item.quantity * item.unitPrice).toFixed(2)}
+                                    Bs. {(item.quantity * item.unitPrice).toFixed(2)}
                                 </span>
                             </li>
                         ))}
@@ -199,7 +293,7 @@ export function OrderModal({ order, open, onClose, onReorder }: OrderModalProps)
 
                     <div style={styles.totalRow}>
                         <span style={styles.totalLabel}>Total</span>
-                        <span style={styles.totalValue}>${order.total.toFixed(2)}</span>
+                        <span style={styles.totalValue}>Bs. {order.total.toFixed(2)}</span>
                     </div>
                 </div>
 

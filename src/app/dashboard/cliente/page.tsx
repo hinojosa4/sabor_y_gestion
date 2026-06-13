@@ -37,6 +37,25 @@ function mapStatus(status: string): Order["status"] {
   return map[status] ?? "Pendiente";
 }
 
+// ── Sorting Helper ─────────────────────────────────────────────────────────────
+
+function sortOrdersPriority(orders: Order[]): Order[] {
+  const priority: Record<string, number> = {
+    "En camino": 1,
+    "En cocina": 2,
+    "Listo": 3,
+    "Pendiente": 4,
+    "Completado": 5,
+    "Cancelado": 6,
+  };
+  return [...orders].sort((a, b) => {
+    const pa = priority[a.status] ?? 10;
+    const pb = priority[b.status] ?? 10;
+    if (pa !== pb) return pa - pb;
+    return 0; // maintain original relative order (likely date desc from API)
+  });
+}
+
 function mapLocation(order: RawOrder): string {
   if (order.service_type === "delivery") return order.delivery_address?.trim() || "Delivery";
   if (order.service_type === "pick_up") return "Para llevar";
@@ -65,6 +84,10 @@ interface RawOrder {
   delivery_coords?: { lat?: number | null; lng?: number | null };
   driver_location?: { lat?: number | null; lng?: number | null; updatedAt?: string | Date | null };
   payment_method?: string;
+  payment?: {
+    status: "pending" | "completed";
+    method: string;
+  } | null;
   notes?: string;
   createdAt: string;
   items: RawOrderItem[];
@@ -132,7 +155,9 @@ function toFrontendOrder(raw: RawOrder, index: number): Order {
     location: mapLocation(raw),
     waiter: raw.service_type === "delivery" ? "Delivery" : "—",
     paymentMethod: (raw.payment_method as Order["paymentMethod"]) ?? "Efectivo",
+    payment: raw.payment,
     status: mapStatus(raw.status),
+    rawStatus: raw.status,
     items: (raw.items ?? []).map((it) => ({
       name: it.dish_id?.name ?? "Plato",
       quantity: it.quantity,
@@ -261,9 +286,10 @@ export default function ClientePage() {
       });
       const json = await res.json();
       if (!json.ok) throw new Error(json.message ?? "Error al cargar historial");
-      setOrders((json.data as RawOrder[]).map((raw, index, arr) =>
+      const rawHistory = (json.data as RawOrder[]).map((raw, index, arr) =>
         toFrontendOrder(raw, arr.length - 1 - index)
-      ));
+      );
+      setOrders(sortOrdersPriority(rawHistory));
     } catch (e) {
       setError(e instanceof Error ? e.message : "Error de red");
     } finally {
@@ -315,35 +341,35 @@ export default function ClientePage() {
       channel.bind("order:new", () => { loadHistory(); });
       channel.bind("order:status_updated", (data: { orderId: string; status: string }) => {
         setOrders((prev) =>
-          prev.map((o) => o._id === data.orderId ? { ...o, status: mapStatus(data.status) } : o)
+          prev.map((o) => o._id === data.orderId ? { ...o, status: mapStatus(data.status), rawStatus: data.status } : o)
         );
         setSelectedOrder((prev) =>
-          prev && prev._id === data.orderId ? { ...prev, status: mapStatus(data.status) } : prev
+          prev && prev._id === data.orderId ? { ...prev, status: mapStatus(data.status), rawStatus: data.status } : prev
         );
       });
       channel.bind("order:updated", (data: { orderId: string; newStatus: string }) => {
         setOrders((prev) =>
-          prev.map((o) => o._id === data.orderId ? { ...o, status: mapStatus(data.newStatus) } : o)
+          prev.map((o) => o._id === data.orderId ? { ...o, status: mapStatus(data.newStatus), rawStatus: data.newStatus } : o)
         );
         setSelectedOrder((prev) =>
-          prev && prev._id === data.orderId ? { ...prev, status: mapStatus(data.newStatus) } : prev
+          prev && prev._id === data.orderId ? { ...prev, status: mapStatus(data.newStatus), rawStatus: data.newStatus } : prev
         );
       });
 
       deliveryChannel.bind("order:status_updated", (data: { orderId: string; status: string }) => {
         setOrders((prev) =>
-          prev.map((o) => o._id === data.orderId ? { ...o, status: mapStatus(data.status) } : o)
+          prev.map((o) => o._id === data.orderId ? { ...o, status: mapStatus(data.status), rawStatus: data.status } : o)
         );
         setSelectedOrder((prev) =>
-          prev && prev._id === data.orderId ? { ...prev, status: mapStatus(data.status) } : prev
+          prev && prev._id === data.orderId ? { ...prev, status: mapStatus(data.status), rawStatus: data.status } : prev
         );
       });
       deliveryChannel.bind("order:updated", (data: { orderId: string; newStatus: string }) => {
         setOrders((prev) =>
-          prev.map((o) => o._id === data.orderId ? { ...o, status: mapStatus(data.newStatus) } : o)
+          prev.map((o) => o._id === data.orderId ? { ...o, status: mapStatus(data.newStatus), rawStatus: data.newStatus } : o)
         );
         setSelectedOrder((prev) =>
-          prev && prev._id === data.orderId ? { ...prev, status: mapStatus(data.newStatus) } : prev
+          prev && prev._id === data.orderId ? { ...prev, status: mapStatus(data.newStatus), rawStatus: data.newStatus } : prev
         );
       });
 

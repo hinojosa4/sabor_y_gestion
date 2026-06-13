@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { DELIVERY_CONFIG } from "@/lib/deliveryConfig";
 
 interface DeliveryTrackingMapProps {
@@ -16,18 +16,14 @@ export function DeliveryTrackingMap({ customerCoords, driverCoords }: DeliveryTr
   const mapRef = useRef<HTMLDivElement>(null);
   const mapInstance = useRef<import("leaflet").Map | null>(null);
   const driverMarker = useRef<import("leaflet").Marker | null>(null);
-  const driverCoordsRef = useRef(driverCoords);
-  const hasUserMovedMap = useRef(false);
-  const hasAutoFitDriver = useRef(false);
+  const LRef = useRef<typeof import("leaflet") | null>(null);
 
-  useEffect(() => {
-    driverCoordsRef.current = driverCoords;
-  }, [driverCoords]);
-
+  // ── Inicialización de Leaflet y Mapa ───────────────────────────────────────────
   useEffect(() => {
     if (!mapRef.current) return;
     let destroyed = false;
 
+    // Inyectar CSS si no existe
     if (!document.getElementById("leaflet-css")) {
       const link = document.createElement("link");
       link.id = "leaflet-css";
@@ -38,10 +34,13 @@ export function DeliveryTrackingMap({ customerCoords, driverCoords }: DeliveryTr
 
     import("leaflet").then((L) => {
       if (destroyed || !mapRef.current) return;
+      LRef.current = L;
 
+      // Limpiar instancia previa
       if (mapInstance.current) {
         mapInstance.current.remove();
         mapInstance.current = null;
+        driverMarker.current = null;
       }
 
       const restaurantCoords: [number, number] = [
@@ -56,15 +55,13 @@ export function DeliveryTrackingMap({ customerCoords, driverCoords }: DeliveryTr
         zoomControl: true,
       });
       mapInstance.current = map;
-      map.on("dragstart zoomstart", () => {
-        hasUserMovedMap.current = true;
-      });
 
       L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
         attribution: "OpenStreetMap",
         maxZoom: 19,
       }).addTo(map);
 
+      // Marcadores estáticos
       const restaurantIcon = L.divIcon({
         html: markerHtml("R", "#ef4444"),
         className: "",
@@ -77,77 +74,60 @@ export function DeliveryTrackingMap({ customerCoords, driverCoords }: DeliveryTr
         iconSize: [34, 34],
         iconAnchor: [17, 17],
       });
+
+      L.marker(restaurantCoords, { icon: restaurantIcon }).addTo(map).bindPopup("Restaurante");
+      L.marker(customerPoint, { icon: customerIcon }).addTo(map).bindPopup("Tu entrega");
+
+      // Ajuste inicial de vista
+      const bounds = L.latLngBounds([restaurantCoords, customerPoint]);
+      map.fitBounds(bounds, { padding: [40, 40], maxZoom: 16 });
+
+      // Forzar renderizado correcto
+      setTimeout(() => map.invalidateSize(), 100);
+    });
+
+    return () => {
+      destroyed = true;
+      if (mapInstance.current) {
+        mapInstance.current.remove();
+        mapInstance.current = null;
+        driverMarker.current = null;
+      }
+    };
+  }, [customerCoords.lat, customerCoords.lng]);
+
+  // ── Sincronización del Marcador del Repartidor ──────────────────────────────
+  useEffect(() => {
+    const L = LRef.current;
+    const map = mapInstance.current;
+    if (!L || !map || !driverCoords) return;
+
+    const point: [number, number] = [driverCoords.lat, driverCoords.lng];
+
+    if (driverMarker.current) {
+      driverMarker.current.setLatLng(point);
+    } else {
       const driverIcon = L.divIcon({
         html: markerHtml("D", "#2563eb"),
         className: "",
         iconSize: [34, 34],
         iconAnchor: [17, 17],
       });
-      L.marker(restaurantCoords, { icon: restaurantIcon }).addTo(map).bindPopup("Restaurante");
-      L.marker(customerPoint, { icon: customerIcon }).addTo(map).bindPopup("Tu entrega");
-
-      const bounds = L.latLngBounds([restaurantCoords, customerPoint]);
-      const initialDriverCoords = driverCoordsRef.current;
-      if (initialDriverCoords) {
-        const driverPoint: [number, number] = [initialDriverCoords.lat, initialDriverCoords.lng];
-        driverMarker.current = L.marker(driverPoint, { icon: driverIcon })
-          .addTo(map)
-          .bindPopup("Repartidor");
-        bounds.extend(driverPoint);
-        hasAutoFitDriver.current = true;
+      driverMarker.current = L.marker(point, { icon: driverIcon, zIndexOffset: 1000 })
+        .addTo(map)
+        .bindPopup("Repartidor");
+      
+      // La primera vez que aparece el repartidor, expandimos la vista para incluirlo
+      const bounds = map.getBounds();
+      if (!bounds.contains(point)) {
+        map.fitBounds(bounds.extend(point), { padding: [40, 40], maxZoom: 17 });
       }
-      map.fitBounds(bounds, { padding: [36, 36], maxZoom: 16 });
-      setTimeout(() => map.invalidateSize(), 100);
-    });
-
-    return () => {
-      destroyed = true;
-      driverMarker.current = null;
-      hasUserMovedMap.current = false;
-      hasAutoFitDriver.current = false;
-      if (mapInstance.current) {
-        mapInstance.current.remove();
-        mapInstance.current = null;
-      }
-    };
-  }, [customerCoords.lat, customerCoords.lng]);
-
-  useEffect(() => {
-    if (!mapInstance.current || !driverCoords) return;
-
-    import("leaflet").then((L) => {
-      if (!mapInstance.current) return;
-
-      const point: [number, number] = [driverCoords.lat, driverCoords.lng];
-      if (driverMarker.current) {
-        driverMarker.current.setLatLng(point);
-      } else {
-        const driverIcon = L.divIcon({
-          html: markerHtml("D", "#2563eb"),
-          className: "",
-          iconSize: [34, 34],
-          iconAnchor: [17, 17],
-        });
-        driverMarker.current = L.marker(point, { icon: driverIcon })
-          .addTo(mapInstance.current)
-          .bindPopup("Repartidor");
-      }
-
-      if (!hasUserMovedMap.current && !hasAutoFitDriver.current) {
-        const bounds = L.latLngBounds([
-          [DELIVERY_CONFIG.restaurant.lat, DELIVERY_CONFIG.restaurant.lng],
-          [customerCoords.lat, customerCoords.lng],
-          point,
-        ]);
-        mapInstance.current.fitBounds(bounds, { padding: [36, 36], maxZoom: 17 });
-        hasAutoFitDriver.current = true;
-      }
-    });
-  }, [customerCoords.lat, customerCoords.lng, driverCoords]);
+    }
+  }, [driverCoords]);
 
   return (
-    <div style={{ border: "1px solid #e5e7eb", borderRadius: 10, overflow: "hidden" }}>
-      <div ref={mapRef} style={{ height: 260, width: "100%" }} />
+    <div style={{ border: "1px solid #e5e7eb", borderRadius: 12, overflow: "hidden", position: "relative" }}>
+      <div ref={mapRef} style={{ height: 280, width: "100%", zIndex: 1 }} />
     </div>
   );
 }

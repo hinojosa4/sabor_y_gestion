@@ -517,7 +517,7 @@ export default function PagoQRPage() {
             {showFactura && paymentData && (
                 <FacturaFinal
                     isOpen={showFactura}
-                    onClose={() => { setShowFactura(false); router.push('/'); }}
+                    onClose={() => { setShowFactura(false); router.push('/dashboard/cliente'); }}
                     orderId={paymentData.orderId}
                     dailyNumber={paymentData.dailyNumber}
                     tableNumber={tableNumber}
