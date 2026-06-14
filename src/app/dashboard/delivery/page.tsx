@@ -10,7 +10,27 @@ import {
 import { useAuth } from "@/lib/useAuth";
 import { DELIVERY } from "@/lib/roles";
 import { getPusherClient } from "@/lib/pusherClient";
+import { Capacitor, registerPlugin } from "@capacitor/core";
 import styles from "./page.module.css";
+
+// ── Capacitor Plugins ──────────────────────────────────────────────────────────
+
+interface BackgroundGeolocationPlugin {
+  addWatcher(
+    options: {
+      backgroundMessage?: string;
+      backgroundTitle?: string;
+      requestPermissions?: boolean;
+      stale?: boolean;
+      distanceFilter?: number;
+    },
+    callback: (location: { latitude: number; longitude: number } | null, error: unknown) => void
+  ): Promise<string>;
+  removeWatcher(options: { id: string }): Promise<void>;
+}
+
+// Registramos el plugin de geolocalización de fondo
+const BackgroundGeolocation = registerPlugin<BackgroundGeolocationPlugin>("BackgroundGeolocation");
 
 // ── Tipos ──────────────────────────────────────────────────────────────────────
 
@@ -35,6 +55,7 @@ interface RawItem {
 interface RawOrder {
   _id: string;
   status: BackendStatus;
+  driver_id?: string;
   total_amount: number;
   delivery_fee?: number;              // ← costo de envío
   delivery_distance_km?: number | null; // ← distancia en km
@@ -339,6 +360,7 @@ export default function DeliveryPage() {
   const [actionLoading, setActionLoading]     = useState(false);
   const [error, setError]                     = useState<string | null>(null);
   const [newOrderAlert, setNewOrderAlert]     = useState(false);
+  const [trackingInfo, setTrackingInfo]       = useState<string | null>(null);
 
   // ── Carga ─────────────────────────────────────────────────────────────────
   const loadOrders = useCallback(async () => {
@@ -416,6 +438,108 @@ export default function DeliveryPage() {
     };
   }, [user]);
 
+  useEffect(() => {
+    if (!user) return;
+    const token = getToken();
+    if (!token) return;
+
+    const trackedOrder = activeOrders.find((order) =>
+      ["picked_up", "in_transit"].includes(order.status) &&
+      String(order.driver_id ?? "") === user._id
+    );
+
+    if (!trackedOrder) {
+      setTrackingInfo(null);
+      return;
+    }
+    setTrackingInfo("Tracking activo: obteniendo GPS...");
+
+    let lastSentAt = 0;
+    const sendLocation = async (lat: number, lng: number) => {
+      const now = Date.now();
+      if (now - lastSentAt < 3000) return;
+      lastSentAt = now;
+      try {
+        await fetch(`/api/orders/${trackedOrder._id}/driver-location`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+          body: JSON.stringify({ lat, lng }),
+        });
+        setTrackingInfo(`Tracking activo: ubicación enviada ${new Date().toLocaleTimeString("es-BO", {
+          hour: "2-digit", minute: "2-digit", second: "2-digit",
+        })}`);
+      } catch {
+        // Error silencioso
+      }
+    };
+
+    // ── Lógica NATIVA (Capacitor) ──────────────────────────────────────────────
+    if (Capacitor.isNativePlatform()) {
+      let watcherId: string | null = null;
+      
+      const startNativeTracking = async () => {
+        try {
+          // Solicitar permisos explícitamente (algunos plugins lo requieren)
+          // El plugin @capacitor-community/background-geolocation usa addWatcher
+          watcherId = await BackgroundGeolocation.addWatcher(
+            {
+              backgroundMessage: "Tu ubicación se está compartiendo con el cliente.",
+              backgroundTitle: "Reparto en curso",
+              requestPermissions: true,
+              stale: false,
+              distanceFilter: 5 // metros
+            },
+            (location, error) => {
+              if (error) {
+                console.error("Background Geolocation Error:", error);
+                return;
+              }
+              if (location) {
+                sendLocation(location.latitude, location.longitude);
+              }
+            }
+          );
+        } catch {
+          setTrackingInfo("Error al iniciar GPS nativo");
+        }
+      };
+
+      startNativeTracking();
+      return () => {
+        if (watcherId) BackgroundGeolocation.removeWatcher({ id: watcherId });
+      };
+    }
+
+    // ── Lógica WEB (Navegador) ────────────────────────────────────────────────
+    if (!navigator.geolocation) {
+      setTrackingInfo("GPS no soportado en este navegador");
+      return;
+    }
+
+    const requestAndSendLocation = () => {
+      navigator.geolocation.getCurrentPosition(
+        (pos) => sendLocation(pos.coords.latitude, pos.coords.longitude),
+        () => setTrackingInfo("Tracking activo: no se pudo refrescar el GPS"),
+        { enableHighAccuracy: true, maximumAge: 0, timeout: 12000 }
+      );
+    };
+
+    const watchId = navigator.geolocation.watchPosition(
+      (pos) => sendLocation(pos.coords.latitude, pos.coords.longitude),
+      () => setTrackingInfo("Tracking activo: permiso GPS pendiente o bloqueado"),
+      { enableHighAccuracy: true, maximumAge: 10000, timeout: 15000 }
+    );
+    
+    requestAndSendLocation();
+    const intervalId = window.setInterval(requestAndSendLocation, 3000);
+
+    return () => {
+      navigator.geolocation.clearWatch(watchId);
+      window.clearInterval(intervalId);
+      setTrackingInfo(null);
+    };
+  }, [activeOrders, user]);
+
   // ── Acciones ───────────────────────────────────────────────────────────────
   const handleAdvance = async (orderId: string, nextStatus: BackendStatus) => {
     const token = getToken();
@@ -443,7 +567,17 @@ export default function DeliveryPage() {
         setActiveOrders((prev) => prev.filter((o) => o._id !== orderId));
       } else {
         setActiveOrders((prev) =>
-          prev.map((o) => o._id === orderId ? { ...o, status: nextStatus } : o)
+          prev.map((o) =>
+            o._id === orderId
+              ? {
+                  ...o,
+                  status: nextStatus,
+                  driver_id: ["picked_up", "in_transit"].includes(nextStatus)
+                    ? user?._id ?? o.driver_id
+                    : o.driver_id,
+                }
+              : o
+          )
         );
       }
     } catch (e) {
@@ -523,6 +657,20 @@ export default function DeliveryPage() {
       <main className={styles.main}>
         {newOrderAlert && (
           <div className={styles.newOrderAlert}>🛵 ¡Nueva orden de delivery recibida!</div>
+        )}
+        {trackingInfo && (
+          <div style={{
+            marginBottom: "1rem",
+            backgroundColor: "#eff6ff",
+            border: "1px solid #bfdbfe",
+            color: "#1d4ed8",
+            borderRadius: 10,
+            padding: "0.75rem 1rem",
+            fontSize: "0.9rem",
+            fontWeight: 700,
+          }}>
+            {trackingInfo}
+          </div>
         )}
         {error && (
           <div className={styles.errorBanner}>

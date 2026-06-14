@@ -130,7 +130,12 @@ export async function PATCH(req: NextRequest, { params }: Params) {
       return NextResponse.json({ ok: false, message: friendlyMsg }, { status: 400 });
     }
 
-    const order = await Order.findByIdAndUpdate(id, { status }, { new: true });
+    const update: Record<string, unknown> = { status };
+    if (["picked_up", "in_transit"].includes(status) && userRol === "delivery") {
+      update.driver_id = payload.userId;
+    }
+
+    const order = await Order.findByIdAndUpdate(id, update, { new: true });
     if (!order) {
       return NextResponse.json({ ok: false, message: "Orden no encontrada" }, { status: 404 });
     }

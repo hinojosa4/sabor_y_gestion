@@ -6,7 +6,6 @@ import React, { useMemo, useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/useAuth";
 import { CLIENTE } from "@/lib/roles";
-import { getPusherClient } from "@/lib/pusherClient";
 import { DeliveryHeader } from "@/components/clientScreen/delivery/DeliveryHeader";
 import { DeliveryEstimateBanner } from "@/components/clientScreen/delivery/DeliveryEstimateBanner";
 import { CategoryTabs } from "@/components/clientScreen/delivery/CategoryTabs";
@@ -14,7 +13,6 @@ import { DishCard, Dish } from "@/components/clientScreen/delivery/DishCard";
 import { OrderCart, CartItem } from "@/components/clientScreen/delivery/OrderCart";
 import { haversineKm, calcDeliveryFee, DELIVERY_CONFIG } from "@/lib/deliveryConfig";
 import dynamic from "next/dynamic";
-import { FacturaFinal } from "@/components/caja/FacturaFinal";
 
 // ── Tipos ──────────────────────────────────────────────────────────────────────
 const DeliveryMap = dynamic(
@@ -67,17 +65,6 @@ export default function DeliveryPage() {
   const router = useRouter();
   const { loading: authLoading, logout } = useAuth(CLIENTE);
 
-  const [showFactura, setShowFactura]     = useState(false);
-  const [facturaData, setFacturaData]     = useState<{
-    orderId: string;
-    items: { dish: { name: string; price: number }; quantity: number; subtotal: number }[];
-    total: number;
-    subtotal: number;
-    discountAmount: number;
-    discountPercent: number;
-    loyaltyTierName: string | null;
-    deliveryFeeAmount: number;
-  } | null>(null);
   const [categories, setCategories]   = useState<ApiCategory[]>([]);
   const [apiDishes, setApiDishes]     = useState<ApiDish[]>([]);
   const [loadingData, setLoadingData] = useState(true);
@@ -96,7 +83,6 @@ export default function DeliveryPage() {
   const [phone, setPhone]                 = useState("");
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("Efectivo");
   const [notes, setNotes]                 = useState("");
-  const [lastOrderId, setLastOrderId]     = useState<string | null>(null);
 
   // ── Estado de geolocalización ─────────────────────────────────────────────
   const [geoStatus, setGeoStatus]       = useState<GeoStatus>("idle");
@@ -235,55 +221,7 @@ export default function DeliveryPage() {
     }
   }, []);
 
-  // ── Pusher ─────────────────────────────────────────────────────────────────
-  useEffect(() => {
-    if (!lastOrderId) return;
 
-    const STATUS_LABELS: Record<string, string> = {
-      in_kitchen: "🍳 Tu pedido está en cocina",
-      ready:      "✅ Tu pedido está listo",
-      picked_up:  "🛵 El repartidor recogió tu pedido",
-      in_transit: "🚗 Tu pedido está en camino",
-      delivered:  "🎉 ¡Tu pedido fue entregado!",
-      cancelled:  "❌ Tu pedido fue cancelado",
-    };
-
-    const handleStatusUpdate = (data: { orderId: string; status: string }) => {
-      if (data.orderId !== lastOrderId) return;
-      const label = STATUS_LABELS[data.status];
-      if (label) {
-        setToastMsg(label);
-        setToastType(data.status === "cancelled" ? "info" : "success");
-        setTimeout(() => setToastMsg(null), 5000);
-      }
-      if (data.status === "delivered" || data.status === "cancelled") {
-        setTimeout(() => setLastOrderId(null), 6000);
-      }
-    };
-
-    const handleKitchenUpdate = (data: { orderId: string; newStatus: string }) => {
-      handleStatusUpdate({ orderId: data.orderId, status: data.newStatus });
-    };
-
-    let cancelled = false;
-    getPusherClient().then((client) => {
-      if (cancelled) return;
-      const channel = client.subscribe("restaurant");
-      const deliveryChannel = client.subscribe("delivery");
-      channel.bind("order:status_updated", handleStatusUpdate);
-      channel.bind("order:updated", handleKitchenUpdate);
-      deliveryChannel.bind("order:status_updated", handleStatusUpdate);
-      deliveryChannel.bind("order:updated", handleKitchenUpdate);
-    });
-
-    return () => {
-      cancelled = true;
-      getPusherClient().then((client) => {
-        client.unsubscribe("restaurant");
-        client.unsubscribe("delivery");
-      });
-    };
-  }, [lastOrderId]);
 
   // ── Mapeos ─────────────────────────────────────────────────────────────────
   const dishes: Dish[] = useMemo(() =>
@@ -358,10 +296,8 @@ export default function DeliveryPage() {
       if (!json.ok) throw new Error(json.message ?? "Error al crear orden");
 
       const orderId: string = json.data.order._id;
-      setLastOrderId(orderId);
 
       // Limpiar carrito y cerrar modal
-      const cartSnapshot = [...cart];
       setCart([]);
       setAddress(""); setPhone(""); setNotes(""); setPaymentMethod("Efectivo");
       handleCloseModal();
@@ -370,25 +306,8 @@ export default function DeliveryPage() {
         // Redirigir a la página de pago QR existente
         router.push(`/pago-qr/${orderId}`);
       } else {
-        // Efectivo: mostrar factura de confirmación
-        setFacturaData({
-          orderId,
-          items: cartSnapshot.map((it) => ({
-            dish: { name: it.dish.name, price: it.dish.price },
-            quantity: it.quantity,
-            subtotal: it.dish.price * it.quantity,
-          })),
-          total: Number(json.data.total ?? totalConEnvio),
-          subtotal: Number(json.data.subtotal ?? cartSubtotal),
-          discountAmount: Number(json.data.discountAmount ?? loyaltyDiscountAmount),
-          discountPercent: Number(json.data.discountPercent ?? loyaltyDiscountPercent),
-          loyaltyTierName: json.data.loyaltyTierName ?? loyalty?.tier.name ?? null,
-          deliveryFeeAmount: Number(json.data.deliveryFee ?? deliveryFee ?? 0),
-        });
-        setShowFactura(true);
-        setToastMsg("✅ ¡Pedido enviado! El repartidor cobrará al entregar.");
-        setToastType("success");
-        setTimeout(() => setToastMsg(null), 6000);
+        // Efectivo: redireccionar al dashboard de cliente
+        router.push("/dashboard/cliente");
       }
     } catch (e) {
       alert(e instanceof Error ? e.message : "Error al enviar la orden");
@@ -646,25 +565,6 @@ export default function DeliveryPage() {
                 {submitting ? "Enviando…" : "Confirmar pedido"}
               </button>
             </div>
-            {/* ── Factura post-orden (solo efectivo) ───────────────────────── */}
-              {showFactura && facturaData && (
-                <FacturaFinal
-                  isOpen={showFactura}
-                  onClose={() => { setShowFactura(false); setFacturaData(null); }}
-                  orderId={facturaData.orderId}
-                  tableNumber={null}
-                  items={facturaData.items}
-                  iva={0}
-                  total={facturaData.total}
-                  subtotal={facturaData.subtotal}
-                  discountAmount={facturaData.discountAmount}
-                  discountPercent={facturaData.discountPercent}
-                  loyaltyTierName={facturaData.loyaltyTierName}
-                  deliveryFee={facturaData.deliveryFeeAmount}
-                  paymentMethod="cash"
-                  paymentDate={new Date()}
-                />
-              )}
           </div>
         </div>
       )}
@@ -685,6 +585,14 @@ const s: { [k: string]: React.CSSProperties } = {
   retryBtn:    { backgroundColor: "#f97316", color: "#fff", border: "none", borderRadius: 8, padding: "0.5rem 1.25rem", fontWeight: 600, cursor: "pointer" },
   toast:       { margin: "1rem 2rem 0", padding: "0.85rem 1.25rem", backgroundColor: "#ecfdf5", border: "1px solid #6ee7b7", borderRadius: 10, color: "#065f46", fontWeight: 600, fontSize: "0.95rem" },
   toastInfo:   { backgroundColor: "#fef3c7", border: "1px solid #fcd34d", color: "#92400e" },
+  trackingPanel: { margin: "1rem 2rem 0", backgroundColor: "#fff", border: "1px solid #e5e7eb", borderRadius: 10, padding: "1rem", display: "flex", flexDirection: "column", gap: "0.75rem", boxShadow: "0 6px 18px rgba(15,23,42,0.06)" },
+  trackingHeader: { display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: "1rem" },
+  trackingTitle: { margin: 0, fontSize: "1rem", fontWeight: 700, color: "#111827" },
+  trackingSubtitle: { margin: "0.25rem 0 0", fontSize: "0.85rem", color: "#4b5563" },
+  trackingBadge: { backgroundColor: "#eff6ff", border: "1px solid #bfdbfe", color: "#1d4ed8", borderRadius: 999, padding: "0.25rem 0.65rem", fontSize: "0.75rem", fontWeight: 700, whiteSpace: "nowrap" },
+  trackingFooter: { display: "flex", gap: "0.75rem", flexWrap: "wrap", color: "#6b7280", fontSize: "0.75rem", fontWeight: 600 },
+  trackingUpdated: { margin: 0, color: "#4b5563", fontSize: "0.78rem", fontWeight: 600 },
+  trackingWaiting: { margin: 0, color: "#92400e", backgroundColor: "#fffbeb", border: "1px solid #fde68a", borderRadius: 8, padding: "0.65rem 0.75rem", fontSize: "0.85rem" },
 
   // ── Modal ──────────────────────────────────────────────────────────────────
   overlay:     { position: "fixed", inset: 0, backgroundColor: "rgba(17,24,39,0.55)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000, padding: "1rem" },

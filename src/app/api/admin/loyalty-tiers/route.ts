@@ -81,7 +81,7 @@ export async function GET(req: NextRequest) {
     await ensureDefaultLoyaltyTiers();
 
     const tiers = await LoyaltyTier.find()
-      .sort({ sortOrder: 1, minOrders: 1, minSpent: 1 })
+      .sort({ discountPercent: -1, minOrders: 1, minSpent: 1 })
       .lean();
 
     return NextResponse.json({ ok: true, data: tiers });
@@ -89,7 +89,7 @@ export async function GET(req: NextRequest) {
     return NextResponse.json(
       {
         ok: false,
-        message: "Error al obtener categorias de fidelizacion",
+        message: "Error al obtener categorías de segmentación de clientes",
         error: error instanceof Error ? error.message : "Error desconocido",
       },
       { status: 500 }
@@ -116,7 +116,7 @@ export async function POST(req: NextRequest) {
 
     if (existingTier) {
       return NextResponse.json(
-        { ok: false, message: "Ya existe una categoria con ese nombre" },
+        { ok: false, message: "Ya existe una categoría con ese nombre en la segmentación de clientes" },
         { status: 409 }
       );
     }
@@ -124,14 +124,14 @@ export async function POST(req: NextRequest) {
     const tier = await LoyaltyTier.create(normalized.data);
 
     return NextResponse.json(
-      { ok: true, message: "Categoria de fidelizacion creada correctamente", data: tier },
+      { ok: true, message: "Categoría de segmentación de clientes creada correctamente", data: tier },
       { status: 201 }
     );
   } catch (error) {
     return NextResponse.json(
       {
         ok: false,
-        message: "Error al crear categoria de fidelizacion",
+        message: "Error al crear categoría de segmentación de clientes",
         error: error instanceof Error ? error.message : "Error desconocido",
       },
       { status: 500 }

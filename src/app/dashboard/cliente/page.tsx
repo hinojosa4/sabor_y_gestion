@@ -37,6 +37,25 @@ function mapStatus(status: string): Order["status"] {
   return map[status] ?? "Pendiente";
 }
 
+// ── Sorting Helper ─────────────────────────────────────────────────────────────
+
+function sortOrdersPriority(orders: Order[]): Order[] {
+  const priority: Record<string, number> = {
+    "En camino": 1,
+    "En cocina": 2,
+    "Listo": 3,
+    "Pendiente": 4,
+    "Completado": 5,
+    "Cancelado": 6,
+  };
+  return [...orders].sort((a, b) => {
+    const pa = priority[a.status] ?? 10;
+    const pb = priority[b.status] ?? 10;
+    if (pa !== pb) return pa - pb;
+    return 0; // maintain original relative order (likely date desc from API)
+  });
+}
+
 function mapLocation(order: RawOrder): string {
   if (order.service_type === "delivery") return order.delivery_address?.trim() || "Delivery";
   if (order.service_type === "pick_up") return "Para llevar";
@@ -62,7 +81,13 @@ interface RawOrder {
   total_amount: number;
   table_id?: string;
   delivery_address?: string;
+  delivery_coords?: { lat?: number | null; lng?: number | null };
+  driver_location?: { lat?: number | null; lng?: number | null; updatedAt?: string | Date | null };
   payment_method?: string;
+  payment?: {
+    status: "pending" | "completed";
+    method: string;
+  } | null;
   notes?: string;
   createdAt: string;
   items: RawOrderItem[];
@@ -107,35 +132,39 @@ const RESERVATION_STATUS_COLORS: Record<string, { bg: string; text: string; bord
 
 // ── Helpers de conversión ──────────────────────────────────────────────────────
 
-interface CustomerLoyalty {
-  totalPaidOrders: number;
-  totalSpent: number;
-  averageTicket: number;
-  points: number;
-  discountPercent: number;
-  benefits: string[];
-  tier: {
-    name: string;
-    slug: string;
-  };
-}
-
 function toFrontendOrder(raw: RawOrder, index: number): Order {
   return {
     id: raw.daily_number ? String(raw.daily_number) : String(index + 1001),
     _id: raw._id,
+    serviceType: raw.service_type,
     date: formatDate(raw.createdAt),
     time: formatTime(raw.createdAt),
     location: mapLocation(raw),
     waiter: raw.service_type === "delivery" ? "Delivery" : "—",
     paymentMethod: (raw.payment_method as Order["paymentMethod"]) ?? "Efectivo",
+    payment: raw.payment,
     status: mapStatus(raw.status),
+    rawStatus: raw.status,
     items: (raw.items ?? []).map((it) => ({
       name: it.dish_id?.name ?? "Plato",
       quantity: it.quantity,
       unitPrice: it.unit_price,
     })),
     total: raw.total_amount,
+    deliveryCoords:
+      raw.delivery_coords?.lat != null && raw.delivery_coords?.lng != null
+        ? { lat: raw.delivery_coords.lat, lng: raw.delivery_coords.lng }
+        : null,
+    driverLocation:
+      raw.driver_location?.lat != null && raw.driver_location?.lng != null
+        ? {
+            lat: raw.driver_location.lat,
+            lng: raw.driver_location.lng,
+            updatedAt: raw.driver_location.updatedAt
+              ? new Date(raw.driver_location.updatedAt).toISOString()
+              : undefined,
+          }
+        : null,
   };
 }
 
@@ -222,11 +251,17 @@ export default function ClientePage() {
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
   const [reservaOpen, setReservaOpen] = useState(false);
-  const [loyalty, setLoyalty] = useState<CustomerLoyalty | null>(null);
 
   // ── Estado de reservas ─────────────────────────────────────────────────────
   const [reservations, setReservations] = useState<ClientReservation[]>([]);
   const [reservationToast, setReservationToast] = useState<string | null>(null);
+
+  // ── Estado de fidelización real ───────────────────────────────────────────
+  const [loyaltyData, setLoyaltyData] = useState<{
+    tier: { name: string; discountPercent: number; benefits: string[]; slug: string };
+    discountPercent: number;
+    benefits: string[];
+  } | null>(null);
 
   // Ref para evitar stale closures en Pusher
   const userRef = useRef(user);
@@ -244,9 +279,10 @@ export default function ClientePage() {
       });
       const json = await res.json();
       if (!json.ok) throw new Error(json.message ?? "Error al cargar historial");
-      setOrders((json.data as RawOrder[]).map((raw, index, arr) =>
+      const rawHistory = (json.data as RawOrder[]).map((raw, index, arr) =>
         toFrontendOrder(raw, arr.length - 1 - index)
-      ));
+      );
+      setOrders(sortOrdersPriority(rawHistory));
     } catch (e) {
       setError(e instanceof Error ? e.message : "Error de red");
     } finally {
@@ -275,12 +311,30 @@ export default function ClientePage() {
     }
   }, []);
 
+  // ── Carga de fidelización real del cliente ────────────────────────────────
+  const loadLoyalty = useCallback(async () => {
+    const token = localStorage.getItem("token");
+    if (!token) return;
+    try {
+      const res = await fetch("/api/customers/me/loyalty", {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const json = await res.json();
+      if (json.ok) {
+        setLoyaltyData(json.data);
+      }
+    } catch (e) {
+      console.error("Error al cargar fidelización:", e);
+    }
+  }, []);
+
   useEffect(() => {
     if (!authLoading && user) {
       loadHistory();
       loadReservations();
+      loadLoyalty();
     }
-  }, [authLoading, user, loadHistory, loadReservations]);
+  }, [authLoading, user, loadHistory, loadReservations, loadLoyalty]);
 
   // ── Pusher ─────────────────────────────────────────────────────────────────
   useEffect(() => {
@@ -298,35 +352,35 @@ export default function ClientePage() {
       channel.bind("order:new", () => { loadHistory(); });
       channel.bind("order:status_updated", (data: { orderId: string; status: string }) => {
         setOrders((prev) =>
-          prev.map((o) => o._id === data.orderId ? { ...o, status: mapStatus(data.status) } : o)
+          prev.map((o) => o._id === data.orderId ? { ...o, status: mapStatus(data.status), rawStatus: data.status } : o)
         );
         setSelectedOrder((prev) =>
-          prev && prev._id === data.orderId ? { ...prev, status: mapStatus(data.status) } : prev
+          prev && prev._id === data.orderId ? { ...prev, status: mapStatus(data.status), rawStatus: data.status } : prev
         );
       });
       channel.bind("order:updated", (data: { orderId: string; newStatus: string }) => {
         setOrders((prev) =>
-          prev.map((o) => o._id === data.orderId ? { ...o, status: mapStatus(data.newStatus) } : o)
+          prev.map((o) => o._id === data.orderId ? { ...o, status: mapStatus(data.newStatus), rawStatus: data.newStatus } : o)
         );
         setSelectedOrder((prev) =>
-          prev && prev._id === data.orderId ? { ...prev, status: mapStatus(data.newStatus) } : prev
+          prev && prev._id === data.orderId ? { ...prev, status: mapStatus(data.newStatus), rawStatus: data.newStatus } : prev
         );
       });
 
       deliveryChannel.bind("order:status_updated", (data: { orderId: string; status: string }) => {
         setOrders((prev) =>
-          prev.map((o) => o._id === data.orderId ? { ...o, status: mapStatus(data.status) } : o)
+          prev.map((o) => o._id === data.orderId ? { ...o, status: mapStatus(data.status), rawStatus: data.status } : o)
         );
         setSelectedOrder((prev) =>
-          prev && prev._id === data.orderId ? { ...prev, status: mapStatus(data.status) } : prev
+          prev && prev._id === data.orderId ? { ...prev, status: mapStatus(data.status), rawStatus: data.status } : prev
         );
       });
       deliveryChannel.bind("order:updated", (data: { orderId: string; newStatus: string }) => {
         setOrders((prev) =>
-          prev.map((o) => o._id === data.orderId ? { ...o, status: mapStatus(data.newStatus) } : o)
+          prev.map((o) => o._id === data.orderId ? { ...o, status: mapStatus(data.newStatus), rawStatus: data.newStatus } : o)
         );
         setSelectedOrder((prev) =>
-          prev && prev._id === data.orderId ? { ...prev, status: mapStatus(data.newStatus) } : prev
+          prev && prev._id === data.orderId ? { ...prev, status: mapStatus(data.newStatus), rawStatus: data.newStatus } : prev
         );
       });
 
@@ -387,7 +441,6 @@ export default function ClientePage() {
   const average     = totalVisits > 0 ? totalSpent / totalVisits : 0;
   const points      = Math.floor(totalSpent);
   const isNew       = totalVisits <= 2;
-  const benefits    = loyalty?.benefits.length ? loyalty.benefits : getBenefits(totalVisits, isNew);
 
   const rawUser = (() => {
     try { return JSON.parse(localStorage.getItem("user") ?? "{}"); }
@@ -397,8 +450,14 @@ export default function ClientePage() {
   const clientStats: ClientStats = {
     name: user?.name ?? rawUser?.name ?? "Cliente",
     memberSince: rawUser?.createdAt ? formatMemberSince(rawUser.createdAt) : "este año",
-    totalVisits, totalSpent, average, points, isNew,
-    benefits: getBenefits(totalVisits, isNew),
+    totalVisits,
+    totalSpent,
+    average,
+    points,
+    isNew: loyaltyData ? loyaltyData.tier.slug === "nuevo" : isNew,
+    tierName: loyaltyData?.tier.name || undefined,
+    discountPercent: loyaltyData?.discountPercent ?? undefined,
+    benefits: loyaltyData?.benefits ?? getBenefits(totalVisits, isNew),
   };
 
   const handleViewOrder  = (order: Order) => { setSelectedOrder(order); setModalOpen(true); };

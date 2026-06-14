@@ -114,14 +114,14 @@ export async function getActiveLoyaltyTiers() {
   await ensureDefaultLoyaltyTiers();
 
   const tiers = await LoyaltyTier.find({ isActive: true })
-    .sort({ sortOrder: 1, minOrders: 1, minSpent: 1 })
+    .sort({ discountPercent: 1, minOrders: 1, minSpent: 1 })
     .lean<Array<LoyaltyTierInput & { _id: Types.ObjectId }>>();
 
   return tiers.length > 0 ? tiers.map(toTierSnapshot) : DEFAULT_LOYALTY_TIERS.map(toTierSnapshot);
 }
 
 function pickTier(tiers: LoyaltyTierSnapshot[], totalPaidOrders: number, totalSpent: number) {
-  const sorted = [...tiers].sort((a, b) => b.sortOrder - a.sortOrder);
+  const sorted = [...tiers].sort((a, b) => b.discountPercent - a.discountPercent);
 
   return sorted.find((tier) => {
     // La categoria sube por cantidad de pedidos o por gasto acumulado.

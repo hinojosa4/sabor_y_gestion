@@ -266,8 +266,6 @@ export function PaymentModal({ isOpen, onClose, orderId, tableId, tableNumber, t
     
     // Estados para la factura final
     const [showFactura, setShowFactura] = useState(false);
-    const [orderItems] = useState<OrderItemType[]>([]);
-    const [orderIva] = useState(0);
     const [receipt, setReceipt] = useState<PaymentReceipt | null>(null);
 
     useEffect(() => {
@@ -433,8 +431,8 @@ export function PaymentModal({ isOpen, onClose, orderId, tableId, tableNumber, t
                 orderId={orderId}
                 dailyNumber={receipt.dailyNumber}
                 tableNumber={tableNumber}
-                items={orderItems}
-                iva={orderIva}
+                items={[]}
+                iva={0}
                 total={receipt.total}
                 subtotal={receipt.subtotal}
                 discountAmount={receipt.discountAmount}

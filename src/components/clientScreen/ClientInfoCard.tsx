@@ -1,6 +1,6 @@
 // src/components/clientScreen/ClientInfoCard.tsx
 import React from "react";
-import { User, Sparkles, ShoppingBag, DollarSign, TrendingUp, Award, Star, ChevronRight } from "lucide-react";
+import { User, Sparkles, ShoppingBag, DollarSign, TrendingUp, Star, ChevronRight } from "lucide-react";
 
 export interface ClientStats {
     name: string;
@@ -62,13 +62,6 @@ export function ClientInfoCard({ data }: ClientInfoCardProps) {
                     value={`Bs ${data.average.toFixed(2)}`}
                     valueColor="#8b5cf6"
                 />
-                <StatBox
-                    bg="#fff7ed"
-                    icon={<Award size={22} color="#f97316" />}
-                    label="Puntos"
-                    value={String(data.points)}
-                    valueColor="#f97316"
-                />
             </div>
 
             <div style={styles.benefitsCard}>
@@ -101,8 +94,20 @@ interface StatBoxProps {
 }
 
 function StatBox({ bg, icon, label, value, valueColor }: StatBoxProps) {
+    const [isHovered, setIsHovered] = React.useState(false);
     return (
-        <div style={{ ...styles.statBox, backgroundColor: bg }}>
+        <div 
+            onMouseEnter={() => setIsHovered(true)}
+            onMouseLeave={() => setIsHovered(false)}
+            style={{ 
+                ...styles.statBox, 
+                backgroundColor: bg,
+                transform: isHovered ? "translateY(-4px)" : "translateY(0)",
+                boxShadow: isHovered ? "0 10px 20px rgba(0,0,0,0.06)" : "0 2px 8px rgba(0,0,0,0.02)",
+                transition: "transform 0.2s ease, box-shadow 0.2s ease",
+                cursor: "pointer"
+            }}
+        >
             <div style={styles.statIcon}>{icon}</div>
             <div style={styles.statLabel}>{label}</div>
             <div style={{ ...styles.statValue, color: valueColor }}>{value}</div>
@@ -127,6 +132,7 @@ const styles: { [key: string]: React.CSSProperties } = {
         flexWrap: "wrap",
         gap: "1rem",
         color: "#ffffff",
+        boxShadow: "0 4px 15px rgba(249, 115, 22, 0.15)",
     },
     gradientLeft: {
         display: "flex",
@@ -141,6 +147,7 @@ const styles: { [key: string]: React.CSSProperties } = {
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
+        boxShadow: "0 2px 10px rgba(0,0,0,0.1)",
     },
     clientName: {
         margin: 0,
@@ -166,10 +173,11 @@ const styles: { [key: string]: React.CSSProperties } = {
         cursor: "pointer",
         fontSize: "0.875rem",
         fontWeight: 500,
+        transition: "background-color 0.2s",
     },
     statsGrid: {
         display: "grid",
-        gridTemplateColumns: "repeat(4, 1fr)",
+        gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
         gap: "1rem",
     },
     statBox: {
@@ -197,6 +205,7 @@ const styles: { [key: string]: React.CSSProperties } = {
         border: "1px solid #fde68a",
         borderRadius: 14,
         padding: "1.25rem 1.25rem",
+        boxShadow: "0 2px 8px rgba(253, 230, 138, 0.15)",
     },
     benefitsHeader: {
         display: "flex",
@@ -213,7 +222,7 @@ const styles: { [key: string]: React.CSSProperties } = {
     },
     benefitsGrid: {
         display: "grid",
-        gridTemplateColumns: "repeat(2, 1fr)",
+        gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
         gap: "0.4rem 1.5rem",
         fontSize: "0.875rem",
         color: "#374151",
