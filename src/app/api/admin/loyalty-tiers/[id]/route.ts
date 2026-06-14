@@ -130,7 +130,7 @@ export async function PUT(req: NextRequest, { params }: Params) {
 
     if (existingTier) {
       return NextResponse.json(
-        { ok: false, message: "Ya existe otra categoria con ese nombre" },
+        { ok: false, message: "Ya existe otra categoría con ese nombre en la segmentación de clientes" },
         { status: 409 }
       );
     }
@@ -141,19 +141,19 @@ export async function PUT(req: NextRequest, { params }: Params) {
     });
 
     if (!tier) {
-      return NextResponse.json({ ok: false, message: "Categoria no encontrada" }, { status: 404 });
+      return NextResponse.json({ ok: false, message: "Categoría no encontrada" }, { status: 404 });
     }
 
     return NextResponse.json({
       ok: true,
-      message: "Categoria de fidelizacion actualizada correctamente",
+      message: "Categoría de segmentación de clientes actualizada correctamente",
       data: tier,
     });
   } catch (error) {
     return NextResponse.json(
       {
         ok: false,
-        message: "Error al actualizar categoria de fidelizacion",
+        message: "Error al actualizar categoría de segmentación de clientes",
         error: error instanceof Error ? error.message : "Error desconocido",
       },
       { status: 500 }
@@ -171,20 +171,20 @@ export async function DELETE(req: NextRequest, { params }: Params) {
 
     const { id } = await params;
     if (!Types.ObjectId.isValid(id)) {
-      return NextResponse.json({ ok: false, message: "ID no valido" }, { status: 400 });
+      return NextResponse.json({ ok: false, message: "ID no válido" }, { status: 400 });
     }
 
-    // Siempre debe quedar al menos una regla activa para calcular la fidelizacion.
+    // Siempre debe quedar al menos una regla activa para calcular la segmentación.
     const tier = await LoyaltyTier.findById(id);
     if (!tier) {
-      return NextResponse.json({ ok: false, message: "Categoria no encontrada" }, { status: 404 });
+      return NextResponse.json({ ok: false, message: "Categoría no encontrada" }, { status: 404 });
     }
 
     if (tier.isActive) {
       const activeCount = await LoyaltyTier.countDocuments({ isActive: true });
       if (activeCount <= 1) {
         return NextResponse.json(
-          { ok: false, message: "Debe existir al menos una categoria activa" },
+          { ok: false, message: "Debe existir al menos una categoría activa" },
           { status: 409 }
         );
       }
@@ -194,13 +194,13 @@ export async function DELETE(req: NextRequest, { params }: Params) {
 
     return NextResponse.json({
       ok: true,
-      message: "Categoria de fidelizacion eliminada correctamente",
+      message: "Categoría de segmentación de clientes eliminada correctamente",
     });
   } catch (error) {
     return NextResponse.json(
       {
         ok: false,
-        message: "Error al eliminar categoria de fidelizacion",
+        message: "Error al eliminar categoría de segmentación de clientes",
         error: error instanceof Error ? error.message : "Error desconocido",
       },
       { status: 500 }

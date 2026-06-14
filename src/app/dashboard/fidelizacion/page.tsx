@@ -14,7 +14,7 @@ type LoyaltyTier = {
   minSpent: number;
   discountPercent: number;
   benefits: string[];
-  sortOrder: number;
+  sortOrder?: number;
   isActive: boolean;
 };
 
@@ -24,7 +24,6 @@ type TierForm = {
   minSpent: string;
   discountPercent: string;
   benefitsText: string;
-  sortOrder: string;
   isActive: boolean;
 };
 
@@ -36,7 +35,6 @@ const emptyForm: TierForm = {
   minSpent: "0",
   discountPercent: "0",
   benefitsText: "",
-  sortOrder: "0",
   isActive: true,
 };
 
@@ -68,7 +66,6 @@ function tierToForm(tier: LoyaltyTier): TierForm {
     minSpent: String(tier.minSpent),
     discountPercent: String(tier.discountPercent),
     benefitsText: tier.benefits.join("\n"),
-    sortOrder: String(tier.sortOrder),
     isActive: tier.isActive,
   };
 }
@@ -80,7 +77,6 @@ function formToPayload(form: TierForm) {
     minSpent: Number(form.minSpent),
     discountPercent: Number(form.discountPercent),
     benefits: form.benefitsText.split("\n").map((line) => line.trim()).filter(Boolean),
-    sortOrder: Number(form.sortOrder),
     isActive: form.isActive,
   };
 }
@@ -97,7 +93,6 @@ function validateTierForm(form: TierForm): TierFormErrors {
   const minOrders = parseRequiredNumber(form.minOrders);
   const minSpent = parseRequiredNumber(form.minSpent);
   const discountPercent = parseRequiredNumber(form.discountPercent);
-  const sortOrder = parseRequiredNumber(form.sortOrder);
 
   if (!name) {
     errors.name = "El nombre es obligatorio";
@@ -117,10 +112,6 @@ function validateTierForm(form: TierForm): TierFormErrors {
 
   if (discountPercent === null || discountPercent < 0 || discountPercent > 100) {
     errors.discountPercent = "El descuento debe estar entre 0 y 100";
-  }
-
-  if (sortOrder === null || sortOrder < 0 || !Number.isInteger(sortOrder)) {
-    errors.sortOrder = "Ingresa un numero entero mayor o igual a 0";
   }
 
   return errors;
@@ -228,6 +219,18 @@ export default function FidelizacionPage() {
       return;
     }
 
+    // Validar duplicados por nombre
+    const duplicateName = tiers.some(
+      (t) =>
+        t.name.trim().toLowerCase() === form.name.trim().toLowerCase() &&
+        t._id !== editingTier?._id
+    );
+    if (duplicateName) {
+      setError(`No se puede guardar: Ya existe una categoría registrada con el nombre "${form.name.trim()}". Por favor, utiliza un nombre diferente.`);
+      setFormErrors((prev) => ({ ...prev, name: "Este nombre ya está registrado" }));
+      return;
+    }
+
     setSaving(true);
     setError("");
 
@@ -286,8 +289,8 @@ export default function FidelizacionPage() {
             <Award size={21} />
           </div>
           <div style={{ minWidth: 0 }}>
-            <h1 style={{ margin: 0, fontSize: isMobile ? 18 : 24, lineHeight: 1.1 }}>Fidelizacion</h1>
-            {!isMobile && <p style={{ margin: "4px 0 0", fontSize: 12, color: "#777" }}>Configura categorias, umbrales y descuentos para clientes registrados.</p>}
+            <h1 style={{ margin: 0, fontSize: isMobile ? 18 : 24, lineHeight: 1.1 }}>Segmentación de Clientes</h1>
+            {!isMobile && <p style={{ margin: "4px 0 0", fontSize: 12, color: "#777" }}>Configura categorías, umbrales y descuentos para la segmentación de clientes.</p>}
           </div>
         </div>
         <div style={{ display: "flex", gap: 8, flexShrink: 0 }}>
@@ -322,15 +325,15 @@ export default function FidelizacionPage() {
             <p style={emptyStyle}>Cargando categorias...</p>
           ) : tiers.length === 0 ? (
             <div style={{ padding: 32, textAlign: "center" }}>
-              <p style={{ margin: "0 0 14px", color: "#777" }}>No hay categorias de fidelizacion.</p>
-              <button onClick={openCreate} style={primaryButtonStyle}><Plus size={16} /> Crear categoria</button>
+              <p style={{ margin: "0 0 14px", color: "#777" }}>No hay categorías de segmentación de clientes.</p>
+              <button onClick={openCreate} style={primaryButtonStyle}><Plus size={16} /> Crear categoría</button>
             </div>
           ) : (
             <div style={{ overflowX: "auto" }}>
               <table style={{ width: "100%", borderCollapse: "collapse", minWidth: 860 }}>
                 <thead>
                   <tr style={{ background: "#fafafa" }}>
-                    {["Categoria", "Condicion", "Descuento", "Beneficios", "Estado", "Acciones"].map((head) => (
+                    {["Categoría", "Condición", "Descuento", "Beneficios", "Estado", "Acciones"].map((head) => (
                       <th key={head} style={{ textAlign: head === "Acciones" ? "center" : "left", padding: "13px 16px", fontSize: 11, color: "#777", borderBottom: "1px solid #eee", whiteSpace: "nowrap" }}>{head}</th>
                     ))}
                   </tr>
@@ -340,7 +343,7 @@ export default function FidelizacionPage() {
                     <tr key={tier._id} style={{ borderBottom: "1px solid #f0f0f0" }}>
                       <td style={cellStyle}>
                         <strong style={{ color: "#1a1a1a" }}>{tier.name}</strong>
-                        <p style={subTextStyle}>Orden {tier.sortOrder} · {tier.slug}</p>
+                        <p style={subTextStyle}>{tier.slug}</p>
                       </td>
                       <td style={cellStyle}>
                         <span>{tier.minOrders} pedidos</span>
@@ -425,36 +428,20 @@ export default function FidelizacionPage() {
                   <FieldError message={formErrors.minSpent} />
                 </Field>
               </div>
-              <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap: 12 }}>
-                <Field label="Descuento %">
-                  <input
-                    type="text"
-                    inputMode="decimal"
-                    value={form.discountPercent}
-                    onKeyDown={blockInvalidNumberKey}
-                    onChange={(event) => {
-                      setForm({ ...form, discountPercent: sanitizeDecimalInput(event.target.value) });
-                      setFormErrors((prev) => ({ ...prev, discountPercent: undefined }));
-                    }}
-                    style={fieldInputStyle(formErrors.discountPercent)}
-                  />
-                  <FieldError message={formErrors.discountPercent} />
-                </Field>
-                <Field label="Orden">
-                  <input
-                    type="text"
-                    inputMode="numeric"
-                    value={form.sortOrder}
-                    onKeyDown={blockInvalidNumberKey}
-                    onChange={(event) => {
-                      setForm({ ...form, sortOrder: sanitizeIntegerInput(event.target.value) });
-                      setFormErrors((prev) => ({ ...prev, sortOrder: undefined }));
-                    }}
-                    style={fieldInputStyle(formErrors.sortOrder)}
-                  />
-                  <FieldError message={formErrors.sortOrder} />
-                </Field>
-              </div>
+              <Field label="Descuento %">
+                <input
+                  type="text"
+                  inputMode="decimal"
+                  value={form.discountPercent}
+                  onKeyDown={blockInvalidNumberKey}
+                  onChange={(event) => {
+                    setForm({ ...form, discountPercent: sanitizeDecimalInput(event.target.value) });
+                    setFormErrors((prev) => ({ ...prev, discountPercent: undefined }));
+                  }}
+                  style={fieldInputStyle(formErrors.discountPercent)}
+                />
+                <FieldError message={formErrors.discountPercent} />
+              </Field>
               <Field label="Beneficios">
                 <textarea value={form.benefitsText} onChange={(event) => setForm({ ...form, benefitsText: event.target.value })} rows={4} style={{ ...inputStyle, resize: "vertical", minHeight: 94 }} placeholder={"Un beneficio por linea"} />
               </Field>

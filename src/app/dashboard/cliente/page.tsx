@@ -256,6 +256,13 @@ export default function ClientePage() {
   const [reservations, setReservations] = useState<ClientReservation[]>([]);
   const [reservationToast, setReservationToast] = useState<string | null>(null);
 
+  // ── Estado de fidelización real ───────────────────────────────────────────
+  const [loyaltyData, setLoyaltyData] = useState<{
+    tier: { name: string; discountPercent: number; benefits: string[]; slug: string };
+    discountPercent: number;
+    benefits: string[];
+  } | null>(null);
+
   // Ref para evitar stale closures en Pusher
   const userRef = useRef(user);
   useEffect(() => { userRef.current = user; }, [user]);
@@ -304,12 +311,30 @@ export default function ClientePage() {
     }
   }, []);
 
+  // ── Carga de fidelización real del cliente ────────────────────────────────
+  const loadLoyalty = useCallback(async () => {
+    const token = localStorage.getItem("token");
+    if (!token) return;
+    try {
+      const res = await fetch("/api/customers/me/loyalty", {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const json = await res.json();
+      if (json.ok) {
+        setLoyaltyData(json.data);
+      }
+    } catch (e) {
+      console.error("Error al cargar fidelización:", e);
+    }
+  }, []);
+
   useEffect(() => {
     if (!authLoading && user) {
       loadHistory();
       loadReservations();
+      loadLoyalty();
     }
-  }, [authLoading, user, loadHistory, loadReservations]);
+  }, [authLoading, user, loadHistory, loadReservations, loadLoyalty]);
 
   // ── Pusher ─────────────────────────────────────────────────────────────────
   useEffect(() => {
@@ -425,8 +450,14 @@ export default function ClientePage() {
   const clientStats: ClientStats = {
     name: user?.name ?? rawUser?.name ?? "Cliente",
     memberSince: rawUser?.createdAt ? formatMemberSince(rawUser.createdAt) : "este año",
-    totalVisits, totalSpent, average, points, isNew,
-    benefits: getBenefits(totalVisits, isNew),
+    totalVisits,
+    totalSpent,
+    average,
+    points,
+    isNew: loyaltyData ? loyaltyData.tier.slug === "nuevo" : isNew,
+    tierName: loyaltyData?.tier.name || undefined,
+    discountPercent: loyaltyData?.discountPercent ?? undefined,
+    benefits: loyaltyData?.benefits ?? getBenefits(totalVisits, isNew),
   };
 
   const handleViewOrder  = (order: Order) => { setSelectedOrder(order); setModalOpen(true); };
