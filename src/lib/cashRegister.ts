@@ -49,7 +49,10 @@ export function formatShiftRange(start: string, end: string) {
 }
 
 function getShiftBoundary(dateKey: string, time: string) {
-  return new Date(`${dateKey}T${time}:00-04:00`);
+  const [hours, minutes] = time.split(':').map(Number);
+  const [year, month, day] = dateKey.split('-').map(Number);
+
+  return new Date(Date.UTC(year, month - 1, day, hours + 4, minutes, 0));
 }
 
 function getLaPazDateParts(date = new Date()) {

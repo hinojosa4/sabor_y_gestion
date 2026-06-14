@@ -1,6 +1,5 @@
-// src/app/dashboard/reportes/page.tsx
 "use client";
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '@/lib/useAuth';
 import { ADMIN } from '@/lib/roles';
 import { Printer, Calendar, DollarSign, CreditCard, Users, BarChart3, LineChart, TrendingUp, TrendingDown } from 'lucide-react';
@@ -113,6 +112,19 @@ interface IncomeReport {
     };
 }
 
+interface MetricsData {
+    topWaiters: Array<{ id: string; name: string; total: number }>;
+    topDishes: Array<{ id: string; name: string; quantity: number; total: number }>;
+    bestDay: { date: string; amount: number } | null;
+    peakHour: { hour: string; amount: number } | null;
+    topTables: Array<{ id: string; number: number; total: number }>;
+    cancellationRate: number;
+    totalOrders: number;
+    completedPayments: number;
+    topCustomers: Array<{ email: string; name: string; total: number }>;
+    loyaltyPointsUsed: number;
+}
+
 const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('es-BO', { style: 'currency', currency: 'BOB' }).format(amount);
 };
@@ -142,8 +154,10 @@ export default function ReportesPage() {
     const [biData, setBiData] = useState<IncomeReport | null>(null);
     const [loading, setLoading] = useState(false);
     const [chartType, setChartType] = useState<ChartType>('bar');
+    const [metrics, setMetrics] = useState<MetricsData | null>(null);
+    const [metricsLoading, setMetricsLoading] = useState(false);
 
-    const fetchReport = async () => {
+    const fetchReport = useCallback(async () => {
         setLoading(true);
         let params = '';
         if (periodType === 'day') params = `type=day&value=${selectedDay}`;
@@ -166,7 +180,25 @@ export default function ReportesPage() {
         } finally {
             setLoading(false);
         }
-    };
+    }, [periodType, selectedDay, selectedMonth, selectedYear, compare]);
+
+    const fetchMetrics = useCallback(async () => {
+        setMetricsLoading(true);
+        let params = '';
+        if (periodType === 'day') params = `type=day&value=${selectedDay}`;
+        if (periodType === 'month') params = `type=month&value=${selectedMonth}`;
+        if (periodType === 'year') params = `type=year&value=${selectedYear}`;
+
+        try {
+            const res = await fetch(`/api/dsBi/metrics?${params}`);
+            const data = await res.json();
+            setMetrics(data);
+        } catch (error) {
+            console.error('Error cargando métricas:', error);
+        } finally {
+            setMetricsLoading(false);
+        }
+    }, [periodType, selectedDay, selectedMonth, selectedYear, compare]);
 
     const handlePrint = () => {
         window.print();
@@ -278,7 +310,8 @@ export default function ReportesPage() {
 
     useEffect(() => {
         fetchReport();
-    }, [periodType, selectedDay, selectedMonth, selectedYear, compare]);
+        fetchMetrics();
+    }, [periodType, selectedDay, selectedMonth, selectedYear, compare, fetchReport, fetchMetrics]);
 
     if (userLoading || !user) return null;
 
@@ -439,6 +472,174 @@ export default function ReportesPage() {
                             </div>
                         </div>
 
+                        {/* Métricas BI - 3 columnas */}
+                        <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "1.5rem", marginBottom: "1.5rem" }}>
+
+                            {/* Top Meseros */}
+                            <div style={cardStyle}>
+                                <h3 style={{ fontSize: "1rem", fontWeight: "bold", marginBottom: "1rem", borderLeft: "3px solid #e85d26", paddingLeft: "0.5rem" }}>
+                                    🥇 Top Meseros
+                                </h3>
+                                {metricsLoading ? (
+                                    <p style={{ textAlign: "center", padding: "2rem", color: "var(--muted-foreground)" }}>Cargando...</p>
+                                ) : (
+                                    <ul style={{ listStyle: "none", padding: 0, margin: 0 }}>
+                                        {metrics?.topWaiters?.map((waiter, idx) => (
+                                            <li key={waiter.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "0.5rem 0", borderBottom: "1px solid var(--border)" }}>
+                                                <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+                                                    <span style={{ fontWeight: "bold", color: "#e85d26", width: "30px" }}>#{idx + 1}</span>
+                                                    <span style={{ fontSize: "0.875rem" }}>{waiter.name}</span>
+                                                </div>
+                                                <span style={{ fontWeight: "bold", fontSize: "0.875rem" }}>{formatCurrency(waiter.total)}</span>
+                                            </li>
+                                        ))}
+                                        {(!metrics?.topWaiters || metrics.topWaiters.length === 0) && (
+                                            <p style={{ textAlign: "center", padding: "1rem", color: "var(--muted-foreground)" }}>No hay datos</p>
+                                        )}
+                                    </ul>
+                                )}
+                            </div>
+
+                            {/* Top Platos */}
+                            <div style={cardStyle}>
+                                <h3 style={{ fontSize: "1rem", fontWeight: "bold", marginBottom: "1rem", borderLeft: "3px solid #e85d26", paddingLeft: "0.5rem" }}>
+                                    🍽️ Top Platos
+                                </h3>
+                                {metricsLoading ? (
+                                    <p style={{ textAlign: "center", padding: "2rem", color: "var(--muted-foreground)" }}>Cargando...</p>
+                                ) : (
+                                    <ul style={{ listStyle: "none", padding: 0, margin: 0 }}>
+                                        {metrics?.topDishes?.map((dish, idx) => (
+                                            <li key={dish.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "0.5rem 0", borderBottom: "1px solid var(--border)" }}>
+                                                <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+                                                    <span style={{ fontWeight: "bold", color: "#e85d26", width: "30px" }}>#{idx + 1}</span>
+                                                    <span style={{ fontSize: "0.875rem" }}>{dish.name}</span>
+                                                </div>
+                                                <span style={{ fontWeight: "bold", fontSize: "0.875rem" }}>{dish.quantity} uds</span>
+                                            </li>
+                                        ))}
+                                        {(!metrics?.topDishes || metrics.topDishes.length === 0) && (
+                                            <p style={{ textAlign: "center", padding: "1rem", color: "var(--muted-foreground)" }}>No hay datos</p>
+                                        )}
+                                    </ul>
+                                )}
+                            </div>
+
+                            {/* Análisis por Tiempo */}
+                            <div style={cardStyle}>
+                                <h3 style={{ fontSize: "1rem", fontWeight: "bold", marginBottom: "1rem", borderLeft: "3px solid #e85d26", paddingLeft: "0.5rem" }}>
+                                    📅 Análisis por Tiempo
+                                </h3>
+                                {metricsLoading ? (
+                                    <p style={{ textAlign: "center", padding: "2rem", color: "var(--muted-foreground)" }}>Cargando...</p>
+                                ) : (
+                                    <ul style={{ listStyle: "none", padding: 0, margin: 0 }}>
+                                        <li style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "0.5rem 0", borderBottom: "1px solid var(--border)" }}>
+                                            <span style={{ fontSize: "0.875rem" }}>📆 Día con más ventas</span>
+                                            <span style={{ fontWeight: "bold", fontSize: "0.875rem" }}>
+                                                {metrics?.bestDay ? `${new Date(metrics.bestDay.date).toLocaleDateString('es-BO')} - ${formatCurrency(metrics.bestDay.amount)}` : 'Sin datos'}
+                                            </span>
+                                        </li>
+                                        <li style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "0.5rem 0", borderBottom: "1px solid var(--border)" }}>
+                                            <span style={{ fontSize: "0.875rem" }}>⏰ Hora pico</span>
+                                            <span style={{ fontWeight: "bold", fontSize: "0.875rem" }}>
+                                                {metrics?.peakHour ? `${metrics.peakHour.hour} (${formatCurrency(metrics.peakHour.amount)})` : 'Sin datos'}
+                                            </span>
+                                        </li>
+                                        <li style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "0.5rem 0" }}>
+                                            <span style={{ fontSize: "0.875rem" }}>📊 Cancelaciones</span>
+                                            <span style={{ fontWeight: "bold", fontSize: "0.875rem", color: "#e85d26" }}>
+                                                {metrics?.cancellationRate ? `${metrics.cancellationRate.toFixed(1)}%` : '0%'}
+                                            </span>
+                                        </li>
+                                    </ul>
+                                )}
+                            </div>
+                        </div>
+
+                        {/* Segunda fila de métricas */}
+                        <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "1.5rem", marginBottom: "1.5rem" }}>
+
+                            {/* Top Mesas */}
+                            <div style={cardStyle}>
+                                <h3 style={{ fontSize: "1rem", fontWeight: "bold", marginBottom: "1rem", borderLeft: "3px solid #e85d26", paddingLeft: "0.5rem" }}>
+                                    🪑 Top Mesas
+                                </h3>
+                                {metricsLoading ? (
+                                    <p style={{ textAlign: "center", padding: "2rem", color: "var(--muted-foreground)" }}>Cargando...</p>
+                                ) : (
+                                    <ul style={{ listStyle: "none", padding: 0, margin: 0 }}>
+                                        {metrics?.topTables?.map((table, idx) => (
+                                            <li key={table.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "0.5rem 0", borderBottom: "1px solid var(--border)" }}>
+                                                <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+                                                    <span style={{ fontWeight: "bold", color: "#e85d26", width: "30px" }}>#{idx + 1}</span>
+                                                    <span style={{ fontSize: "0.875rem" }}>Mesa {table.number || 'N/A'}</span>
+                                                </div>
+                                                <span style={{ fontWeight: "bold", fontSize: "0.875rem" }}>{formatCurrency(table.total)}</span>
+                                            </li>
+                                        ))}
+                                        {(!metrics?.topTables || metrics.topTables.length === 0) && (
+                                            <p style={{ textAlign: "center", padding: "1rem", color: "var(--muted-foreground)" }}>No hay datos</p>
+                                        )}
+                                    </ul>
+                                )}
+                            </div>
+
+                            {/* Clientes Destacados */}
+                            <div style={cardStyle}>
+                                <h3 style={{ fontSize: "1rem", fontWeight: "bold", marginBottom: "1rem", borderLeft: "3px solid #e85d26", paddingLeft: "0.5rem" }}>
+                                    👥 Clientes Destacados
+                                </h3>
+                                {metricsLoading ? (
+                                    <p style={{ textAlign: "center", padding: "2rem", color: "var(--muted-foreground)" }}>Cargando...</p>
+                                ) : (
+                                    <ul style={{ listStyle: "none", padding: 0, margin: 0 }}>
+                                        {metrics?.topCustomers?.map((customer, idx) => (
+                                            <li key={customer.email} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "0.5rem 0", borderBottom: "1px solid var(--border)" }}>
+                                                <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+                                                    <span style={{ fontWeight: "bold", color: "#e85d26", width: "30px" }}>#{idx + 1}</span>
+                                                    <span style={{ fontSize: "0.875rem" }}>{customer.name}</span>
+                                                </div>
+                                                <span style={{ fontWeight: "bold", fontSize: "0.875rem" }}>{formatCurrency(customer.total)}</span>
+                                            </li>
+                                        ))}
+                                        {(!metrics?.topCustomers || metrics.topCustomers.length === 0) && (
+                                            <p style={{ textAlign: "center", padding: "1rem", color: "var(--muted-foreground)" }}>No hay datos</p>
+                                        )}
+                                    </ul>
+                                )}
+                            </div>
+
+                            {/* Eficiencia Operativa */}
+                            <div style={cardStyle}>
+                                <h3 style={{ fontSize: "1rem", fontWeight: "bold", marginBottom: "1rem", borderLeft: "3px solid #e85d26", paddingLeft: "0.5rem" }}>
+                                    ⚡ Eficiencia Operativa
+                                </h3>
+                                {metricsLoading ? (
+                                    <p style={{ textAlign: "center", padding: "2rem", color: "var(--muted-foreground)" }}>Cargando...</p>
+                                ) : (
+                                    <ul style={{ listStyle: "none", padding: 0, margin: 0 }}>
+                                        <li style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "0.5rem 0", borderBottom: "1px solid var(--border)" }}>
+                                            <span style={{ fontSize: "0.875rem" }}>✅ Pedidos completados</span>
+                                            <span style={{ fontWeight: "bold", fontSize: "0.875rem" }}>{metrics?.completedPayments || 0}</span>
+                                        </li>
+                                        <li style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "0.5rem 0", borderBottom: "1px solid var(--border)" }}>
+                                            <span style={{ fontSize: "0.875rem" }}>📋 Total órdenes creadas</span>
+                                            <span style={{ fontWeight: "bold", fontSize: "0.875rem" }}>{metrics?.totalOrders || 0}</span>
+                                        </li>
+                                        <li style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "0.5rem 0", borderBottom: "1px solid var(--border)" }}>
+                                            <span style={{ fontSize: "0.875rem" }}>💰 Pedidos pagados</span>
+                                            <span style={{ fontWeight: "bold", fontSize: "0.875rem" }}>{biData?.ordersCount || 0}</span>
+                                        </li>
+                                        <li style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "0.5rem 0" }}>
+                                            <span style={{ fontSize: "0.875rem" }}>🎁 Puntos lealtad usados</span>
+                                            <span style={{ fontWeight: "bold", fontSize: "0.875rem" }}>{metrics?.loyaltyPointsUsed || 0} pts</span>
+                                        </li>
+                                    </ul>
+                                )}
+                            </div>
+                        </div>
+
                         {/* Gráfico o mensaje informativo */}
                         {periodType === 'day' ? (
                             <div style={{ ...cardStyle, textAlign: "center", padding: "3rem" }}>
@@ -490,7 +691,7 @@ export default function ReportesPage() {
                                         {Object.entries(periodType === 'year' ? (biData.monthlyIncome || {}) : (biData.dailyIncome || {})).map(([key, amount]) => (
                                             <tr key={key}>
                                                 <td style={{ padding: "0.5rem 0.75rem", borderBottom: `1px solid var(--border)` }}>
-                                                    {periodType === 'year' ? key : formatDateKey(key)}
+                                                    {periodType === 'year' ? key : (periodType === 'day' ? formatDateKey(selectedDay) : formatDateKey(key))}
                                                 </td>
                                                 <td style={{ textAlign: "right", padding: "0.5rem 0.75rem", borderBottom: `1px solid var(--border)` }}>
                                                     {formatCurrency(amount as number)}
@@ -504,10 +705,14 @@ export default function ReportesPage() {
 
                         <div style={{ ...cardStyle, textAlign: "center" }}>
                             <p style={{ fontSize: "0.875rem", color: "var(--muted-foreground)" }}>
-                                Período: {formatDateKey(biData.period.startDate.split('T')[0])} - {formatDateKey(biData.period.endDate.split('T')[0])}
+                                Período: {periodType === 'month'
+                                    ? `${formatDateKey(`${selectedMonth}-01`)} - ${formatDateKey(`${selectedMonth}-${new Date(parseInt(selectedMonth.split('-')[0]), parseInt(selectedMonth.split('-')[1]), 0).getDate()}`)}`
+                                    : periodType === 'year'
+                                        ? `${formatDateKey(`${selectedYear}-01-01`)} - ${formatDateKey(`${selectedYear}-12-31`)}`
+                                        : `${formatDateKey(selectedDay)} - ${formatDateKey(selectedDay)}`}
                             </p>
                             <p style={{ fontSize: "0.875rem", color: "var(--muted-foreground)" }}>
-                                Total de pedidos: {biData.ordersCount}
+                                Pedidos pagados: {biData.ordersCount}
                             </p>
                         </div>
                     </>
