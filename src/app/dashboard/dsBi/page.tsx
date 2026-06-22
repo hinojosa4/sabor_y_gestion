@@ -1,8 +1,9 @@
+// src/app/dashboard/dsBi/page.tsx
 "use client";
 import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '@/lib/useAuth';
 import { ADMIN } from '@/lib/roles';
-import { Printer, Calendar, DollarSign, CreditCard, Users, BarChart3, LineChart, TrendingUp, TrendingDown, Bike } from 'lucide-react';
+import { Printer, Calendar, DollarSign, CreditCard, Users, BarChart3, LineChart, TrendingUp, TrendingDown } from 'lucide-react';
 import Link from 'next/link';
 import {
     BarChart,
@@ -16,95 +17,13 @@ import {
     Legend,
     ResponsiveContainer,
     Area,
-    ComposedChart,
-    PieChart,
-    Pie,
-    Cell
+    ComposedChart
 } from 'recharts';
-
-const containerStyle: React.CSSProperties = {
-    minHeight: "100vh",
-    backgroundColor: "var(--background)",
-    fontFamily: "inherit",
-};
-
-const headerStyle: React.CSSProperties = {
-    backgroundColor: "var(--card)",
-    borderBottom: `2px solid var(--primary)`,
-    position: "sticky",
-    top: 0,
-    zIndex: 10,
-    padding: "18px 40px",
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "space-between",
-};
-
-const cardStyle: React.CSSProperties = {
-    backgroundColor: "var(--card)",
-    borderRadius: "var(--radius-lg)",
-    border: `1px solid var(--border)`,
-    padding: "1.5rem",
-    marginBottom: "1.5rem",
-};
-
-const statsGridStyle: React.CSSProperties = {
-    display: "grid",
-    gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
-    gap: "1.5rem",
-    marginBottom: "1.5rem",
-};
-
-const statCardStyle: React.CSSProperties = {
-    backgroundColor: "var(--card)",
-    borderRadius: "var(--radius-lg)",
-    border: `1px solid var(--border)`,
-    padding: "1rem",
-    textAlign: "center",
-};
-
-const selectStyle: React.CSSProperties = {
-    padding: "0.5rem",
-    borderRadius: "var(--radius-md)",
-    border: `1px solid var(--border)`,
-    backgroundColor: "var(--input-background)",
-    color: "var(--foreground)",
-    fontSize: "0.875rem",
-};
-
-const buttonStyle: React.CSSProperties = {
-    backgroundColor: "var(--primary)",
-    color: "var(--primary-foreground)",
-    border: "none",
-    borderRadius: "var(--radius-md)",
-    padding: "0.5rem 1rem",
-    cursor: "pointer",
-    display: "inline-flex",
-    alignItems: "center",
-    gap: "0.5rem",
-};
-
-const chartTypeButtonStyle = (active: boolean): React.CSSProperties => ({
-    backgroundColor: active ? "var(--primary)" : "var(--muted)",
-    color: active ? "var(--primary-foreground)" : "var(--foreground)",
-    border: "none",
-    borderRadius: "var(--radius-md)",
-    padding: "0.5rem 1rem",
-    cursor: "pointer",
-    display: "inline-flex",
-    alignItems: "center",
-    gap: "0.5rem",
-    fontSize: "0.875rem",
-});
 
 interface IncomeReport {
     totalSales: number;
     cashTotal: number;
     qrTotal: number;
-    dineInSales?: number;
-    deliverySales?: number;
-    pickUpSales?: number;
-    deliveryFeesTotal?: number;
     ordersCount: number;
     tablesServed: number;
     dailyIncome: Record<string, number>;
@@ -124,13 +43,81 @@ interface MetricsData {
     topDishes: Array<{ id: string; name: string; quantity: number; total: number }>;
     bestDay: { date: string; amount: number } | null;
     peakHour: { hour: string; amount: number } | null;
-    hourlyData?: Array<{ hour: string; amount: number }>;
     topTables: Array<{ id: string; number: number; total: number }>;
     cancellationRate: number;
     totalOrders: number;
     completedPayments: number;
     topCustomers: Array<{ email: string; name: string; total: number }>;
     loyaltyPointsUsed: number;
+    dineInRevenue?: number;
+    deliveryRevenue?: number;
+    dineInOrders?: number;
+    deliveryOrders?: number;
+    avgDineIn?: number;
+    avgDelivery?: number;
+    dineInOrdersCount?: number;
+    deliveryOrdersCount?: number;
+    dineInCompleted?: number;
+    deliveryCompleted?: number;
+    dineInCancelled?: number;
+    deliveryCancelled?: number;
+    dineInInProgress?: number;
+    deliveryInProgress?: number;
+    inProgressOrders?: number;
+    cancelledOrdersCount?: number;
+    avgCompletionTime?: number;
+    topWaiter?: { name: string; count: number; total: number } | null;
+    tablesServedToday?: number;
+    totalCustomers?: number;
+    newCustomers?: number;
+    recurringCustomers?: number;
+    customerAvgSpent?: Array<{ email: string; avg: number; total: number; orders: number }>;
+    mostLoyal?: { email: string; count: number; total: number } | null;
+    loyaltyData?: Array<{ email: string; points: number; tier: { name: string; color: string }; orders: number; total: number }>;
+    customerLastVisit?: Record<string, string>;
+    customerOrders?: Record<string, number>;
+    customerTotalSpent?: Record<string, number>;
+    mesaDetalle?: Array<{
+        tableId: string;
+        number: number;
+        location: string;
+        totalPedidos: number;
+        totalIngresos: number;
+        promedio: number;
+        pedidos: Array<{
+            orderId: string;
+            fecha: string;
+            total: number;
+            status: string;
+            items: Array<{
+                name: string;
+                quantity: number;
+                price: number;
+                subtotal: number;
+            }>;
+        }>;
+    }>;
+    topHours?: Array<{
+        hour: string;
+        count: number;
+        total: number;
+        orders: Array<{
+            orderId: string;
+            total: number;
+            status: string;
+            service_type: string;
+        }>;
+    }>;
+    topCancellationDays?: Array<{
+        date: string;
+        count: number;
+    }>;
+    serviceByHourArray?: Array<{
+        hour: string;
+        dine_in: number;
+        delivery: number;
+        total: number;
+    }>;
 }
 
 const formatCurrency = (amount: number) => {
@@ -142,7 +129,7 @@ const formatDateKey = (dateKey: string) => {
     return `${parseInt(day)}/${parseInt(month)}/${year}`;
 };
 
-type ChartType = 'bar' | 'line' | 'area' | 'pie';
+type ChartType = 'bar' | 'line' | 'area';
 
 const getLocalDate = () => {
     const now = new Date();
@@ -152,32 +139,32 @@ const getLocalDate = () => {
     return `${year}-${month}-${day}`;
 };
 
-export default function ReportesPage() {
+export default function DashboardBIPage() {
     const { user, loading: userLoading } = useAuth(ADMIN);
+    const [activeTab, setActiveTab] = useState('resumen');
     const [periodType, setPeriodType] = useState<'day' | 'month' | 'year'>('day');
     const [selectedDay, setSelectedDay] = useState(getLocalDate);
     const [selectedMonth, setSelectedMonth] = useState(`${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, '0')}`);
     const [selectedYear, setSelectedYear] = useState(new Date().getFullYear().toString());
-    const [compare, setCompare] = useState<'none' | 'previous_month' | 'previous_year'>('none');
-    const [biData, setBiData] = useState<IncomeReport | null>(null);
-    const [loading, setLoading] = useState(false);
-    const [chartType, setChartType] = useState<ChartType>('bar');
+    const [compare] = useState<'none' | 'previous_month' | 'previous_year'>('none');
+    const [report, setReport] = useState<IncomeReport | null>(null);
     const [metrics, setMetrics] = useState<MetricsData | null>(null);
+    const [loading, setLoading] = useState(false);
     const [metricsLoading, setMetricsLoading] = useState(false);
-    const [activeTab, setActiveTab] = useState<'sales' | 'dishes' | 'waiters' | 'hours' | 'channels'>('sales');
-    const [mainSection, setMainSection] = useState<'financial' | 'operations' | 'products'>('financial');
+    const [chartType, setChartType] = useState<ChartType>('bar');
+    const dineInRevenue = metrics?.dineInRevenue || 0;
+    const deliveryRevenue = metrics?.deliveryRevenue || 0;
+    const dineInOrders = metrics?.dineInOrders || 0;
+    const deliveryOrders = metrics?.deliveryOrders || 0;
+    const avgDineIn = metrics?.avgDineIn || 0;
+    const avgDelivery = metrics?.avgDelivery || 0;
+    const [expandedMesa, setExpandedMesa] = useState<string | null>(null);
 
-    const handleSectionChange = (section: 'financial' | 'operations' | 'products') => {
-        setMainSection(section);
-        if (section === 'financial') {
-            setActiveTab('sales');
-        } else if (section === 'operations') {
-            setActiveTab('waiters');
-        } else if (section === 'products') {
-            setActiveTab('dishes');
-        }
+    const toggleMesa = (tableId: string) => {
+        setExpandedMesa(expandedMesa === tableId ? null : tableId);
     };
 
+    // ========== FETCH FUNCTIONS ==========
     const fetchReport = useCallback(async () => {
         setLoading(true);
         let params = '';
@@ -194,8 +181,7 @@ export default function ReportesPage() {
         try {
             const res = await fetch(`/api/dsBi/income?${params}`);
             const data = await res.json();
-            console.log('Periodo recibido:', data.period); //log
-            setBiData(data);
+            setReport(data);
         } catch (error) {
             console.error('Error:', error);
         } finally {
@@ -219,25 +205,25 @@ export default function ReportesPage() {
         } finally {
             setMetricsLoading(false);
         }
-    }, [periodType, selectedDay, selectedMonth, selectedYear, compare]);
+    }, [periodType, selectedDay, selectedMonth, selectedYear]);
 
-    const handlePrint = () => {
-        window.print();
-    };
+    useEffect(() => {
+        fetchReport();
+        fetchMetrics();
+    }, [fetchReport, fetchMetrics]);
 
-    // Preparar datos para el gráfico
+    // ========== RENDER CHART ==========
     const getChartData = () => {
-        if (!biData) return [];
+        if (!report) return [];
 
         if (periodType === 'year') {
-            return Object.entries(biData.monthlyIncome || {}).map(([month, amount]) => ({
+            return Object.entries(report.monthlyIncome || {}).map(([month, amount]) => ({
                 name: month,
                 ingresos: amount,
             }));
         } else if (periodType === 'month') {
             const [year, month] = selectedMonth.split('-');
-
-            const data = Object.entries(biData.dailyIncome || {})
+            const data = Object.entries(report.dailyIncome || {})
                 .filter(([date]) => {
                     const [dateYear, dateMonth] = date.split('-');
                     return dateYear === year && dateMonth === month;
@@ -247,7 +233,6 @@ export default function ReportesPage() {
                     ingresos: amount,
                 }));
 
-            // Ordenar por fecha (convertir a números)
             data.sort((a, b) => {
                 const [dayA, monthA, yearA] = a.name.split('/');
                 const [dayB, monthB, yearB] = b.name.split('/');
@@ -256,10 +241,10 @@ export default function ReportesPage() {
                 return dateA.getTime() - dateB.getTime();
             });
 
-            if (biData.compareDailyIncome && Object.keys(biData.compareDailyIncome).length > 0) {
+            if (report.compareDailyIncome && Object.keys(report.compareDailyIncome).length > 0) {
                 return data.map(item => ({
                     ...item,
-                    comparativo: biData.compareDailyIncome[Object.keys(biData.dailyIncome).find(
+                    comparativo: report.compareDailyIncome[Object.keys(report.dailyIncome).find(
                         d => formatDateKey(d) === item.name
                     ) || ''] || 0
                 }));
@@ -273,7 +258,7 @@ export default function ReportesPage() {
         const data = getChartData();
         if (data.length === 0) return <p>No hay datos para mostrar</p>;
 
-        const hasComparison = biData?.compareTotal !== undefined && biData.compareTotal > 0;
+        const hasComparison = report?.compareTotal !== undefined && report.compareTotal > 0;
 
         switch (chartType) {
             case 'bar':
@@ -329,22 +314,6 @@ export default function ReportesPage() {
         }
     };
 
-    const renderDishesChart = () => {
-        if (!metrics?.topDishes || metrics.topDishes.length === 0) return <p style={{ textAlign: "center", padding: "2rem" }}>No hay datos para mostrar</p>;
-        const data = [...metrics.topDishes].sort((a, b) => b.quantity - a.quantity);
-        return (
-            <ResponsiveContainer width="100%" height={300}>
-                <BarChart data={data} layout="vertical" margin={{ left: 50, right: 20 }}>
-                    <CartesianGrid strokeDasharray="3 3" horizontal={false} />
-                    <XAxis type="number" />
-                    <YAxis dataKey="name" type="category" width={80} style={{ fontSize: '0.75rem' }} />
-                    <Tooltip formatter={(value) => [`${value} uds`, 'Cantidad']} />
-                    <Bar dataKey="quantity" name="Unidades" fill="#1976d2" radius={[0, 4, 4, 0]} />
-                </BarChart>
-            </ResponsiveContainer>
-        );
-    };
-
     const renderWaitersChart = () => {
         if (!metrics?.topWaiters || metrics.topWaiters.length === 0) return <p style={{ textAlign: "center", padding: "2rem" }}>No hay datos para mostrar</p>;
         const data = [...metrics.topWaiters].sort((a, b) => b.total - a.total);
@@ -358,77 +327,140 @@ export default function ReportesPage() {
                         const count = entry?.payload?.count || 0;
                         return [
                             `${formatCurrency(value as number)} (${count} ${count === 1 ? 'pedido' : 'pedidos'})`,
-                            'Total Vendido'
+                            'Total Facturado'
                         ];
                     }} />
-                    <Bar dataKey="total" name="Total Vendido" fill="#8884d8" radius={[0, 4, 4, 0]} />
+                    <Bar dataKey="total" name="Total Facturado" fill="#8884d8" radius={[0, 4, 4, 0]} />
                 </BarChart>
             </ResponsiveContainer>
         );
     };
 
-    const renderHourlyChart = () => {
-        if (!metrics?.hourlyData || metrics.hourlyData.length === 0) return <p style={{ textAlign: "center", padding: "2rem" }}>No hay datos para mostrar</p>;
-        return (
-            <ResponsiveContainer width="100%" height={300}>
-                <ComposedChart data={metrics.hourlyData}>
-                    <defs>
-                        <linearGradient id="colorHourly" x1="0" y1="0" x2="0" y2="1">
-                            <stop offset="5%" stopColor="#e85d26" stopOpacity={0.8}/>
-                            <stop offset="95%" stopColor="#e85d26" stopOpacity={0}/>
-                        </linearGradient>
-                    </defs>
-                    <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis dataKey="hour" />
-                    <YAxis tickFormatter={(v) => `Bs${v}`} />
-                    <Tooltip formatter={(value) => [formatCurrency(value as number), 'Ventas']} />
-                    <Area type="monotone" dataKey="amount" name="Ventas" stroke="#e85d26" fillOpacity={1} fill="url(#colorHourly)" />
-                </ComposedChart>
-            </ResponsiveContainer>
-        );
+    // ========== ESTILOS ==========
+    const cardStyle: React.CSSProperties = {
+        backgroundColor: "var(--card)",
+        borderRadius: "var(--radius-lg)",
+        border: `1px solid var(--border)`,
+        padding: "1.5rem",
+        marginBottom: "1.5rem",
     };
 
-    const renderChannelsChart = () => {
-        if (!biData) return <p style={{ textAlign: "center", padding: "2rem" }}>No hay datos para mostrar</p>;
-        const data = [
-            { name: 'Salón', value: biData.dineInSales || 0, color: '#030213' },
-            { name: 'Delivery', value: biData.deliverySales || 0, color: '#e85d26' },
-            { name: 'Para Llevar', value: biData.pickUpSales || 0, color: '#27ae60' },
-        ].filter(item => item.value > 0);
-
-        if (data.length === 0) return <p style={{ textAlign: "center", padding: "2rem" }}>No hay ventas registradas por canal</p>;
-        return (
-            <ResponsiveContainer width="100%" height={300}>
-                <PieChart>
-                    <Pie
-                        data={data}
-                        cx="50%"
-                        cy="50%"
-                        innerRadius={60}
-                        outerRadius={80}
-                        paddingAngle={5}
-                        dataKey="value"
-                    >
-                        {data.map((entry, index) => (
-                            <Cell key={`cell-${index}`} fill={entry.color} />
-                        ))}
-                    </Pie>
-                    <Tooltip formatter={(value) => [formatCurrency(value as number), 'Monto']} />
-                    <Legend verticalAlign="bottom" height={36} />
-                </PieChart>
-            </ResponsiveContainer>
-        );
+    const statsGridStyle: React.CSSProperties = {
+        display: "grid",
+        gridTemplateColumns: "repeat(4, 1fr)",
+        gap: "1.5rem",
+        marginBottom: "1.5rem",
     };
 
-    useEffect(() => {
-        fetchReport();
-        fetchMetrics();
-    }, [periodType, selectedDay, selectedMonth, selectedYear, compare, fetchReport, fetchMetrics]);
+    const statCardStyle: React.CSSProperties = {
+        backgroundColor: "var(--card)",
+        borderRadius: "var(--radius-lg)",
+        border: `1px solid var(--border)`,
+        padding: "1rem",
+        textAlign: "center",
+    };
+
+    const buttonStyle: React.CSSProperties = {
+        backgroundColor: "var(--primary)",
+        color: "var(--primary-foreground)",
+        border: "none",
+        borderRadius: "var(--radius-md)",
+        padding: "0.5rem 1rem",
+        cursor: "pointer",
+        display: "inline-flex",
+        alignItems: "center",
+        gap: "0.5rem",
+    };
+
+    const chartTypeButtonStyle = (active: boolean): React.CSSProperties => ({
+        backgroundColor: active ? "var(--primary)" : "var(--muted)",
+        color: active ? "var(--primary-foreground)" : "var(--foreground)",
+        border: "none",
+        borderRadius: "var(--radius-md)",
+        padding: "0.5rem 1rem",
+        cursor: "pointer",
+        display: "inline-flex",
+        alignItems: "center",
+        gap: "0.5rem",
+        fontSize: "0.875rem",
+    });
+
+    const tabStyle = (active: boolean): React.CSSProperties => ({
+        padding: "8px 20px",
+        borderRadius: "var(--radius-md)",
+        fontSize: "0.875rem",
+        fontWeight: 600,
+        cursor: "pointer",
+        backgroundColor: active ? "var(--primary)" : "transparent",
+        color: active ? "var(--primary-foreground)" : "var(--foreground)",
+        border: "none",
+        fontFamily: "inherit",
+        transition: "all 0.2s",
+    });
+
+    const tabsContainerStyle: React.CSSProperties = {
+        display: "flex",
+        gap: "4px",
+        marginBottom: "1.5rem",
+        backgroundColor: "var(--muted)",
+        padding: "4px",
+        borderRadius: "var(--radius-lg)",
+        flexWrap: "wrap",
+    };
+
+    const selectStyle: React.CSSProperties = {
+        padding: "0.5rem",
+        borderRadius: "var(--radius-md)",
+        border: `1px solid var(--border)`,
+        backgroundColor: "var(--input-background)",
+        color: "var(--foreground)",
+        fontSize: "0.875rem",
+    };
+
+    const headerStyle: React.CSSProperties = {
+        backgroundColor: "var(--card)",
+        borderBottom: `2px solid var(--primary)`,
+        position: "sticky",
+        top: 0,
+        zIndex: 10,
+        padding: "18px 40px",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "space-between",
+    };
+
+    const filterBarStyle: React.CSSProperties = {
+        backgroundColor: "var(--card)",
+        borderBottom: `1px solid var(--border)`,
+        padding: "12px 40px",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "space-between",
+        flexWrap: "wrap",
+        gap: "12px",
+        position: "sticky",
+        top: "72px",
+        zIndex: 9,
+    };
+
+    const containerStyle: React.CSSProperties = {
+        minHeight: "100vh",
+        backgroundColor: "var(--background)",
+        fontFamily: "inherit",
+    };
+
+    const mainStyle: React.CSSProperties = {
+        maxWidth: 1280,
+        margin: "0 auto",
+        padding: "1.5rem",
+    };
 
     if (userLoading || !user) return null;
+    const isMobile = typeof window !== "undefined" ? window.innerWidth < 640 : false;
 
     return (
         <div style={containerStyle}>
+            {/* Header */}
             <header style={headerStyle}>
                 <div style={{ display: "flex", alignItems: "center", gap: "0.75rem" }}>
                     <div style={{
@@ -453,277 +485,156 @@ export default function ReportesPage() {
                     <Link href="/dashboard" style={{ ...buttonStyle, backgroundColor: "transparent", border: `1px solid var(--border)`, color: "var(--foreground)", textDecoration: "none" }}>
                         Volver
                     </Link>
-                    <button onClick={handlePrint} style={buttonStyle}>
+                    <button onClick={() => window.print()} style={buttonStyle}>
                         <Printer size={16} /> Imprimir
                     </button>
                 </div>
             </header>
 
-            <main style={{ maxWidth: 1280, margin: "0 auto", padding: "1.5rem" }}>
-                {/* Filtros */}
-                <div style={cardStyle}>
-                    <div style={{ display: "flex", gap: "1rem", alignItems: "flex-end", flexWrap: "wrap" }}>
-                        <div>
-                            <label style={{ display: "block", marginBottom: "0.25rem", fontSize: "0.875rem", fontWeight: "bold" }}>Período</label>
-                            <select
-                                value={periodType}
-                                onChange={(e) => setPeriodType(e.target.value as 'day' | 'month' | 'year')}
-                                style={selectStyle}
+            {/* Filtros */}
+            <div style={filterBarStyle}>
+                <div style={{ display: "flex", gap: "0.5rem", alignItems: "center", flexWrap: "wrap" }}>
+                    <select
+                        value={periodType}
+                        onChange={(e) => setPeriodType(e.target.value as 'day' | 'month' | 'year')}
+                        style={selectStyle}
+                    >
+                        <option value="day">Día</option>
+                        <option value="month">Mes</option>
+                        <option value="year">Año</option>
+                    </select>
+
+                    {periodType === 'day' && (
+                        <input
+                            type="date"
+                            value={selectedDay}
+                            onChange={(e) => setSelectedDay(e.target.value)}
+                            style={selectStyle}
+                        />
+                    )}
+
+                    {periodType === 'month' && (
+                        <input
+                            type="month"
+                            value={selectedMonth}
+                            onChange={(e) => setSelectedMonth(e.target.value)}
+                            style={selectStyle}
+                        />
+                    )}
+
+                    {periodType === 'year' && (
+                        <input
+                            type="number"
+                            value={selectedYear}
+                            onChange={(e) => setSelectedYear(e.target.value)}
+                            style={selectStyle}
+                            min={2020}
+                            max={new Date().getFullYear()}
+                        />
+                    )}
+
+                    <button onClick={() => { fetchReport(); fetchMetrics(); }} style={buttonStyle}>
+                        <Calendar size={16} /> Consultar
+                    </button>
+                </div>
+            </div>
+
+            {/* Tabs */}
+            <div style={{ maxWidth: 1280, margin: "0 auto", padding: "1.5rem 1.5rem 0 1.5rem" }}>
+                <div style={tabsContainerStyle}>
+                    {['resumen', 'ganancias', 'meseros', 'platos', 'horarios', 'mesas', 'clientes', 'eficiencia'].map((tab) => {
+                        const labels: Record<string, string> = {
+                            resumen: '📊 Resumen',
+                            ganancias: '💰 Ganancias',
+                            meseros: '🥇 Meseros',
+                            platos: '🍽️ Platos',
+                            horarios: '📅 Horarios',
+                            mesas: '🪑 Mesas',
+                            clientes: '👥 Clientes',
+                            eficiencia: '⚡ Eficiencia'
+                        };
+                        return (
+                            <button
+                                key={tab}
+                                onClick={() => setActiveTab(tab)}
+                                style={tabStyle(activeTab === tab)}
                             >
-                                <option value="day">Día</option>
-                                <option value="month">Mes</option>
-                                <option value="year">Año</option>
-                            </select>
-                        </div>
-
-                        {periodType === 'day' && (
-                            <div>
-                                <label style={{ display: "block", marginBottom: "0.25rem", fontSize: "0.875rem", fontWeight: "bold" }}>Fecha</label>
-                                <input
-                                    type="date"
-                                    value={selectedDay}
-                                    onChange={(e) => setSelectedDay(e.target.value)}
-                                    style={selectStyle}
-                                />
-                            </div>
-                        )}
-
-                        {periodType === 'month' && (
-                            <>
-                                <div>
-                                    <label style={{ display: "block", marginBottom: "0.25rem", fontSize: "0.875rem", fontWeight: "bold" }}>Mes</label>
-                                    <input
-                                        type="month"
-                                        value={selectedMonth}
-                                        onChange={(e) => setSelectedMonth(e.target.value)}
-                                        style={selectStyle}
-                                    />
-                                </div>
-                                <div>
-                                    <label style={{ display: "block", marginBottom: "0.25rem", fontSize: "0.875rem", fontWeight: "bold" }}>Comparar con</label>
-                                    <select
-                                        value={compare}
-                                        onChange={(e) => setCompare(e.target.value as 'none' | 'previous_month')}
-                                        style={selectStyle}
-                                    >
-                                        <option value="none">Sin comparación</option>
-                                        <option value="previous_month">Mes anterior</option>
-                                    </select>
-                                </div>
-                            </>
-                        )}
-
-                        {periodType === 'year' && (
-                            <>
-                                <div>
-                                    <label style={{ display: "block", marginBottom: "0.25rem", fontSize: "0.875rem", fontWeight: "bold" }}>Año</label>
-                                    <input
-                                        type="number"
-                                        value={selectedYear}
-                                        onChange={(e) => setSelectedYear(e.target.value)}
-                                        style={selectStyle}
-                                        min={2020}
-                                        max={new Date().getFullYear()}
-                                    />
-                                </div>
-                                <div>
-                                    <label style={{ display: "block", marginBottom: "0.25rem", fontSize: "0.875rem", fontWeight: "bold" }}>Comparar con</label>
-                                    <select
-                                        value={compare}
-                                        onChange={(e) => setCompare(e.target.value as 'none' | 'previous_year')}
-                                        style={selectStyle}
-                                    >
-                                        <option value="none">Sin comparación</option>
-                                        <option value="previous_year">Año anterior</option>
-                                    </select>
-                                </div>
-                            </>
-                        )}
-
-                        <button onClick={fetchReport} style={buttonStyle}>
-                            <Calendar size={16} /> Consultar
-                        </button>
-                    </div>
+                                {isMobile ? labels[tab].split(' ')[0] : labels[tab]}
+                            </button>
+                        );
+                    })}
                 </div>
+            </div>
 
-                {/* Pestañas de Alto Nivel de BI */}
-                <div style={{ display: "flex", borderBottom: "2px solid var(--border)", marginBottom: "1.5rem", gap: "1rem", flexWrap: "wrap", paddingBottom: "0.25rem" }} className="print-hide">
-                    <button
-                        onClick={() => handleSectionChange('financial')}
-                        style={{
-                            padding: "0.75rem 1.5rem",
-                            backgroundColor: mainSection === 'financial' ? "var(--primary)" : "transparent",
-                            border: "none",
-                            borderRadius: "var(--radius-md)",
-                            color: mainSection === 'financial' ? "var(--primary-foreground)" : "var(--foreground)",
-                            fontWeight: "bold",
-                            cursor: "pointer",
-                            fontSize: "0.9rem",
-                            transition: "all 0.2s ease",
-                            boxShadow: mainSection === 'financial' ? "0 4px 12px rgba(0,0,0,0.1)" : "none",
-                        }}
-                    >
-                        💰 Reporte Financiero
-                    </button>
-                    <button
-                        onClick={() => handleSectionChange('operations')}
-                        style={{
-                            padding: "0.75rem 1.5rem",
-                            backgroundColor: mainSection === 'operations' ? "var(--primary)" : "transparent",
-                            border: "none",
-                            borderRadius: "var(--radius-md)",
-                            color: mainSection === 'operations' ? "var(--primary-foreground)" : "var(--foreground)",
-                            fontWeight: "bold",
-                            cursor: "pointer",
-                            fontSize: "0.9rem",
-                            transition: "all 0.2s ease",
-                            boxShadow: mainSection === 'operations' ? "0 4px 12px rgba(0,0,0,0.1)" : "none",
-                        }}
-                    >
-                        👥 Personal y Salón
-                    </button>
-                    <button
-                        onClick={() => handleSectionChange('products')}
-                        style={{
-                            padding: "0.75rem 1.5rem",
-                            backgroundColor: mainSection === 'products' ? "var(--primary)" : "transparent",
-                            border: "none",
-                            borderRadius: "var(--radius-md)",
-                            color: mainSection === 'products' ? "var(--primary-foreground)" : "var(--foreground)",
-                            fontWeight: "bold",
-                            cursor: "pointer",
-                            fontSize: "0.9rem",
-                            transition: "all 0.2s ease",
-                            boxShadow: mainSection === 'products' ? "0 4px 12px rgba(0,0,0,0.1)" : "none",
-                        }}
-                    >
-                        🍽️ Menú y Demanda
-                    </button>
-                </div>
-
-                {loading && (
+            {/* Contenido */}
+            <main style={mainStyle}>
+                {loading || metricsLoading ? (
                     <div style={{ textAlign: "center", padding: "3rem", color: "var(--muted-foreground)" }}>
                         Cargando...
                     </div>
-                )}
-
-                {biData && !loading && (
+                ) : (
                     <>
-                        {/* ========================================================================= */}
-                        {/* 1. SECCIÓN FINANCIERA                                                     */}
-                        {/* ========================================================================= */}
-                        {mainSection === 'financial' && (
+                        {/* ====== TAB: RESUMEN ====== */}
+                        {activeTab === 'resumen' && (
                             <>
                                 {/* Stats Cards */}
                                 <div style={statsGridStyle}>
-                                    <div style={{ ...statCardStyle, borderLeft: "4px solid #27ae60" }} className="stat-card">
-                                        <DollarSign size={24} style={{ margin: "0 auto 0.5rem", color: "#27ae60" }} />
-                                        <h3 style={{ fontSize: "1.5rem", fontWeight: "bold", margin: 0 }}>{formatCurrency(biData.totalSales)}</h3>
+                                    <div style={statCardStyle}>
+                                        <DollarSign size={24} style={{ margin: "0 auto 0.5rem", color: "var(--primary)" }} />
+                                        <h3 style={{ fontSize: "1.5rem", fontWeight: "bold", margin: 0 }}>{formatCurrency(report?.totalSales || 0)}</h3>
                                         <p style={{ fontSize: "0.75rem", color: "var(--muted-foreground)", margin: 0 }}>Ventas Totales</p>
-                                        {biData.compareTotal !== undefined && biData.compareTotal > 0 && (
-                                            <p style={{ fontSize: "0.7rem", marginTop: "0.25rem", color: biData.totalSales >= biData.compareTotal ? "#27ae60" : "#e85d26" }}>
-                                                {biData.totalSales >= biData.compareTotal ? <TrendingUp size={12} /> : <TrendingDown size={12} />}
-                                                {Math.abs(((biData.totalSales - biData.compareTotal) / biData.compareTotal) * 100).toFixed(1)}% vs período anterior
+                                        {report?.compareTotal !== undefined && report.compareTotal > 0 && (
+                                            <p style={{ fontSize: "0.7rem", marginTop: "0.25rem", color: (report.totalSales || 0) >= report.compareTotal ? "#27ae60" : "#e85d26" }}>
+                                                {(report.totalSales || 0) >= report.compareTotal ? <TrendingUp size={12} /> : <TrendingDown size={12} />}
+                                                {Math.abs(((report.totalSales - report.compareTotal) / report.compareTotal) * 100).toFixed(1)}% vs período anterior
                                             </p>
                                         )}
                                     </div>
-                                    <div style={{ ...statCardStyle, borderLeft: "4px solid #2e7d32" }} className="stat-card">
-                                        <CreditCard size={24} style={{ margin: "0 auto 0.5rem", color: "#2e7d32" }} />
-                                        <h3 style={{ fontSize: "1.5rem", fontWeight: "bold", margin: 0 }}>{formatCurrency(biData.cashTotal)}</h3>
+                                    <div style={statCardStyle}>
+                                        <CreditCard size={24} style={{ margin: "0 auto 0.5rem", color: "#27ae60" }} />
+                                        <h3 style={{ fontSize: "1.5rem", fontWeight: "bold", margin: 0 }}>{formatCurrency(report?.cashTotal || 0)}</h3>
                                         <p style={{ fontSize: "0.75rem", color: "var(--muted-foreground)", margin: 0 }}>Efectivo</p>
                                     </div>
-                                    <div style={{ ...statCardStyle, borderLeft: "4px solid #1976d2" }} className="stat-card">
+                                    <div style={statCardStyle}>
                                         <CreditCard size={24} style={{ margin: "0 auto 0.5rem", color: "#1976d2" }} />
-                                        <h3 style={{ fontSize: "1.5rem", fontWeight: "bold", margin: 0 }}>{formatCurrency(biData.qrTotal)}</h3>
+                                        <h3 style={{ fontSize: "1.5rem", fontWeight: "bold", margin: 0 }}>{formatCurrency(report?.qrTotal || 0)}</h3>
                                         <p style={{ fontSize: "0.75rem", color: "var(--muted-foreground)", margin: 0 }}>QR / Digital</p>
                                     </div>
-                                    <div style={{ ...statCardStyle, borderLeft: "4px solid #e85d26" }} className="stat-card">
-                                        <Bike size={24} style={{ margin: "0 auto 0.5rem", color: "#e85d26" }} />
-                                        <h3 style={{ fontSize: "1.5rem", fontWeight: "bold", margin: 0 }}>{formatCurrency(biData.deliverySales || 0)}</h3>
-                                        <p style={{ fontSize: "0.75rem", color: "var(--muted-foreground)", margin: 0 }}>Ventas Delivery</p>
-                                    </div>
-                                    <div style={{ ...statCardStyle, borderLeft: "4px solid #9c27b0" }} className="stat-card">
-                                        <DollarSign size={24} style={{ margin: "0 auto 0.5rem", color: "#9c27b0" }} />
-                                        <h3 style={{ fontSize: "1.5rem", fontWeight: "bold", margin: 0 }}>{formatCurrency(biData.deliveryFeesTotal || 0)}</h3>
-                                        <p style={{ fontSize: "0.75rem", color: "var(--muted-foreground)", margin: 0 }}>Cargos de Envío</p>
+                                    <div style={statCardStyle}>
+                                        <Users size={24} style={{ margin: "0 auto 0.5rem", color: "var(--primary)" }} />
+                                        <h3 style={{ fontSize: "1.5rem", fontWeight: "bold", margin: 0 }}>{report?.tablesServed || 0}</h3>
+                                        <p style={{ fontSize: "0.75rem", color: "var(--muted-foreground)", margin: 0 }}>Mesas Atendidas</p>
                                     </div>
                                 </div>
 
-                                {/* Gráficos Financieros */}
-                                <div style={{ ...cardStyle, marginBottom: "1.5rem" }}>
-                                    <div style={{ display: "flex", borderBottom: "1px solid var(--border)", marginBottom: "1.5rem", gap: "0.5rem", flexWrap: "wrap" }}>
-                                        <button 
-                                            onClick={() => setActiveTab('sales')} 
-                                            style={{
-                                                padding: "0.75rem 1rem",
-                                                backgroundColor: "transparent",
-                                                border: "none",
-                                                borderBottom: activeTab === 'sales' ? "2px solid #e85d26" : "none",
-                                                color: activeTab === 'sales' ? "#e85d26" : "var(--muted-foreground)",
-                                                fontWeight: activeTab === 'sales' ? "bold" : "normal",
-                                                cursor: "pointer",
-                                                fontSize: "0.875rem",
-                                            }}
-                                        >
-                                            📈 Tendencia de Ventas
-                                        </button>
-                                        <button 
-                                            onClick={() => setActiveTab('channels')} 
-                                            style={{
-                                                padding: "0.75rem 1rem",
-                                                backgroundColor: "transparent",
-                                                border: "none",
-                                                borderBottom: activeTab === 'channels' ? "2px solid #e85d26" : "none",
-                                                color: activeTab === 'channels' ? "#e85d26" : "var(--muted-foreground)",
-                                                fontWeight: activeTab === 'channels' ? "bold" : "normal",
-                                                cursor: "pointer",
-                                                fontSize: "0.875rem",
-                                            }}
-                                        >
-                                            🛵 Canales de Venta
-                                        </button>
+                                {/* Gráfico */}
+                                {periodType === 'day' ? (
+                                    <div style={{ ...cardStyle, textAlign: "center", padding: "3rem" }}>
+                                        <p style={{ margin: "1rem 0", color: "var(--muted-foreground)", fontSize: "1rem" }}>
+                                            📊 Vista de día: No hay gráfico disponible para un solo día.
+                                        </p>
+                                        <p style={{ margin: "1rem 0", color: "var(--muted-foreground)", fontSize: "0.875rem" }}>
+                                            Selecciona un <strong>mes</strong> o <strong>año</strong> para ver tendencias y gráficos.
+                                        </p>
                                     </div>
-
-                                    <div style={{ minHeight: "320px", display: "flex", flexDirection: "column", justifyContent: "center" }}>
-                                        {activeTab === 'sales' && (
-                                            <>
-                                                {periodType === 'day' ? (
-                                                    <div style={{ textAlign: "center", padding: "2rem" }}>
-                                                        <p style={{ color: "var(--muted-foreground)", fontSize: "0.875rem" }}>
-                                                            📊 Vista de día: No hay gráfico de tendencia disponible para un solo día.
-                                                        </p>
-                                                        <p style={{ color: "var(--muted-foreground)", fontSize: "0.75rem", marginTop: "0.5rem" }}>
-                                                            Consulta el reporte de <strong>Menú y Demanda</strong> para ver las horas pico de hoy, o cambia el período a <strong>Mes</strong> o <strong>Año</strong>.
-                                                        </p>
-                                                    </div>
-                                                ) : (
-                                                    <>
-                                                        <div style={{ display: "flex", gap: "0.5rem", justifyContent: "flex-end", marginBottom: "1rem" }}>
-                                                            <button onClick={() => setChartType('bar')} style={chartTypeButtonStyle(chartType === 'bar')}>
-                                                                <BarChart3 size={16} /> Barras
-                                                            </button>
-                                                            <button onClick={() => setChartType('line')} style={chartTypeButtonStyle(chartType === 'line')}>
-                                                                <LineChart size={16} /> Líneas
-                                                            </button>
-                                                            <button onClick={() => setChartType('area')} style={chartTypeButtonStyle(chartType === 'area')}>
-                                                                <BarChart3 size={16} /> Área
-                                                            </button>
-                                                        </div>
-                                                        <div style={{ width: "100%", height: 300 }}>
-                                                            {renderChart()}
-                                                        </div>
-                                                    </>
-                                                )}
-                                            </>
-                                        )}
-
-                                        {activeTab === 'channels' && (
-                                            <div style={{ width: "100%", height: 300 }}>
-                                                {renderChannelsChart()}
-                                            </div>
-                                        )}
+                                ) : (
+                                    <div style={cardStyle}>
+                                        <div style={{ display: "flex", gap: "0.5rem", justifyContent: "flex-end", marginBottom: "1rem" }}>
+                                            <button onClick={() => setChartType('bar')} style={chartTypeButtonStyle(chartType === 'bar')}>
+                                                <BarChart3 size={16} /> Barras
+                                            </button>
+                                            <button onClick={() => setChartType('line')} style={chartTypeButtonStyle(chartType === 'line')}>
+                                                <LineChart size={16} /> Líneas
+                                            </button>
+                                            <button onClick={() => setChartType('area')} style={chartTypeButtonStyle(chartType === 'area')}>
+                                                <BarChart3 size={16} /> Área
+                                            </button>
+                                        </div>
+                                        <div style={{ width: "100%", height: 320 }}>
+                                            {renderChart()}
+                                        </div>
                                     </div>
-                                </div>
+                                )}
 
                                 {/* Tabla de ingresos */}
                                 <div style={cardStyle}>
@@ -741,10 +652,10 @@ export default function ReportesPage() {
                                                 </tr>
                                             </thead>
                                             <tbody>
-                                                {Object.entries(periodType === 'year' ? (biData.monthlyIncome || {}) : (biData.dailyIncome || {})).map(([key, amount]) => (
+                                                {Object.entries(periodType === 'year' ? (report?.monthlyIncome || {}) : (report?.dailyIncome || {})).map(([key, amount]) => (
                                                     <tr key={key}>
                                                         <td style={{ padding: "0.5rem 0.75rem", borderBottom: `1px solid var(--border)` }}>
-                                                            {periodType === 'year' ? key : (periodType === 'day' ? formatDateKey(selectedDay) : formatDateKey(key))}
+                                                            {periodType === 'year' ? key : formatDateKey(key)}
                                                         </td>
                                                         <td style={{ textAlign: "right", padding: "0.5rem 0.75rem", borderBottom: `1px solid var(--border)` }}>
                                                             {formatCurrency(amount as number)}
@@ -755,319 +666,848 @@ export default function ReportesPage() {
                                         </table>
                                     </div>
                                 </div>
+
+                                <div style={{ ...cardStyle, textAlign: "center" }}>
+                                    <p style={{ fontSize: "0.875rem", color: "var(--muted-foreground)" }}>
+                                        Período: {periodType === 'day'
+                                            ? `${formatDateKey(selectedDay)} - ${formatDateKey(selectedDay)}`
+                                            : periodType === 'month'
+                                                ? `${formatDateKey(`${selectedMonth}-01`)} - ${formatDateKey(`${selectedMonth}-${new Date(parseInt(selectedMonth.split('-')[0]), parseInt(selectedMonth.split('-')[1]), 0).getDate()}`)}`
+                                                : `${formatDateKey(`${selectedYear}-01-01`)} - ${formatDateKey(`${selectedYear}-12-31`)}`}
+                                    </p>
+                                    <p style={{ fontSize: "0.875rem", color: "var(--muted-foreground)" }}>
+                                        Pedidos pagados: {report?.ordersCount || 0}
+                                    </p>
+                                </div>
                             </>
                         )}
 
-                        {/* ========================================================================= */}
-                        {/* 2. SECCIÓN DE PERSONAL Y SALÓN                                           */}
-                        {/* ========================================================================= */}
-                        {mainSection === 'operations' && (
-                            <>
-                                {/* Stats Cards */}
-                                <div style={statsGridStyle}>
-                                    <div style={{ ...statCardStyle, borderLeft: "4px solid #607d8b" }} className="stat-card">
-                                        <Users size={24} style={{ margin: "0 auto 0.5rem", color: "#607d8b" }} />
-                                        <h3 style={{ fontSize: "1.5rem", fontWeight: "bold", margin: 0 }}>{biData.tablesServed}</h3>
-                                        <p style={{ fontSize: "0.75rem", color: "var(--muted-foreground)", margin: 0 }}>Mesas Atendidas</p>
+                        {/* ====== TAB: GANANCIAS ====== */}
+                        {activeTab === 'ganancias' && report && (
+                            <div>
+                                <h2 style={{ fontSize: "1.25rem", fontWeight: "bold", marginBottom: "1.5rem" }}>💰 Análisis de Ganancias</h2>
+
+                                {/* ====== 1. RESTAURANTE | DELIVERY ====== */}
+                                <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: "1.5rem" }}>
+
+                                    {/* Restaurante */}
+                                    <div style={statCardStyle}>
+                                        <div style={{ textAlign: "center", marginBottom: "0.5rem" }}>
+                                            <span style={{ fontSize: "2rem" }}>🍽️</span>
+                                            <h3 style={{ fontSize: "1rem", fontWeight: "bold", margin: "0.25rem 0", color: "#27ae60" }}>Restaurante</h3>
+                                        </div>
+                                        <div style={{ borderTop: `1px solid var(--border)`, paddingTop: "0.75rem" }}>
+                                            <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "0.5rem" }}>
+                                                <span style={{ fontSize: "0.875rem", color: "var(--muted-foreground)" }}>Ingresos</span>
+                                                <span style={{ fontSize: "1.125rem", fontWeight: "bold" }}>{formatCurrency(dineInRevenue || 0)}</span>
+                                            </div>
+                                            <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "0.5rem" }}>
+                                                <span style={{ fontSize: "0.875rem", color: "var(--muted-foreground)" }}>Pedidos</span>
+                                                <span style={{ fontSize: "1.125rem", fontWeight: "bold" }}>{dineInOrders || 0}</span>
+                                            </div>
+                                            <div style={{ display: "flex", justifyContent: "space-between" }}>
+                                                <span style={{ fontSize: "0.875rem", color: "var(--muted-foreground)" }}>Promedio</span>
+                                                <span style={{ fontSize: "1.125rem", fontWeight: "bold" }}>{dineInOrders > 0 ? formatCurrency(avgDineIn || 0) : 'Bs 0,00'}</span>
+                                            </div>
+                                        </div>
                                     </div>
-                                    <div style={{ ...statCardStyle, borderLeft: "4px solid #2e7d32" }} className="stat-card">
-                                        <Users size={24} style={{ margin: "0 auto 0.5rem", color: "#2e7d32" }} />
-                                        <h3 style={{ fontSize: "1.5rem", fontWeight: "bold", margin: 0 }}>{metricsLoading ? "..." : (metrics?.completedPayments || 0)}</h3>
-                                        <p style={{ fontSize: "0.75rem", color: "var(--muted-foreground)", margin: 0 }}>Pedidos Completados</p>
-                                    </div>
-                                    <div style={{ ...statCardStyle, borderLeft: "4px solid #1976d2" }} className="stat-card">
-                                        <Users size={24} style={{ margin: "0 auto 0.5rem", color: "#1976d2" }} />
-                                        <h3 style={{ fontSize: "1.5rem", fontWeight: "bold", margin: 0 }}>{metricsLoading ? "..." : (metrics?.totalOrders || 0)}</h3>
-                                        <p style={{ fontSize: "0.75rem", color: "var(--muted-foreground)", margin: 0 }}>Total Órdenes Creadas</p>
+
+                                    {/* Delivery */}
+                                    <div style={statCardStyle}>
+                                        <div style={{ textAlign: "center", marginBottom: "0.5rem" }}>
+                                            <span style={{ fontSize: "2rem" }}>📦</span>
+                                            <h3 style={{ fontSize: "1rem", fontWeight: "bold", margin: "0.25rem 0", color: "#2563eb" }}>Delivery</h3>
+                                        </div>
+                                        <div style={{ borderTop: `1px solid var(--border)`, paddingTop: "0.75rem" }}>
+                                            <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "0.5rem" }}>
+                                                <span style={{ fontSize: "0.875rem", color: "var(--muted-foreground)" }}>Ingresos</span>
+                                                <span style={{ fontSize: "1.125rem", fontWeight: "bold" }}>{formatCurrency(deliveryRevenue || 0)}</span>
+                                            </div>
+                                            <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "0.5rem" }}>
+                                                <span style={{ fontSize: "0.875rem", color: "var(--muted-foreground)" }}>Pedidos</span>
+                                                <span style={{ fontSize: "1.125rem", fontWeight: "bold" }}>{deliveryOrders || 0}</span>
+                                            </div>
+                                            <div style={{ display: "flex", justifyContent: "space-between" }}>
+                                                <span style={{ fontSize: "0.875rem", color: "var(--muted-foreground)" }}>Promedio</span>
+                                                <span style={{ fontSize: "1.125rem", fontWeight: "bold" }}>{deliveryOrders > 0 ? formatCurrency(avgDelivery || 0) : 'Bs 0,00'}</span>
+                                            </div>
+                                        </div>
                                     </div>
                                 </div>
 
-                                {/* Gráfico de Meseros */}
+                                {/* ====== 2. TOTALES GENERALES (centrado) ====== */}
+                                <div style={{
+                                    ...statCardStyle,
+                                    backgroundColor: "var(--muted)",
+                                    borderColor: "var(--primary)",
+                                    borderWidth: "2px",
+                                    marginTop: "1.5rem"
+                                }}>
+                                    <div style={{ textAlign: "center" }}>
+                                        <span style={{ fontSize: "2rem" }}>📊</span>
+                                        <h3 style={{ fontSize: "1.125rem", fontWeight: "bold", margin: "0.25rem 0", color: "var(--primary)" }}>Totales Generales</h3>
+                                        <div style={{ display: "flex", justifyContent: "center", gap: "3rem", flexWrap: "wrap", marginTop: "0.5rem" }}>
+                                            <div>
+                                                <p style={{ fontSize: "0.75rem", color: "var(--muted-foreground)", margin: 0 }}>Ingresos</p>
+                                                <p style={{ fontSize: "1.5rem", fontWeight: "bold", color: "var(--primary)", margin: 0 }}>
+                                                    {formatCurrency((dineInRevenue || 0) + (deliveryRevenue || 0))}
+                                                </p>
+                                            </div>
+                                            <div>
+                                                <p style={{ fontSize: "0.75rem", color: "var(--muted-foreground)", margin: 0 }}>Pedidos</p>
+                                                <p style={{ fontSize: "1.5rem", fontWeight: "bold", color: "var(--primary)", margin: 0 }}>
+                                                    {(dineInOrders || 0) + (deliveryOrders || 0)}
+                                                </p>
+                                            </div>
+                                            <div>
+                                                <p style={{ fontSize: "0.75rem", color: "var(--muted-foreground)", margin: 0 }}>Promedio</p>
+                                                <p style={{ fontSize: "1.5rem", fontWeight: "bold", color: "var(--primary)", margin: 0 }}>
+                                                    {((dineInOrders || 0) + (deliveryOrders || 0)) > 0
+                                                        ? formatCurrency(((dineInRevenue || 0) + (deliveryRevenue || 0)) / ((dineInOrders || 0) + (deliveryOrders || 0)))
+                                                        : 'Bs 0,00'}
+                                                </p>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {/* ====== 3. MÉTODO DE PAGO ====== */}
                                 <div style={cardStyle}>
-                                    <h3 style={{ fontSize: "1.125rem", fontWeight: "bold", marginBottom: "1.5rem", borderLeft: "4px solid #8884d8", paddingLeft: "0.5rem" }}>
-                                        🥇 Rendimiento por Mesero (Total Facturado y Pedidos)
+                                    <h3 style={{ fontSize: "1rem", fontWeight: "bold", marginBottom: "1rem" }}>
+                                        💳 Método de Pago
                                     </h3>
-                                    <div style={{ width: "100%", height: 300 }}>
+                                    <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: "1.5rem" }}>
+
+                                        {/* Efectivo */}
+                                        <div style={{ ...statCardStyle, borderColor: "#27ae60", borderWidth: "1px" }}>
+                                            <div style={{ textAlign: "center", marginBottom: "0.5rem" }}>
+                                                <span style={{ fontSize: "2rem" }}>💵</span>
+                                                <h3 style={{ fontSize: "1rem", fontWeight: "bold", margin: "0.25rem 0", color: "#27ae60" }}>Efectivo</h3>
+                                            </div>
+                                            <div style={{ borderTop: `1px solid var(--border)`, paddingTop: "0.75rem" }}>
+                                                <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "0.5rem" }}>
+                                                    <span style={{ fontSize: "0.875rem", color: "var(--muted-foreground)" }}>Monto</span>
+                                                    <span style={{ fontSize: "1.125rem", fontWeight: "bold" }}>{formatCurrency(report.cashTotal || 0)}</span>
+                                                </div>
+                                                <div style={{ display: "flex", justifyContent: "space-between" }}>
+                                                    <span style={{ fontSize: "0.875rem", color: "var(--muted-foreground)" }}>% del total</span>
+                                                    <span style={{ fontSize: "1.125rem", fontWeight: "bold" }}>
+                                                        {report.totalSales > 0 ? `${((report.cashTotal / report.totalSales) * 100).toFixed(1)}%` : '0%'}
+                                                    </span>
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        {/* QR */}
+                                        <div style={{ ...statCardStyle, borderColor: "#1976d2", borderWidth: "1px" }}>
+                                            <div style={{ textAlign: "center", marginBottom: "0.5rem" }}>
+                                                <span style={{ fontSize: "2rem" }}>📱</span>
+                                                <h3 style={{ fontSize: "1rem", fontWeight: "bold", margin: "0.25rem 0", color: "#1976d2" }}>QR / Digital</h3>
+                                            </div>
+                                            <div style={{ borderTop: `1px solid var(--border)`, paddingTop: "0.75rem" }}>
+                                                <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "0.5rem" }}>
+                                                    <span style={{ fontSize: "0.875rem", color: "var(--muted-foreground)" }}>Monto</span>
+                                                    <span style={{ fontSize: "1.125rem", fontWeight: "bold" }}>{formatCurrency(report.qrTotal || 0)}</span>
+                                                </div>
+                                                <div style={{ display: "flex", justifyContent: "space-between" }}>
+                                                    <span style={{ fontSize: "0.875rem", color: "var(--muted-foreground)" }}>% del total</span>
+                                                    <span style={{ fontSize: "1.125rem", fontWeight: "bold" }}>
+                                                        {report.totalSales > 0 ? `${((report.qrTotal / report.totalSales) * 100).toFixed(1)}%` : '0%'}
+                                                    </span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    {/* Método más usado */}
+                                    <div style={{
+                                        marginTop: "1rem",
+                                        padding: "0.75rem",
+                                        backgroundColor: "var(--muted)",
+                                        borderRadius: "var(--radius-md)",
+                                        textAlign: "center"
+                                    }}>
+                                        <span style={{ fontSize: "0.875rem", color: "var(--muted-foreground)" }}>
+                                            Método que más genera:
+                                            <strong style={{
+                                                marginLeft: "0.5rem",
+                                                color: report.cashTotal >= report.qrTotal ? "#27ae60" : "#1976d2"
+                                            }}>
+                                                {report.cashTotal >= report.qrTotal ? '💵 Efectivo' : '📱 QR'}
+                                                ({report.totalSales > 0
+                                                    ? `${(Math.max(report.cashTotal, report.qrTotal) / report.totalSales * 100).toFixed(1)}%`
+                                                    : '0%'})
+                                            </strong>
+                                        </span>
+                                    </div>
+                                </div>
+
+                                {/* ====== 4. FOOTER ====== */}
+                                <div style={{ ...cardStyle, textAlign: "center", backgroundColor: "var(--muted)" }}>
+                                    <p style={{ fontSize: "0.75rem", color: "var(--muted-foreground)", margin: 0 }}>
+                                        ℹ️ Datos basados en pagos completados del período seleccionado. · {(dineInOrders || 0) + (deliveryOrders || 0)} pedidos en total
+                                    </p>
+                                </div>
+                            </div>
+                        )}
+
+                        {/* ====== TAB: MESEROS ====== */}
+                        {activeTab === 'meseros' && (
+                            <div>
+                                <h2 style={{ fontSize: "1.25rem", fontWeight: "bold", marginBottom: "1.5rem" }}>🥇 Ranking de Meseros</h2>
+                                
+                                {/* Gráfico de barras del ranking */}
+                                <div style={cardStyle}>
+                                    <h3 style={{ fontSize: "1rem", fontWeight: "bold", marginBottom: "1.5rem" }}>
+                                        📊 Ventas Totales por Mesero
+                                    </h3>
+                                    <div style={{ width: "100%", height: 320 }}>
                                         {renderWaitersChart()}
                                     </div>
                                 </div>
 
-                                {/* Listas de Desglose de Operaciones (Grid 2x2) */}
-                                <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: "1.5rem", marginBottom: "1.5rem" }}>
-                                    {/* Top Meseros */}
-                                    <div style={cardStyle}>
-                                        <h3 style={{ fontSize: "1rem", fontWeight: "bold", marginBottom: "1rem", borderLeft: "3px solid #e85d26", paddingLeft: "0.5rem" }}>
-                                            🥇 Top Meseros
-                                        </h3>
-                                        {metricsLoading ? (
-                                            <p style={{ textAlign: "center", padding: "2rem", color: "var(--muted-foreground)" }}>Cargando...</p>
-                                        ) : (
-                                            <ul style={{ listStyle: "none", padding: 0, margin: 0 }}>
-                                                {metrics?.topWaiters?.map((waiter, idx) => (
-                                                    <li key={waiter.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "0.5rem 0", borderBottom: "1px solid var(--border)" }}>
-                                                        <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
-                                                            <span style={{ fontWeight: "bold", color: "#e85d26", width: "30px" }}>#{idx + 1}</span>
-                                                            <span style={{ fontSize: "0.875rem" }}>{waiter.name}</span>
-                                                        </div>
-                                                        <span style={{ fontWeight: "bold", fontSize: "0.875rem" }}>
-                                                            {formatCurrency(waiter.total)} <span style={{ fontSize: '0.75rem', fontWeight: 'normal', color: 'var(--muted-foreground)' }}>({waiter.count || 0} ped.)</span>
-                                                        </span>
-                                                    </li>
-                                                ))}
-                                                {(!metrics?.topWaiters || metrics.topWaiters.length === 0) && (
-                                                    <p style={{ textAlign: "center", padding: "1rem", color: "var(--muted-foreground)" }}>No hay datos</p>
-                                                )}
-                                            </ul>
-                                        )}
-                                    </div>
-
-                                    {/* Top Mesas */}
-                                    <div style={cardStyle}>
-                                        <h3 style={{ fontSize: "1rem", fontWeight: "bold", marginBottom: "1rem", borderLeft: "3px solid #e85d26", paddingLeft: "0.5rem" }}>
-                                            🪑 Top Mesas
-                                        </h3>
-                                        {metricsLoading ? (
-                                            <p style={{ textAlign: "center", padding: "2rem", color: "var(--muted-foreground)" }}>Cargando...</p>
-                                        ) : (
-                                            <ul style={{ listStyle: "none", padding: 0, margin: 0 }}>
-                                                {metrics?.topTables?.map((table, idx) => (
-                                                    <li key={table.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "0.5rem 0", borderBottom: "1px solid var(--border)" }}>
-                                                        <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
-                                                            <span style={{ fontWeight: "bold", color: "#e85d26", width: "30px" }}>#{idx + 1}</span>
-                                                            <span style={{ fontSize: "0.875rem" }}>Mesa {table.number || 'N/A'}</span>
-                                                        </div>
-                                                        <span style={{ fontWeight: "bold", fontSize: "0.875rem" }}>{formatCurrency(table.total)}</span>
-                                                    </li>
-                                                ))}
-                                                {(!metrics?.topTables || metrics.topTables.length === 0) && (
-                                                    <p style={{ textAlign: "center", padding: "1rem", color: "var(--muted-foreground)" }}>No hay datos</p>
-                                                )}
-                                            </ul>
-                                        )}
-                                    </div>
-
-                                    {/* Clientes Destacados */}
-                                    <div style={cardStyle}>
-                                        <h3 style={{ fontSize: "1rem", fontWeight: "bold", marginBottom: "1rem", borderLeft: "3px solid #e85d26", paddingLeft: "0.5rem" }}>
-                                            👥 Clientes Destacados
-                                        </h3>
-                                        {metricsLoading ? (
-                                            <p style={{ textAlign: "center", padding: "2rem", color: "var(--muted-foreground)" }}>Cargando...</p>
-                                        ) : (
-                                            <ul style={{ listStyle: "none", padding: 0, margin: 0 }}>
-                                                {metrics?.topCustomers?.map((customer, idx) => (
-                                                    <li key={customer.email} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "0.5rem 0", borderBottom: "1px solid var(--border)" }}>
-                                                        <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
-                                                            <span style={{ fontWeight: "bold", color: "#e85d26", width: "30px" }}>#{idx + 1}</span>
-                                                            <span style={{ fontSize: "0.875rem" }}>{customer.name}</span>
-                                                        </div>
-                                                        <span style={{ fontWeight: "bold", fontSize: "0.875rem" }}>{formatCurrency(customer.total)}</span>
-                                                    </li>
-                                                ))}
-                                                {(!metrics?.topCustomers || metrics.topCustomers.length === 0) && (
-                                                    <p style={{ textAlign: "center", padding: "1rem", color: "var(--muted-foreground)" }}>No hay datos</p>
-                                                )}
-                                            </ul>
-                                        )}
-                                    </div>
-
-                                    {/* Eficiencia Operativa */}
-                                    <div style={cardStyle}>
-                                        <h3 style={{ fontSize: "1rem", fontWeight: "bold", marginBottom: "1rem", borderLeft: "3px solid #e85d26", paddingLeft: "0.5rem" }}>
-                                            ⚡ Eficiencia Operativa
-                                        </h3>
-                                        {metricsLoading ? (
-                                            <p style={{ textAlign: "center", padding: "2rem", color: "var(--muted-foreground)" }}>Cargando...</p>
-                                        ) : (
-                                            <ul style={{ listStyle: "none", padding: 0, margin: 0 }}>
-                                                <li style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "0.5rem 0", borderBottom: "1px solid var(--border)" }}>
-                                                    <span style={{ fontSize: "0.875rem" }}>✅ Pedidos completados</span>
-                                                    <span style={{ fontWeight: "bold", fontSize: "0.875rem" }}>{metrics?.completedPayments || 0}</span>
+                                {/* Tabla/Lista detallada */}
+                                <div style={cardStyle}>
+                                    <h3 style={{ fontSize: "1rem", fontWeight: "bold", marginBottom: "1rem" }}>
+                                        📋 Desglose de Ventas y Pedidos
+                                    </h3>
+                                    {metricsLoading ? (
+                                        <p>Cargando...</p>
+                                    ) : (
+                                        <ul style={{ listStyle: "none", padding: 0, margin: 0 }}>
+                                            {metrics?.topWaiters?.map((waiter, idx) => (
+                                                <li key={waiter.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "0.75rem 0", borderBottom: "1px solid var(--border)" }}>
+                                                    <div style={{ display: "flex", alignItems: "center", gap: "0.75rem" }}>
+                                                        <span style={{ fontWeight: "bold", color: "#e85d26", width: "30px" }}>#{idx + 1}</span>
+                                                        <span>{waiter.name}</span>
+                                                    </div>
+                                                    <span style={{ fontWeight: "bold" }}>
+                                                        {formatCurrency(waiter.total)} <span style={{ fontSize: '0.75rem', fontWeight: 'normal', color: 'var(--muted-foreground)' }}>({waiter.count || 0} ped.)</span>
+                                                    </span>
                                                 </li>
-                                                <li style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "0.5rem 0", borderBottom: "1px solid var(--border)" }}>
-                                                    <span style={{ fontSize: "0.875rem" }}>📋 Total órdenes creadas</span>
-                                                    <span style={{ fontWeight: "bold", fontSize: "0.875rem" }}>{metrics?.totalOrders || 0}</span>
-                                                </li>
-                                                <li style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "0.5rem 0" }}>
-                                                    <span style={{ fontSize: "0.875rem" }}>💰 Pedidos pagados</span>
-                                                    <span style={{ fontWeight: "bold", fontSize: "0.875rem" }}>{biData?.ordersCount || 0}</span>
-                                                </li>
-                                            </ul>
-                                        )}
-                                    </div>
+                                            ))}
+                                            {(!metrics?.topWaiters || metrics.topWaiters.length === 0) && (
+                                                <p style={{ textAlign: "center", padding: "1rem", color: "var(--muted-foreground)" }}>No hay datos de meseros en este período</p>
+                                            )}
+                                        </ul>
+                                    )}
                                 </div>
-                            </>
+                            </div>
                         )}
 
-                        {/* ========================================================================= */}
-                        {/* 3. SECCIÓN DE MENÚ Y DEMANDA                                              */}
-                        {/* ========================================================================= */}
-                        {mainSection === 'products' && (
-                            <>
-                                {/* Stats Cards */}
+                        {/* ====== TAB: PLATOS ====== */}
+                        {activeTab === 'platos' && (
+                            <div>
+                                <h2 style={{ fontSize: "1.25rem", fontWeight: "bold", marginBottom: "1.5rem" }}>🍽️ Top Platos</h2>
+                                <div style={cardStyle}>
+                                    {metricsLoading ? (
+                                        <p>Cargando...</p>
+                                    ) : (
+                                        <ul style={{ listStyle: "none", padding: 0, margin: 0 }}>
+                                            {metrics?.topDishes?.map((dish, idx) => (
+                                                <li key={dish.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "0.75rem 0", borderBottom: "1px solid var(--border)" }}>
+                                                    <span>#{idx + 1} {dish.name}</span>
+                                                    <span style={{ fontWeight: "bold" }}>{dish.quantity} uds</span>
+                                                </li>
+                                            ))}
+                                            {(!metrics?.topDishes || metrics.topDishes.length === 0) && (
+                                                <p style={{ textAlign: "center", padding: "1rem", color: "var(--muted-foreground)" }}>No hay datos</p>
+                                            )}
+                                        </ul>
+                                    )}
+                                </div>
+                            </div>
+                        )}
+
+                        {/* ====== TAB: HORARIOS ====== */}
+                        {activeTab === 'horarios' && metrics && (
+                            <div>
+                                <h2 style={{ fontSize: "1.25rem", fontWeight: "bold", marginBottom: "1.5rem" }}>📅 Horarios</h2>
+
+                                {/* Resumen de Horarios */}
                                 <div style={statsGridStyle}>
-                                    <div style={{ ...statCardStyle, borderLeft: "4px solid #e85d26" }} className="stat-card">
-                                        <Calendar size={24} style={{ margin: "0 auto 0.5rem", color: "#e85d26" }} />
-                                        <h3 style={{ fontSize: "1rem", fontWeight: "bold", margin: 0 }}>
-                                            {metricsLoading ? "Cargando..." : (metrics?.bestDay ? `${new Date(metrics.bestDay.date).toLocaleDateString('es-BO')}` : 'Sin datos')}
+                                    <div style={statCardStyle}>
+                                        <h3 style={{ fontSize: "1.5rem", fontWeight: "bold", margin: 0, color: "var(--foreground)" }}>
+                                            {metrics.totalOrders || 0}
                                         </h3>
-                                        <h4 style={{ fontSize: "1.1rem", margin: "0.25rem 0 0", color: "#e85d26" }}>
-                                            {metricsLoading ? "" : (metrics?.bestDay ? formatCurrency(metrics.bestDay.amount) : '')}
-                                        </h4>
+                                        <p style={{ fontSize: "0.75rem", color: "var(--muted-foreground)", margin: 0 }}>Total Pedidos</p>
+                                    </div>
+                                    <div style={statCardStyle}>
+                                        <h3 style={{ fontSize: "1.5rem", fontWeight: "bold", margin: 0, color: "#27ae60" }}>
+                                            {metrics.bestDay ? new Date(metrics.bestDay.date).toLocaleDateString('es-BO') : 'N/A'}
+                                        </h3>
                                         <p style={{ fontSize: "0.75rem", color: "var(--muted-foreground)", margin: 0 }}>Día con más ventas</p>
                                     </div>
-                                    <div style={{ ...statCardStyle, borderLeft: "4px solid #1976d2" }} className="stat-card">
-                                        <Calendar size={24} style={{ margin: "0 auto 0.5rem", color: "#1976d2" }} />
-                                        <h3 style={{ fontSize: "1.2rem", fontWeight: "bold", margin: "0.25rem 0" }}>
-                                            {metricsLoading ? "..." : (metrics?.peakHour ? metrics.peakHour.hour : 'Sin datos')}
+                                    <div style={statCardStyle}>
+                                        <h3 style={{ fontSize: "1.5rem", fontWeight: "bold", margin: 0, color: "#2563eb" }}>
+                                            {metrics.peakHour ? metrics.peakHour.hour : 'N/A'}
                                         </h3>
-                                        <h4 style={{ fontSize: "1rem", margin: 0, color: "var(--muted-foreground)" }}>
-                                            {metricsLoading ? "" : (metrics?.peakHour ? formatCurrency(metrics.peakHour.amount) : '')}
-                                        </h4>
                                         <p style={{ fontSize: "0.75rem", color: "var(--muted-foreground)", margin: 0 }}>Hora pico</p>
                                     </div>
-                                </div>
-
-                                {/* Gráficos de Menú y Demanda */}
-                                <div style={{ ...cardStyle, marginBottom: "1.5rem" }}>
-                                    <div style={{ display: "flex", borderBottom: "1px solid var(--border)", marginBottom: "1.5rem", gap: "0.5rem", flexWrap: "wrap" }}>
-                                        <button 
-                                            onClick={() => setActiveTab('dishes')} 
-                                            style={{
-                                                padding: "0.75rem 1rem",
-                                                backgroundColor: "transparent",
-                                                border: "none",
-                                                borderBottom: activeTab === 'dishes' ? "2px solid #e85d26" : "none",
-                                                color: activeTab === 'dishes' ? "#e85d26" : "var(--muted-foreground)",
-                                                fontWeight: activeTab === 'dishes' ? "bold" : "normal",
-                                                cursor: "pointer",
-                                                fontSize: "0.875rem",
-                                            }}
-                                        >
-                                            🍽️ Platos más Vendidos
-                                        </button>
-                                        <button 
-                                            onClick={() => setActiveTab('hours')} 
-                                            style={{
-                                                padding: "0.75rem 1rem",
-                                                backgroundColor: "transparent",
-                                                border: "none",
-                                                borderBottom: activeTab === 'hours' ? "2px solid #e85d26" : "none",
-                                                color: activeTab === 'hours' ? "#e85d26" : "var(--muted-foreground)",
-                                                fontWeight: activeTab === 'hours' ? "bold" : "normal",
-                                                cursor: "pointer",
-                                                fontSize: "0.875rem",
-                                            }}
-                                        >
-                                            ⏰ Flujo de Horas Pico
-                                        </button>
-                                    </div>
-
-                                    <div style={{ minHeight: "320px", display: "flex", flexDirection: "column", justifyContent: "center" }}>
-                                        {activeTab === 'dishes' && (
-                                            <div style={{ width: "100%", height: 300 }}>
-                                                {renderDishesChart()}
-                                            </div>
-                                        )}
-
-                                        {activeTab === 'hours' && (
-                                            <div style={{ width: "100%", height: 300 }}>
-                                                {renderHourlyChart()}
-                                            </div>
-                                        )}
-                                    </div>
-                                </div>
-
-                                {/* Listas de Desglose de Menú */}
-                                <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: "1.5rem", marginBottom: "1.5rem" }}>
-                                    {/* Top Platos */}
-                                    <div style={cardStyle}>
-                                        <h3 style={{ fontSize: "1rem", fontWeight: "bold", marginBottom: "1rem", borderLeft: "3px solid #e85d26", paddingLeft: "0.5rem" }}>
-                                            🍽️ Top Platos
+                                    <div style={statCardStyle}>
+                                        <h3 style={{ fontSize: "1.5rem", fontWeight: "bold", margin: 0, color: "#e85d26" }}>
+                                            {metrics.cancellationRate !== undefined ? `${metrics.cancellationRate.toFixed(1)}%` : '0%'}
                                         </h3>
-                                        {metricsLoading ? (
-                                            <p style={{ textAlign: "center", padding: "2rem", color: "var(--muted-foreground)" }}>Cargando...</p>
-                                        ) : (
-                                            <ul style={{ listStyle: "none", padding: 0, margin: 0 }}>
-                                                {metrics?.topDishes?.map((dish, idx) => (
-                                                    <li key={dish.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "0.5rem 0", borderBottom: "1px solid var(--border)" }}>
-                                                        <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
-                                                            <span style={{ fontWeight: "bold", color: "#e85d26", width: "30px" }}>#{idx + 1}</span>
-                                                            <span style={{ fontSize: "0.875rem" }}>{dish.name}</span>
+                                        <p style={{ fontSize: "0.75rem", color: "var(--muted-foreground)", margin: 0 }}>Cancelaciones</p>
+                                    </div>
+                                </div>
+
+                                {/* Top 3 horas pico */}
+                                <div style={cardStyle}>
+                                    <h3 style={{ fontSize: "1rem", fontWeight: "bold", marginBottom: "1rem" }}>
+                                        ⏰ Top 3 Horas Pico
+                                    </h3>
+                                    {metrics.topHours && metrics.topHours.length > 0 ? (
+                                        <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
+                                            {metrics.topHours.map((hour, idx) => (
+                                                <div key={hour.hour} style={{
+                                                    display: "flex",
+                                                    justifyContent: "space-between",
+                                                    alignItems: "center",
+                                                    padding: "0.75rem 1rem",
+                                                    backgroundColor: idx === 0 ? "var(--muted)" : "transparent",
+                                                    borderRadius: "var(--radius-md)",
+                                                    borderLeft: idx === 0 ? `3px solid var(--primary)` : `3px solid transparent`
+                                                }}>
+                                                    <div style={{ display: "flex", alignItems: "center", gap: "1rem" }}>
+                                                        <span style={{
+                                                            fontWeight: "bold",
+                                                            fontSize: "1.25rem",
+                                                            color: idx === 0 ? "var(--primary)" : "var(--foreground)"
+                                                        }}>
+                                                            #{idx + 1}
+                                                        </span>
+                                                        <div>
+                                                            <span style={{ fontWeight: "bold", fontSize: "1rem" }}>
+                                                                {hour.hour}
+                                                            </span>
+                                                            <span style={{ fontSize: "0.75rem", color: "var(--muted-foreground)", marginLeft: "0.5rem" }}>
+                                                                {hour.count} pedidos
+                                                            </span>
                                                         </div>
-                                                        <span style={{ fontWeight: "bold", fontSize: "0.875rem" }}>{dish.quantity} uds</span>
-                                                    </li>
-                                                ))}
-                                                {(!metrics?.topDishes || metrics.topDishes.length === 0) && (
-                                                    <p style={{ textAlign: "center", padding: "1rem", color: "var(--muted-foreground)" }}>No hay datos</p>
-                                                )}
-                                            </ul>
-                                        )}
-                                    </div>
+                                                    </div>
+                                                    <span style={{ fontWeight: "bold", fontSize: "1rem" }}>
+                                                        {formatCurrency(hour.total)}
+                                                    </span>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    ) : (
+                                        <p style={{ fontSize: "0.875rem", color: "var(--muted-foreground)", margin: 0 }}>
+                                            No hay datos de horas pico
+                                        </p>
+                                    )}
+                                </div>
 
-                                    {/* Análisis por Tiempo */}
-                                    <div style={cardStyle}>
-                                        <h3 style={{ fontSize: "1rem", fontWeight: "bold", marginBottom: "1rem", borderLeft: "3px solid #e85d26", paddingLeft: "0.5rem" }}>
-                                            📅 Análisis por Tiempo
-                                        </h3>
-                                        {metricsLoading ? (
-                                            <p style={{ textAlign: "center", padding: "2rem", color: "var(--muted-foreground)" }}>Cargando...</p>
-                                        ) : (
-                                            <ul style={{ listStyle: "none", padding: 0, margin: 0 }}>
-                                                <li style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "0.5rem 0", borderBottom: "1px solid var(--border)" }}>
-                                                    <span style={{ fontSize: "0.875rem" }}>📆 Día con más ventas</span>
-                                                    <span style={{ fontWeight: "bold", fontSize: "0.875rem" }}>
-                                                        {metrics?.bestDay ? `${new Date(metrics.bestDay.date).toLocaleDateString('es-BO')} - ${formatCurrency(metrics.bestDay.amount)}` : 'Sin datos'}
+                                {/* Días con más cancelaciones */}
+                                <div style={cardStyle}>
+                                    <h3 style={{ fontSize: "1rem", fontWeight: "bold", marginBottom: "1rem" }}>
+                                        📅 Días con más cancelaciones
+                                    </h3>
+                                    {metrics.topCancellationDays && metrics.topCancellationDays.length > 0 ? (
+                                        <div style={{ display: "flex", flexWrap: "wrap", gap: "0.75rem" }}>
+                                            {metrics.topCancellationDays.map((day) => (
+                                                <div key={day.date} style={{
+                                                    display: "flex",
+                                                    alignItems: "center",
+                                                    gap: "0.5rem",
+                                                    padding: "0.5rem 1rem",
+                                                    backgroundColor: "#fee2e2",
+                                                    borderRadius: "var(--radius-md)",
+                                                    border: "1px solid #fecaca"
+                                                }}>
+                                                    <span style={{ fontSize: "0.875rem", fontWeight: "bold", color: "#991b1b" }}>
+                                                        {new Date(day.date).toLocaleDateString('es-BO')}
                                                     </span>
-                                                </li>
-                                                <li style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "0.5rem 0" }}>
-                                                    <span style={{ fontSize: "0.875rem" }}>⏰ Hora pico</span>
-                                                    <span style={{ fontWeight: "bold", fontSize: "0.875rem" }}>
-                                                        {metrics?.peakHour ? `${metrics.peakHour.hour} (${formatCurrency(metrics.peakHour.amount)})` : 'Sin datos'}
+                                                    <span style={{
+                                                        fontSize: "0.75rem",
+                                                        backgroundColor: "#991b1b",
+                                                        color: "white",
+                                                        padding: "2px 8px",
+                                                        borderRadius: "9999px"
+                                                    }}>
+                                                        {day.count} {day.count === 1 ? 'cancelación' : 'cancelaciones'}
                                                     </span>
-                                                </li>
-                                            </ul>
-                                        )}
+                                                </div>
+                                            ))}
+                                        </div>
+                                    ) : (
+                                        <p style={{ fontSize: "0.875rem", color: "var(--muted-foreground)", margin: 0 }}>
+                                            No hay cancelaciones en este período
+                                        </p>
+                                    )}
+                                </div>
+
+                                {/* Comparativa: delivery vs restaurante por horario */}
+                                <div style={cardStyle}>
+                                    <h3 style={{ fontSize: "1rem", fontWeight: "bold", marginBottom: "1rem" }}>
+                                        📊 Delivery vs Restaurante por Horario
+                                    </h3>
+                                    {metrics.serviceByHourArray && metrics.serviceByHourArray.length > 0 ? (
+                                        <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
+                                            {metrics.serviceByHourArray.map((item) => {
+                                                const total = item.dine_in + item.delivery;
+                                                const dineInPercent = total > 0 ? (item.dine_in / total) * 100 : 0;
+                                                const deliveryPercent = total > 0 ? (item.delivery / total) * 100 : 0;
+
+                                                return (
+                                                    <div key={item.hour}>
+                                                        <div style={{ display: "flex", justifyContent: "space-between", fontSize: "0.875rem" }}>
+                                                            <span style={{ fontWeight: "bold" }}>{item.hour}</span>
+                                                            <span>{item.dine_in} 🍽️ / {item.delivery} 📦</span>
+                                                        </div>
+                                                        <div style={{ display: "flex", height: "12px", borderRadius: "6px", overflow: "hidden", marginTop: "0.25rem" }}>
+                                                            <div style={{
+                                                                width: `${dineInPercent}%`,
+                                                                backgroundColor: "#27ae60",
+                                                                transition: "width 0.5s ease"
+                                                            }} />
+                                                            <div style={{
+                                                                width: `${deliveryPercent}%`,
+                                                                backgroundColor: "#2563eb",
+                                                                transition: "width 0.5s ease"
+                                                            }} />
+                                                        </div>
+                                                    </div>
+                                                );
+                                            })}
+                                        </div>
+                                    ) : (
+                                        <p style={{ fontSize: "0.875rem", color: "var(--muted-foreground)", margin: 0 }}>
+                                            No hay datos de horarios
+                                        </p>
+                                    )}
+                                </div>
+
+                                {/* Métricas existentes (resumen) */}
+                                <div style={{ ...cardStyle, textAlign: "center", backgroundColor: "var(--muted)" }}>
+                                    <div style={{ display: "flex", justifyContent: "center", gap: "2rem", flexWrap: "wrap" }}>
+                                        <div>
+                                            <p style={{ fontSize: "0.75rem", color: "var(--muted-foreground)", margin: 0 }}>📆 Día con más ventas</p>
+                                            <p style={{ fontSize: "1rem", fontWeight: "bold", margin: 0 }}>
+                                                {metrics.bestDay ? `${new Date(metrics.bestDay.date).toLocaleDateString('es-BO')} - ${formatCurrency(metrics.bestDay.amount)}` : 'Sin datos'}
+                                            </p>
+                                        </div>
+                                        <div>
+                                            <p style={{ fontSize: "0.75rem", color: "var(--muted-foreground)", margin: 0 }}>⏰ Hora pico</p>
+                                            <p style={{ fontSize: "1rem", fontWeight: "bold", margin: 0 }}>
+                                                {metrics.peakHour ? `${metrics.peakHour.hour} (${formatCurrency(metrics.peakHour.amount)})` : 'Sin datos'}
+                                            </p>
+                                        </div>
+                                        <div>
+                                            <p style={{ fontSize: "0.75rem", color: "var(--muted-foreground)", margin: 0 }}>📊 Cancelaciones</p>
+                                            <p style={{ fontSize: "1rem", fontWeight: "bold", margin: 0, color: "#e85d26" }}>
+                                                {metrics.cancellationRate !== undefined ? `${metrics.cancellationRate.toFixed(1)}%` : '0%'}
+                                            </p>
+                                        </div>
                                     </div>
                                 </div>
-                            </>
+                            </div>
                         )}
 
-                        {/* Summary Footer */}
-                        <div style={{ ...cardStyle, textAlign: "center" }}>
-                            <p style={{ fontSize: "0.875rem", color: "var(--muted-foreground)" }}>
-                                Período: {periodType === 'month'
-                                    ? `${formatDateKey(`${selectedMonth}-01`)} - ${formatDateKey(`${selectedMonth}-${new Date(parseInt(selectedMonth.split('-')[0]), parseInt(selectedMonth.split('-')[1]), 0).getDate()}`)}`
-                                    : periodType === 'year'
-                                        ? `${formatDateKey(`${selectedYear}-01-01`)} - ${formatDateKey(`${selectedYear}-12-31`)}`
-                                        : `${formatDateKey(selectedDay)} - ${formatDateKey(selectedDay)}`}
-                            </p>
-                            <p style={{ fontSize: "0.875rem", color: "var(--muted-foreground)" }}>
-                                Pedidos pagados: {biData.ordersCount}
-                            </p>
-                        </div>
+                        {/* ====== TAB: MESAS ====== */}
+                        {activeTab === 'mesas' && metrics && (
+                            <div>
+                                <h2 style={{ fontSize: "1.25rem", fontWeight: "bold", marginBottom: "1.5rem" }}>🪑 Mesas</h2>
+
+                                {/* Resumen de Mesas */}
+                                <div style={statsGridStyle}>
+                                    <div style={statCardStyle}>
+                                        <h3 style={{ fontSize: "1.5rem", fontWeight: "bold", margin: 0, color: "var(--foreground)" }}>
+                                            {metrics.mesaDetalle?.length || 0}
+                                        </h3>
+                                        <p style={{ fontSize: "0.75rem", color: "var(--muted-foreground)", margin: 0 }}>Mesas con actividad</p>
+                                    </div>
+                                    <div style={statCardStyle}>
+                                        <h3 style={{ fontSize: "1.5rem", fontWeight: "bold", margin: 0, color: "#27ae60" }}>
+                                            {metrics.mesaDetalle?.reduce((sum, m) => sum + m.totalPedidos, 0) || 0}
+                                        </h3>
+                                        <p style={{ fontSize: "0.75rem", color: "var(--muted-foreground)", margin: 0 }}>Total Pedidos</p>
+                                    </div>
+                                    <div style={statCardStyle}>
+                                        <h3 style={{ fontSize: "1.5rem", fontWeight: "bold", margin: 0, color: "#2563eb" }}>
+                                            {formatCurrency(Math.round((metrics.mesaDetalle?.reduce((sum, m) => sum + m.totalIngresos, 0) || 0) * 100) / 100)}
+                                        </h3>
+                                        <p style={{ fontSize: "0.75rem", color: "var(--muted-foreground)", margin: 0 }}>Total Ingresos</p>
+                                    </div>
+                                    <div style={statCardStyle}>
+                                        <h3 style={{ fontSize: "1.5rem", fontWeight: "bold", margin: 0, color: "var(--primary)" }}>
+                                            {metrics.tablesServedToday || 0}
+                                        </h3>
+                                        <p style={{ fontSize: "0.75rem", color: "var(--muted-foreground)", margin: 0 }}>Mesas Atendidas</p>
+                                    </div>
+                                </div>
+
+                                {/* Lista de Mesas con detalle */}
+                                {metrics.mesaDetalle && metrics.mesaDetalle.length > 0 ? (
+                                    <div style={{ display: "flex", flexDirection: "column", gap: "1.5rem" }}>
+                                        {metrics.mesaDetalle.map((mesa, idx) => (
+                                            <div key={mesa.tableId} style={{ ...cardStyle, borderColor: idx === 0 ? "var(--primary)" : "var(--border)" }}>
+                                                {/* Cabecera de la mesa - clickeable */}
+                                                <div
+                                                    onClick={() => toggleMesa(mesa.tableId)}
+                                                    style={{
+                                                        display: "flex",
+                                                        justifyContent: "space-between",
+                                                        alignItems: "center",
+                                                        padding: "0.5rem",
+                                                        borderRadius: "var(--radius-md)",
+                                                        flexWrap: "wrap",
+                                                        gap: "0.5rem",
+                                                        cursor: "pointer",
+                                                        transition: "background 0.2s",
+                                                        backgroundColor: expandedMesa === mesa.tableId ? "var(--muted)" : "transparent"
+                                                    }}
+                                                    onMouseEnter={(e) => {
+                                                        if (expandedMesa !== mesa.tableId) {
+                                                            e.currentTarget.style.backgroundColor = "var(--muted)";
+                                                        }
+                                                    }}
+                                                    onMouseLeave={(e) => {
+                                                        if (expandedMesa !== mesa.tableId) {
+                                                            e.currentTarget.style.backgroundColor = "transparent";
+                                                        }
+                                                    }}
+                                                >
+                                                    <div style={{ display: "flex", alignItems: "center", gap: "1rem" }}>
+                                                        {/* Badge de ranking */}
+                                                        <span style={{
+                                                            backgroundColor: idx === 0 ? "var(--primary)" : "var(--muted)",
+                                                            color: idx === 0 ? "var(--primary-foreground)" : "var(--foreground)",
+                                                            padding: "2px 10px",
+                                                            borderRadius: "9999px",
+                                                            fontSize: "0.75rem",
+                                                            fontWeight: "bold",
+                                                            minWidth: "32px",
+                                                            textAlign: "center"
+                                                        }}>
+                                                            #{idx + 1}
+                                                        </span>
+                                                        <span style={{
+                                                            fontSize: "1.5rem",
+                                                            fontWeight: "bold",
+                                                            color: idx === 0 ? "var(--primary)" : "var(--foreground)"
+                                                        }}>
+                                                            🪑 Mesa {mesa.number}
+                                                        </span>
+                                                        {idx === 0 && <span style={{
+                                                            backgroundColor: "var(--primary)",
+                                                            color: "var(--primary-foreground)",
+                                                            padding: "2px 10px",
+                                                            borderRadius: "9999px",
+                                                            fontSize: "0.75rem",
+                                                            fontWeight: "bold"
+                                                        }}>🏆 Top</span>}
+                                                        <span style={{
+                                                            fontSize: "0.75rem",
+                                                            color: "var(--muted-foreground)",
+                                                            transition: "transform 0.3s",
+                                                            transform: expandedMesa === mesa.tableId ? "rotate(180deg)" : "rotate(0deg)"
+                                                        }}>
+                                                            ▼
+                                                        </span>
+                                                    </div>
+                                                    <div style={{ display: "flex", gap: "2rem", fontSize: "0.875rem", flexWrap: "wrap" }}>
+                                                        <span><strong>{mesa.totalPedidos}</strong> pedidos</span>
+                                                        <span><strong>{formatCurrency(Math.round(mesa.totalIngresos * 100) / 100)}</strong> ingresos</span>
+                                                        <span><strong>{formatCurrency(Math.round(mesa.promedio * 100) / 100)}</strong> promedio</span>
+                                                    </div>
+                                                </div>
+
+                                                {/* Detalle de pedidos - solo visible si está expandido */}
+                                                {expandedMesa === mesa.tableId && (
+                                                    <div style={{ marginTop: "0.75rem" }}>
+                                                        {mesa.pedidos.map((pedido, pIdx) => (
+                                                            <div key={pedido.orderId} style={{
+                                                                padding: "0.75rem 0",
+                                                                borderBottom: pIdx < mesa.pedidos.length - 1 ? `1px solid var(--border)` : "none"
+                                                            }}>
+                                                                <div style={{
+                                                                    display: "flex",
+                                                                    justifyContent: "space-between",
+                                                                    alignItems: "center",
+                                                                    marginBottom: "0.5rem",
+                                                                    flexWrap: "wrap",
+                                                                    gap: "0.5rem"
+                                                                }}>
+                                                                    <div style={{ display: "flex", alignItems: "center", gap: "1rem" }}>
+                                                                        <span style={{ fontWeight: "bold", fontSize: "0.875rem" }}>
+                                                                            Pedido #{pIdx + 1}
+                                                                        </span>
+                                                                        <span style={{ fontSize: "0.75rem", color: "var(--muted-foreground)" }}>
+                                                                            {new Date(pedido.fecha).toLocaleString('es-BO')}
+                                                                        </span>
+                                                                        <span style={{
+                                                                            backgroundColor: pedido.status === 'paid' || pedido.status === 'delivered'
+                                                                                ? '#dcfce7'
+                                                                                : '#fef9c3',
+                                                                            color: pedido.status === 'paid' || pedido.status === 'delivered'
+                                                                                ? '#166534'
+                                                                                : '#854d0e',
+                                                                            padding: "2px 8px",
+                                                                            borderRadius: "9999px",
+                                                                            fontSize: "0.65rem",
+                                                                            fontWeight: "bold"
+                                                                        }}>
+                                                                            {pedido.status === 'paid' ? '✅ Pagado' :
+                                                                                pedido.status === 'delivered' ? '📦 Entregado' :
+                                                                                    pedido.status}
+                                                                        </span>
+                                                                    </div>
+                                                                    <span style={{ fontWeight: "bold", fontSize: "0.875rem" }}>
+                                                                        {formatCurrency(pedido.total)}
+                                                                    </span>
+                                                                </div>
+
+                                                                {/* Items del pedido */}
+                                                                {pedido.items.length > 0 && (
+                                                                    <div style={{
+                                                                        marginLeft: "1rem",
+                                                                        paddingLeft: "0.75rem",
+                                                                        borderLeft: "2px solid var(--border)"
+                                                                    }}>
+                                                                        {pedido.items.map((item, iIdx) => (
+                                                                            <div key={iIdx} style={{
+                                                                                display: "flex",
+                                                                                justifyContent: "space-between",
+                                                                                alignItems: "center",
+                                                                                fontSize: "0.75rem",
+                                                                                color: "var(--muted-foreground)",
+                                                                                padding: "0.125rem 0"
+                                                                            }}>
+                                                                                <span>
+                                                                                    {item.quantity}x {item.name}
+                                                                                </span>
+                                                                                <span>{formatCurrency(item.subtotal)}</span>
+                                                                            </div>
+                                                                        ))}
+                                                                    </div>
+                                                                )}
+                                                            </div>
+                                                        ))}
+                                                    </div>
+                                                )}
+                                            </div>
+                                        ))}
+                                    </div>
+                                ) : (
+                                    <div style={{ ...cardStyle, textAlign: "center", padding: "3rem" }}>
+                                        <p style={{ fontSize: "1rem", color: "var(--muted-foreground)" }}>
+                                            No hay datos de mesas en este período
+                                        </p>
+                                    </div>
+                                )}
+                            </div>
+                        )}
+
+                        {/* ====== TAB: CLIENTES ====== */}
+                        {activeTab === 'clientes' && metrics && (
+                            <div>
+                                <h2 style={{ fontSize: "1.25rem", fontWeight: "bold", marginBottom: "1.5rem" }}>👥 Clientes</h2>
+
+                                {/* Resumen de Clientes */}
+                                <div style={statsGridStyle}>
+                                    <div style={statCardStyle}>
+                                        <h3 style={{ fontSize: "1.5rem", fontWeight: "bold", margin: 0, color: "var(--foreground)" }}>
+                                            {metrics.totalCustomers || 0}
+                                        </h3>
+                                        <p style={{ fontSize: "0.75rem", color: "var(--muted-foreground)", margin: 0 }}>Total Clientes</p>
+                                    </div>
+                                    <div style={statCardStyle}>
+                                        <h3 style={{ fontSize: "1.5rem", fontWeight: "bold", margin: 0, color: "#27ae60" }}>
+                                            {metrics.newCustomers || 0}
+                                        </h3>
+                                        <p style={{ fontSize: "0.75rem", color: "var(--muted-foreground)", margin: 0 }}>Nuevos Clientes</p>
+                                    </div>
+                                    <div style={statCardStyle}>
+                                        <h3 style={{ fontSize: "1.5rem", fontWeight: "bold", margin: 0, color: "#2563eb" }}>
+                                            {metrics.recurringCustomers || 0}
+                                        </h3>
+                                        <p style={{ fontSize: "0.75rem", color: "var(--muted-foreground)", margin: 0 }}>Clientes Recurrentes</p>
+                                    </div>
+                                    <div style={statCardStyle}>
+                                        <h3 style={{ fontSize: "1.5rem", fontWeight: "bold", margin: 0, color: "var(--primary)" }}>
+                                            {metrics.mostLoyal ? metrics.mostLoyal.count : 0}
+                                        </h3>
+                                        <p style={{ fontSize: "0.75rem", color: "var(--muted-foreground)", margin: 0 }}>Máx. Pedidos (1 cliente)</p>
+                                    </div>
+                                </div>
+
+                                {/* Top Clientes y Clientes con mayor ticket */}
+                                <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: "1.5rem" }}>
+
+                                    {/* Top Clientes por gasto */}
+                                    <div style={cardStyle}>
+                                        <h3 style={{ fontSize: "1rem", fontWeight: "bold", marginBottom: "1rem" }}>
+                                            🏆 Top Clientes (por gasto)
+                                        </h3>
+                                        {metrics.topCustomers && metrics.topCustomers.length > 0 ? (
+                                            <ul style={{ listStyle: "none", padding: 0, margin: 0 }}>
+                                                {metrics.topCustomers.map((customer, idx) => {
+                                                    const orders = metrics.customerOrders?.[customer.email] || 0;
+                                                    return (
+                                                        <li key={customer.email} style={{
+                                                            display: "flex",
+                                                            justifyContent: "space-between",
+                                                            alignItems: "center",
+                                                            padding: "0.75rem 0",
+                                                            borderBottom: idx < metrics.topCustomers.length - 1 ? `1px solid var(--border)` : "none"
+                                                        }}>
+                                                            <div style={{ display: "flex", alignItems: "center", gap: "0.75rem" }}>
+                                                                <span style={{ fontWeight: "bold", color: "#e85d26", width: "30px" }}>#{idx + 1}</span>
+                                                                <div>
+                                                                    <span style={{ fontWeight: "bold" }}>{customer.name}</span>
+                                                                    <span style={{ fontSize: "0.75rem", color: "var(--muted-foreground)", marginLeft: "0.5rem" }}>
+                                                                        {orders} {orders === 1 ? 'pedido' : 'pedidos'}
+                                                                    </span>
+                                                                </div>
+                                                            </div>
+                                                            <span style={{ fontWeight: "bold" }}>{formatCurrency(customer.total)}</span>
+                                                        </li>
+                                                    );
+                                                })}
+                                            </ul>
+                                        ) : (
+                                            <p style={{ fontSize: "0.875rem", color: "var(--muted-foreground)", margin: 0 }}>
+                                                No hay datos de clientes
+                                            </p>
+                                        )}
+                                    </div>
+                                </div>
+
+                                {/* Cliente más fiel */}
+                                {metrics.mostLoyal && (
+                                    <div style={{ ...cardStyle, backgroundColor: "var(--muted)", borderColor: "#f59e0b", borderWidth: "2px" }}>
+                                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                                            <div>
+                                                <p style={{ fontSize: "0.75rem", color: "var(--muted-foreground)", margin: 0 }}>🏅 Cliente más fiel</p>
+                                                <p style={{ fontSize: "1.25rem", fontWeight: "bold", margin: 0 }}>
+                                                    {metrics.mostLoyal.email.split('@')[0]}
+                                                </p>
+                                                <p style={{ fontSize: "0.875rem", color: "var(--muted-foreground)", margin: 0 }}>
+                                                    {metrics.mostLoyal.count} pedidos · {formatCurrency(metrics.mostLoyal.total)}
+                                                </p>
+                                            </div>
+                                            <span style={{ fontSize: "3rem" }}>🏆</span>
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+                        )}
+
+                        {/* ====== TAB: EFICIENCIA ====== */}
+                        {activeTab === 'eficiencia' && metrics && (
+                            <div>
+                                <h2 style={{ fontSize: "1.25rem", fontWeight: "bold", marginBottom: "1.5rem" }}>⚡ Eficiencia Operativa</h2>
+
+                                {/* Dos columnas: Restaurante | Delivery */}
+                                <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: "1.5rem" }}>
+
+                                    {/* Restaurante */}
+                                    <div style={statCardStyle}>
+                                        <div style={{ textAlign: "center", marginBottom: "0.5rem" }}>
+                                            <span style={{ fontSize: "2rem" }}>🍽️</span>
+                                            <h3 style={{ fontSize: "1rem", fontWeight: "bold", margin: "0.25rem 0", color: "#27ae60" }}>Restaurante</h3>
+                                        </div>
+                                        <div style={{ borderTop: `1px solid var(--border)`, paddingTop: "0.75rem" }}>
+                                            <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "0.5rem" }}>
+                                                <span style={{ fontSize: "0.875rem", color: "var(--muted-foreground)" }}>Órdenes creadas</span>
+                                                <span style={{ fontWeight: "bold" }}>{metrics.dineInOrdersCount || 0}</span>
+                                            </div>
+                                            <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "0.5rem" }}>
+                                                <span style={{ fontSize: "0.875rem", color: "var(--muted-foreground)" }}>Completados</span>
+                                                <span style={{ fontWeight: "bold", color: "#27ae60" }}>{metrics.dineInCompleted || 0}</span>
+                                            </div>
+                                            <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "0.5rem" }}>
+                                                <span style={{ fontSize: "0.875rem", color: "var(--muted-foreground)" }}>En proceso</span>
+                                                <span style={{ fontWeight: "bold", color: "#f59e0b" }}>{metrics.dineInInProgress || 0}</span>
+                                            </div>
+                                            <div style={{ display: "flex", justifyContent: "space-between" }}>
+                                                <span style={{ fontSize: "0.875rem", color: "var(--muted-foreground)" }}>Cancelados</span>
+                                                <span style={{ fontWeight: "bold", color: "#e85d26" }}>{metrics.dineInCancelled || 0}</span>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    {/* Delivery */}
+                                    <div style={statCardStyle}>
+                                        <div style={{ textAlign: "center", marginBottom: "0.5rem" }}>
+                                            <span style={{ fontSize: "2rem" }}>📦</span>
+                                            <h3 style={{ fontSize: "1rem", fontWeight: "bold", margin: "0.25rem 0", color: "#2563eb" }}>Delivery</h3>
+                                        </div>
+                                        <div style={{ borderTop: `1px solid var(--border)`, paddingTop: "0.75rem" }}>
+                                            <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "0.5rem" }}>
+                                                <span style={{ fontSize: "0.875rem", color: "var(--muted-foreground)" }}>Órdenes creadas</span>
+                                                <span style={{ fontWeight: "bold" }}>{metrics.deliveryOrdersCount || 0}</span>
+                                            </div>
+                                            <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "0.5rem" }}>
+                                                <span style={{ fontSize: "0.875rem", color: "var(--muted-foreground)" }}>Completados</span>
+                                                <span style={{ fontWeight: "bold", color: "#2563eb" }}>{metrics.deliveryCompleted || 0}</span>
+                                            </div>
+                                            <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "0.5rem" }}>
+                                                <span style={{ fontSize: "0.875rem", color: "var(--muted-foreground)" }}>En camino</span>
+                                                <span style={{ fontWeight: "bold", color: "#f59e0b" }}>{metrics.deliveryInProgress || 0}</span>
+                                            </div>
+                                            <div style={{ display: "flex", justifyContent: "space-between" }}>
+                                                <span style={{ fontSize: "0.875rem", color: "var(--muted-foreground)" }}>Cancelados</span>
+                                                <span style={{ fontWeight: "bold", color: "#e85d26" }}>{metrics.deliveryCancelled || 0}</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {/* Rendimiento Operativo */}
+                                <div style={cardStyle}>
+                                    <h3 style={{ fontSize: "1rem", fontWeight: "bold", marginBottom: "1rem" }}>
+                                        📈 Rendimiento Operativo
+                                    </h3>
+                                    <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "1rem" }}>
+                                        <div style={{ textAlign: "center" }}>
+                                            <p style={{ fontSize: "0.75rem", color: "var(--muted-foreground)", margin: 0 }}>Tasa de conversión</p>
+                                            <p style={{ fontSize: "1.25rem", fontWeight: "bold", color: "var(--primary)" }}>
+                                                {((metrics.dineInCompleted || 0) + (metrics.deliveryCompleted || 0)) > 0
+                                                    ? `${Math.round(((metrics.dineInCompleted || 0) + (metrics.deliveryCompleted || 0)) / ((metrics.dineInOrdersCount || 0) + (metrics.deliveryOrdersCount || 0)) * 100)}%`
+                                                    : '0%'}
+                                            </p>
+                                        </div>
+                                        <div style={{ textAlign: "center" }}>
+                                            <p style={{ fontSize: "0.75rem", color: "var(--muted-foreground)", margin: 0 }}>Tiempo promedio de atención</p>
+                                            <p style={{ fontSize: "1.25rem", fontWeight: "bold", color: "var(--primary)" }}>
+                                                {metrics.avgCompletionTime ? `${Math.round(metrics.avgCompletionTime)} min` : 'N/A'}
+                                            </p>
+                                        </div>
+                                        <div style={{ textAlign: "center" }}>
+                                            <p style={{ fontSize: "0.75rem", color: "var(--muted-foreground)", margin: 0 }}>Pedidos cancelados</p>
+                                            <p style={{ fontSize: "1.25rem", fontWeight: "bold", color: "#e85d26" }}>
+                                                {metrics.cancelledOrdersCount || 0}
+                                            </p>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {/* Programa de Lealtad */}
+                                <div style={cardStyle}>
+                                    <h3 style={{ fontSize: "1rem", fontWeight: "bold", marginBottom: "1rem" }}>
+                                        🎁 Programa de Lealtad
+                                    </h3>
+                                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                                        <div>
+                                            <p style={{ fontSize: "0.875rem", color: "var(--muted-foreground)", margin: 0 }}>Puntos usados hoy</p>
+                                            <p style={{ fontSize: "1.25rem", fontWeight: "bold" }}>{metrics.loyaltyPointsUsed || 0} pts</p>
+                                        </div>
+                                        <div>
+                                            <p style={{ fontSize: "0.875rem", color: "var(--muted-foreground)", margin: 0 }}>Clientes con puntos</p>
+                                            <p style={{ fontSize: "1.25rem", fontWeight: "bold" }}>
+                                                {metrics.topCustomers?.length || 0}
+                                            </p>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
                     </>
                 )}
             </main>
-
-            <style jsx global>{`
-        @media print {
-          header, .print-hide {
-            display: none !important;
-          }
-          * {
-            background-color: white !important;
-            color: black !important;
-          }
-        }
-        .stat-card {
-          transition: transform 0.2s ease, box-shadow 0.2s ease;
-        }
-        .stat-card:hover {
-          transform: translateY(-3px);
-          box-shadow: 0 6px 16px rgba(0, 0, 0, 0.06);
-        }
-      `}</style>
         </div>
     );
 }

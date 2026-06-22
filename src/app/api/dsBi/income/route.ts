@@ -46,13 +46,19 @@ export async function GET(req: NextRequest) {
             endDate = new Date(startDate.getTime() + 24 * 60 * 60 * 1000 - 1);
         }
 
-        // Pagos completados en el período
+        // Obtener órdenes del período (con status paid y delivered)
+        const orders = await Order.find({
+            status: { $in: ['paid', 'delivered'] },
+            createdAt: { $gte: startDate, $lte: endDate }
+        }).lean();
+
+        // Obtener pagos solo para desglose de métodos de pago
         const payments = await Payment.find({
             status: 'completed',
             timestamp: { $gte: startDate, $lte: endDate }
         }).lean();
 
-        // Pagos del período comparativo
+        // Pagos del período comparativo (para comparación)
         let comparePayments: Array<{ amount: number; timestamp: Date }> = [];
         if (compareStartDate && compareEndDate) {
             comparePayments = await Payment.find({
@@ -61,20 +67,20 @@ export async function GET(req: NextRequest) {
             }).lean();
         }
 
-        // Órdenes pagadas en el período (para conteo de mesas y total de órdenes)
-        const orders = await Order.find({
-            status: 'paid',
-            updatedAt: { $gte: startDate, $lte: endDate }
-        }).lean();
-
-        // Buscar las órdenes específicas de los pagos completados para categorizarlas consistentemente
+        // Buscar las órdenes específicas de los pagos completados para categorizarlas consistentemente (para canal de venta)
         const paymentOrderIds = payments.map(p => p.order_id);
         const ordersForPayments = await Order.find({ _id: { $in: paymentOrderIds } }).lean();
         const orderMap = new Map(ordersForPayments.map(o => [o._id.toString(), o]));
 
+        // Cálculo de ingresos desde orders (no desde payments)
+        let totalSales = 0;
+        orders.forEach(o => {
+            totalSales += o.total_amount || 0;
+        });
+
+        // Desglose por método de pago (desde payments)
         const cashTotal = payments.filter(p => p.method === 'cash').reduce((s, p) => s + p.amount, 0);
         const qrTotal = payments.filter(p => p.method === 'qr').reduce((s, p) => s + p.amount, 0);
-        const totalSales = cashTotal + qrTotal;
 
         // Desglose de ingresos por canal de venta
         let dineInSales = 0;
@@ -88,7 +94,7 @@ export async function GET(req: NextRequest) {
                 if (order.service_type === 'delivery') {
                     deliverySales += p.amount;
                     deliveryFeesTotal += (order.delivery_fee || 0);
-                } else if (order.service_type === 'dine_in') {
+                } else if (order.service_type === 'dine_in' || order.service_type === 'dinein') {
                     dineInSales += p.amount;
                 } else if (order.service_type === 'pick_up') {
                     pickUpSales += p.amount;
@@ -96,6 +102,7 @@ export async function GET(req: NextRequest) {
             }
         });
 
+        // Comparación (usando payments)
         let compareTotal = 0;
         if (comparePayments.length) {
             compareTotal = comparePayments.reduce((s, p) => s + p.amount, 0);
@@ -107,26 +114,26 @@ export async function GET(req: NextRequest) {
             return new Date(date.getTime() - 4 * 60 * 60 * 1000).toISOString().slice(0, 10);
         };
 
-        // Ingresos agrupados por día (Bolivia UTC-4)
+        // Ingresos agrupados por día (desde orders, con corrección de zona horaria)
         const dailyIncome: Record<string, number> = {};
-        payments.forEach(p => {
-            const dateKey = getBoliviaDateKey(p.timestamp);
-            dailyIncome[dateKey] = (dailyIncome[dateKey] || 0) + p.amount;
+        orders.forEach(o => {
+            const dateKey = getBoliviaDateKey(o.createdAt);
+            dailyIncome[dateKey] = (dailyIncome[dateKey] || 0) + (o.total_amount || 0);
         });
 
-        // Ingresos comparativos por día
+        // Ingresos comparativos por día (desde payments, para comparación, con corrección de zona horaria)
         const compareDailyIncome: Record<string, number> = {};
         comparePayments.forEach(p => {
             const dateKey = getBoliviaDateKey(p.timestamp);
             compareDailyIncome[dateKey] = (compareDailyIncome[dateKey] || 0) + p.amount;
         });
 
-        // Ingresos por mes (para vista anual)
+        // Ingresos por mes (desde orders, con corrección de zona horaria)
         const monthlyIncome: Record<string, number> = {};
-        payments.forEach(p => {
-            const dateKey = getBoliviaDateKey(p.timestamp);
+        orders.forEach(o => {
+            const dateKey = getBoliviaDateKey(o.createdAt);
             const monthKey = dateKey.slice(0, 7);
-            monthlyIncome[monthKey] = (monthlyIncome[monthKey] || 0) + p.amount;
+            monthlyIncome[monthKey] = (monthlyIncome[monthKey] || 0) + (o.total_amount || 0);
         });
 
         return NextResponse.json({
