@@ -7,6 +7,29 @@ import User from '@/models/User';
 import Table from '@/models/Table';
 import mongoose from 'mongoose';
 
+interface OrderItemType {
+    _id: string;
+    dish_id: string;
+    quantity: number;
+    unit_price: number;
+    subtotal: number;
+    status: string;
+    notes?: string;
+}
+
+interface DishType {
+    _id: string;
+    name: string;
+    price: number;
+}
+
+interface OrderSummary {
+    orderId: string;
+    total: number;
+    status: string;
+    service_type: string;
+}
+
 export async function GET(req: NextRequest) {
     try {
         await connectDB();
@@ -384,8 +407,8 @@ export async function GET(req: NextRequest) {
             const total = payment ? payment.amount : order.total_amount || 0;
 
             // Procesar items
-            const items = (order.items || []).map((item: any) => {
-                const dish = order.dishDetails?.find((d: any) => d._id.toString() === item.dish_id.toString());
+            const items = (order.items || []).map((item: OrderItemType) => {
+                const dish = (order.dishDetails || []).find((d: DishType) => d._id.toString() === item.dish_id.toString());
                 return {
                     name: dish?.name || 'Desconocido',
                     quantity: item.quantity || 0,
@@ -431,7 +454,7 @@ export async function GET(req: NextRequest) {
 
         // ========== 11. DATOS PARA HORARIOS ==========
         // Top 3 horas pico (con detalle de pedidos y montos)
-        const hourDetails: Record<string, { count: number; total: number; orders: any[] }> = {};
+        const hourDetails: Record<string, { count: number; total: number; orders: OrderSummary[] }> = {};
 
         orders.forEach(o => {
             const hour = new Date(o.createdAt).getHours();

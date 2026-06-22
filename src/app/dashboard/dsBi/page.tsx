@@ -146,7 +146,7 @@ export default function DashboardBIPage() {
     const [selectedDay, setSelectedDay] = useState(getLocalDate);
     const [selectedMonth, setSelectedMonth] = useState(`${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, '0')}`);
     const [selectedYear, setSelectedYear] = useState(new Date().getFullYear().toString());
-    const [compare, setCompare] = useState<'none' | 'previous_month' | 'previous_year'>('none');
+    const [compare] = useState<'none' | 'previous_month' | 'previous_year'>('none');
     const [report, setReport] = useState<IncomeReport | null>(null);
     const [metrics, setMetrics] = useState<MetricsData | null>(null);
     const [loading, setLoading] = useState(false);
@@ -158,9 +158,6 @@ export default function DashboardBIPage() {
     const deliveryOrders = metrics?.deliveryOrders || 0;
     const avgDineIn = metrics?.avgDineIn || 0;
     const avgDelivery = metrics?.avgDelivery || 0;
-    const totalOrders = (dineInOrders || 0) + (deliveryOrders || 0);
-    const totalRevenue = (dineInRevenue || 0) + (deliveryRevenue || 0);
-    const totalOrdersFooter = (dineInOrders || 0) + (deliveryOrders || 0);
     const [expandedMesa, setExpandedMesa] = useState<string | null>(null);
 
     const toggleMesa = (tableId: string) => {
