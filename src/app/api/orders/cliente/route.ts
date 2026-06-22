@@ -8,6 +8,7 @@ import { pusherServer } from "@/lib/pusher";
 import { haversineKm, calcDeliveryFee, DELIVERY_CONFIG } from "@/lib/deliveryConfig";
 import { getNextDailyNumber } from "@/lib/dailyOrderCounter";
 import { calculateLoyaltyDiscount } from "@/lib/customerLoyalty";
+import "@/models/User";
 
 export async function POST(req: NextRequest) {
   try {
@@ -155,14 +156,19 @@ export async function POST(req: NextRequest) {
       }))
     );
 
+    // Obtener orden con datos del usuario poblados para notificaciones en tiempo real
+    const orderForPusher = await Order.findById(order._id)
+      .populate({ path: "user_id", model: "User", select: "name email" })
+      .lean();
+
     // ── Pusher ────────────────────────────────────────────────────────────────
     await pusherServer.trigger("restaurant", "order:new", {
-      order: { ...order.toObject(), items: orderItems },
+      order: { ...orderForPusher, items: orderItems },
     });
 
     if (service_type === "delivery") {
       await pusherServer.trigger("delivery", "order:new_delivery", {
-        order: { ...order.toObject(), items: orderItems },
+        order: { ...orderForPusher, items: orderItems },
       });
     }
 

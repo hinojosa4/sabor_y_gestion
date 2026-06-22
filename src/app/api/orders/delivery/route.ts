@@ -5,6 +5,7 @@ import Order from "@/models/Order";
 import OrderItem from "@/models/OrderItem";
 import { verifyToken } from "@/lib/jwt";
 import "@/models/Dish";
+import "@/models/User";
 
 /**
  * GET /api/orders/delivery
@@ -38,6 +39,7 @@ export async function GET(req: NextRequest) {
         service_type: "delivery",
         status: { $in: ["pending", "in_kitchen", "ready", "picked_up", "in_transit"] },
       })
+        .populate({ path: "user_id", model: "User", select: "name email" })
         .sort({ createdAt: 1 })
         .lean(),
 
@@ -46,6 +48,7 @@ export async function GET(req: NextRequest) {
         status: { $in: ["delivered", "paid", "cancelled"] },
         createdAt: { $gte: startOfDay },
       })
+        .populate({ path: "user_id", model: "User", select: "name email" })
         .sort({ createdAt: -1 })
         .lean(),
     ]);

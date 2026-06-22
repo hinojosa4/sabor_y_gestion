@@ -384,11 +384,8 @@ export function AdminCobrosPanel({ isMobile, compactHeader = false }: Props) {
 
             <DetailBlock title="Cliente">
               <DetailLine label="Nombre" value={selected.customer.name} />
-              <DetailLine label="Tipo" value={customerTypeLabel[selected.customer.type]} />
-              <DetailLine label="Correo" value={selected.customer.email ?? "Sin correo"} />
-              {selected.customer.receiptEmail && <DetailLine label="Comprobante" value={selected.customer.receiptEmail} />}
+              {selected.customer.email && <DetailLine label="Correo" value={selected.customer.email} />}
               {selected.customer.phone && <DetailLine label="Teléfono" value={selected.customer.phone} />}
-              {selected.customer.address && <DetailLine label="Dirección" value={selected.customer.address} />}
             </DetailBlock>
 
             <DetailBlock title="Pago">

@@ -1,5 +1,5 @@
 // src/components/clientScreen/ClientHeader.tsx
-import React from "react";
+import React, { useState, useEffect } from "react";
 import { User, Truck, CalendarDays, LogOut } from "lucide-react";
 
 interface ClientHeaderProps {
@@ -9,8 +9,16 @@ interface ClientHeaderProps {
 }
 
 export function ClientHeader({ onDelivery, onReservar, onLogout }: ClientHeaderProps) {
+    const [isMobile, setIsMobile] = useState(false);
+    useEffect(() => {
+        const check = () => setIsMobile(window.innerWidth < 640);
+        check();
+        window.addEventListener("resize", check);
+        return () => window.removeEventListener("resize", check);
+    }, []);
+
     return (
-        <header style={styles.header}>
+        <header style={{ ...styles.header, padding: isMobile ? "0.75rem 1rem" : "1rem 2rem" }}>
             <div style={styles.left}>
                 <div style={styles.iconBox}>
                     <User size={22} color="#ffffff" />
@@ -22,17 +30,17 @@ export function ClientHeader({ onDelivery, onReservar, onLogout }: ClientHeaderP
             </div>
 
             <div style={styles.right}>
-                <button style={styles.outlineBtn} onClick={onDelivery}>
+                <button style={styles.outlineBtn} onClick={onDelivery} title="Pedir delivery">
                     <Truck size={16} />
-                    <span>Pedir delivery</span>
+                    {!isMobile && <span>Pedir delivery</span>}
                 </button>
-                <button style={styles.outlineBtn} onClick={onReservar}>
+                <button style={styles.outlineBtn} onClick={onReservar} title="Reservar mesa">
                     <CalendarDays size={16} />
-                    <span>Reservar mesa</span>
+                    {!isMobile && <span>Reservar mesa</span>}
                 </button>
-                <button style={styles.outlineBtn} onClick={onLogout}>
+                <button style={styles.outlineBtn} onClick={onLogout} title="Salir">
                     <LogOut size={16} />
-                    <span>Salir</span>
+                    {!isMobile && <span>Salir</span>}
                 </button>
             </div>
         </header>

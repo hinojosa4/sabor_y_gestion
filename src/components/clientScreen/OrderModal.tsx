@@ -87,6 +87,14 @@ export function OrderModal({ order, open, onClose, onReorder }: OrderModalProps)
         orderId: string;
         coords: NonNullable<Order["driverLocation"]>;
     } | null>(null);
+    const [isMobile, setIsMobile] = useState(false);
+
+    useEffect(() => {
+        const check = () => setIsMobile(window.innerWidth < 640);
+        check();
+        window.addEventListener("resize", check);
+        return () => window.removeEventListener("resize", check);
+    }, []);
 
     useEffect(() => {
         if (!open || !order?._id) return;
@@ -183,8 +191,8 @@ export function OrderModal({ order, open, onClose, onReorder }: OrderModalProps)
     };
 
     return (
-        <div style={styles.overlay} onClick={onClose}>
-            <div style={styles.modal} onClick={(e) => e.stopPropagation()}>
+        <div style={{ ...styles.overlay, alignItems: isMobile ? "flex-end" : "center", padding: isMobile ? 0 : "1rem" }} onClick={onClose}>
+            <div style={{ ...styles.modal, borderRadius: isMobile ? "16px 16px 0 0" : 16, maxHeight: isMobile ? "94vh" : "90vh", padding: isMobile ? "1.25rem" : "1.5rem" }} onClick={(e) => e.stopPropagation()}>
                 <button style={styles.closeBtn} onClick={onClose} aria-label="Cerrar">
                     <X size={20} color="#6b7280" />
                 </button>
@@ -200,7 +208,7 @@ export function OrderModal({ order, open, onClose, onReorder }: OrderModalProps)
                 </div>
 
                 <div style={styles.infoCard}>
-                    <div style={styles.infoHeader}>
+                    <div style={{ ...styles.infoHeader, padding: isMobile ? "0.9rem 1.1rem" : "1.1rem 1.5rem" }}>
                         <div>
                             <h3 style={styles.infoTitle}>Estado del Pedido</h3>
                             <p style={styles.infoDate}>{order.date}</p>
@@ -208,11 +216,11 @@ export function OrderModal({ order, open, onClose, onReorder }: OrderModalProps)
                         <span style={styles.statusBadge}>{order.status}</span>
                     </div>
                     
-                    <div style={{ padding: "0 1.5rem" }}>
+                    <div style={{ padding: isMobile ? "0 1rem" : "0 1.5rem" }}>
                         <StatusProgress status={order.status} />
                     </div>
 
-                    <div style={styles.infoGrid}>
+                    <div style={{ ...styles.infoGrid, gridTemplateColumns: isMobile ? "1fr" : "repeat(2, 1fr)", padding: isMobile ? "1rem 1.1rem" : "1.25rem 1.5rem" }}>
                         <InfoItem icon={<Clock size={18} color="#6b7280" />} label="Hora" value={order.time} />
                         <InfoItem icon={<MapPin size={18} color="#6b7280" />} label="Ubicación" value={order.location} />
                         <InfoItem

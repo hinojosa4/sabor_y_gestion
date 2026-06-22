@@ -55,7 +55,7 @@ interface ActiveOrder {
   table_number?: number | null;
   createdAt: string;
   total_amount: number;
-  items: ActiveOrderItem[]; 
+  items: ActiveOrderItem[];
 }
 
 // Estado global de mesas (sin filtro por mesero) ──────────────────
@@ -102,21 +102,21 @@ const TABLE_STATUS_CONFIG: Record<
     dot: string;
   }
 > = {
-  Libre:               { label: "Libre",             bg: "#f0fdf4", border: "#bbf7d0", badgeBg: "#111",     badgeColor: "#fff",    dot: "#22c55e" },
-  Ocupada:             { label: "Ocupada",           bg: "#fff7ed", border: "#fed7aa", badgeBg: "#f3f4f6", badgeColor: "#374151", dot: "#f97316" },
-  Reservada:           { label: "Reservada",         bg: "#eff6ff", border: "#bfdbfe", badgeBg: "#3b82f6", badgeColor: "#fff",    dot: "#3b82f6" },
-  "Cuenta solicitada": { label: "Cuenta solicitada", bg: "#fff7ed", border: "#fed7aa", badgeBg: "#ea580c", badgeColor: "#fff",    dot: "#ea580c" },
-  Activa:              { label: "Activa",            bg: "#f0fdf4", border: "#bbf7d0", badgeBg: "#111",     badgeColor: "#fff",    dot: "#22c55e" },
-  Inactiva:            { label: "Inactiva",          bg: "#f9fafb", border: "#e5e7eb", badgeBg: "#e5e7eb", badgeColor: "#6b7280", dot: "#9ca3af" },
+  Libre: { label: "Libre", bg: "#f0fdf4", border: "#bbf7d0", badgeBg: "#111", badgeColor: "#fff", dot: "#22c55e" },
+  Ocupada: { label: "Ocupada", bg: "#fff7ed", border: "#fed7aa", badgeBg: "#f3f4f6", badgeColor: "#374151", dot: "#f97316" },
+  Reservada: { label: "Reservada", bg: "#eff6ff", border: "#bfdbfe", badgeBg: "#3b82f6", badgeColor: "#fff", dot: "#3b82f6" },
+  "Cuenta solicitada": { label: "Cuenta solicitada", bg: "#fff7ed", border: "#fed7aa", badgeBg: "#ea580c", badgeColor: "#fff", dot: "#ea580c" },
+  Activa: { label: "Activa", bg: "#f0fdf4", border: "#bbf7d0", badgeBg: "#111", badgeColor: "#fff", dot: "#22c55e" },
+  Inactiva: { label: "Inactiva", bg: "#f9fafb", border: "#e5e7eb", badgeBg: "#e5e7eb", badgeColor: "#6b7280", dot: "#9ca3af" },
 };
 
 const ORDER_STATUS_CONFIG: Record<string, { label: string; color: string; bg: string }> = {
-  pending:    { label: "Pendiente", color: "#d97706", bg: "#fef3c7" },
+  pending: { label: "Pendiente", color: "#d97706", bg: "#fef3c7" },
   in_kitchen: { label: "En Cocina", color: "#2563eb", bg: "#dbeafe" },
-  ready:      { label: "Listo",     color: "#16a34a", bg: "#dcfce7" },
-  delivered:  { label: "Entregado", color: "#7c3aed", bg: "#ede9fe" },
-  paid:       { label: "Pagado",    color: "#374151", bg: "#f3f4f6" },
-  cancelled:  { label: "Cancelado", color: "#dc2626", bg: "#fee2e2" },
+  ready: { label: "Listo", color: "#16a34a", bg: "#dcfce7" },
+  delivered: { label: "Entregado", color: "#7c3aed", bg: "#ede9fe" },
+  paid: { label: "Pagado", color: "#374151", bg: "#f3f4f6" },
+  cancelled: { label: "Cancelado", color: "#dc2626", bg: "#fee2e2" },
 };
 
 const formatBOB = (amount: number) =>
@@ -174,7 +174,7 @@ function InventoryAlertBanner({
   onClose: () => void;
 }) {
   const criticos = alertas.filter((a) => a.stockStatus === "critical");
-  const bajos    = alertas.filter((a) => a.stockStatus === "low");
+  const bajos = alertas.filter((a) => a.stockStatus === "low");
 
   return (
     <div
@@ -529,10 +529,10 @@ function ActiveOrderCard({
   onRequestBill: (tableId: string) => void;
   loading: boolean;
 }) {
-  const elapsed   = useElapsed(order.createdAt);
+  const elapsed = useElapsed(order.createdAt);
   const statusCfg = ORDER_STATUS_CONFIG[order.status] ?? ORDER_STATUS_CONFIG.pending;
-  const tableNum  = order.table_number ?? order.table_id;
-  const isReady   = order.status === "ready";
+  const tableNum = order.table_number ?? order.table_id;
+  const isReady = order.status === "ready";
 
   return (
     <div
@@ -573,7 +573,7 @@ function ActiveOrderCard({
               <p style={{ margin: 0, fontSize: 14, fontWeight: 700, color: "#111" }}>
                 Mesa {tableNum}
               </p>
-              
+
               <span
                 style={{
                   fontSize: 11,
@@ -724,14 +724,23 @@ function OrderModal({
   mode?: "new" | "add";
   existingOrderId?: string;
 }) {
-  const [dishes, setDishes]         = useState<Dish[]>([]);
+  const [dishes, setDishes] = useState<Dish[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [selectedCat, setSelectedCat] = useState<string>("all");
-  const [cart, setCart]             = useState<OrderItemLocal[]>([]);
-  const [loading, setLoading]       = useState(true);
+  const [cart, setCart] = useState<OrderItemLocal[]>([]);
+  const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
-  const [error, setError]           = useState("");
-  const overlayRef                  = useRef<HTMLDivElement>(null);
+  const [error, setError] = useState("");
+  const overlayRef = useRef<HTMLDivElement>(null);
+  const [isMobile, setIsMobile] = useState(false);
+  const [mobileTab, setMobileTab] = useState<"menu" | "cart">("menu");
+
+  useEffect(() => {
+    const check = () => setIsMobile(window.innerWidth < 768);
+    check();
+    window.addEventListener("resize", check);
+    return () => window.removeEventListener("resize", check);
+  }, []);
 
   const handleOverlayClick = (e: React.MouseEvent) => {
     if (e.target === overlayRef.current) onClose();
@@ -745,9 +754,9 @@ function OrderModal({
           fetch("/api/categories"),
         ]);
         const dishData = await dishRes.json();
-        const catData  = await catRes.json();
+        const catData = await catRes.json();
         if (dishData.ok) setDishes(dishData.data.filter((d: Dish) => d.isAvailable));
-        if (catData.ok)  setCategories(catData.data);
+        if (catData.ok) setCategories(catData.data);
       } catch {
         setError("Error al cargar el menú");
       } finally {
@@ -850,18 +859,19 @@ function OrderModal({
         zIndex: 1000,
         background: "rgba(0,0,0,0.45)",
         display: "flex",
-        alignItems: "center",
+        alignItems: isMobile ? "flex-end" : "center",
         justifyContent: "center",
-        padding: 16,
+        padding: isMobile ? 0 : 16,
       }}
     >
       <div
         style={{
           background: "#fff",
-          borderRadius: 20,
+          borderRadius: isMobile ? "20px 20px 0 0" : 20,
           width: "100%",
           maxWidth: 760,
-          maxHeight: "90vh",
+          height: isMobile ? "92vh" : "auto",
+          maxHeight: isMobile ? "92vh" : "90vh",
           display: "flex",
           flexDirection: "column",
           overflow: "hidden",
@@ -911,520 +921,596 @@ function OrderModal({
           </button>
         </div>
 
-        <div style={{ display: "flex", flex: 1, overflow: "hidden" }}>
+        <div style={{ display: "flex", flex: 1, flexDirection: isMobile ? "column" : "row", overflow: "hidden" }}>
           {/* ── Menú ── */}
-          <div
-            style={{
-              flex: 1,
-              display: "flex",
-              flexDirection: "column",
-              borderRight: "1px solid #f3f4f6",
-              overflow: "hidden",
-            }}
-          >
-            <div style={{ padding: "16px 20px 8px" }}>
-              <p style={{ margin: 0, fontSize: 14, fontWeight: 700, color: "#111" }}>
-                Menú Disponible
-              </p>
-            </div>
-            {/* Categorías */}
+          {(!isMobile || mobileTab === "menu") && (
             <div
               style={{
-                padding: "0 20px 12px",
+                flex: 1,
                 display: "flex",
-                gap: 8,
-                overflowX: "auto",
-                flexShrink: 0,
+                flexDirection: "column",
+                borderRight: isMobile ? "none" : "1px solid #f3f4f6",
+                overflow: "hidden",
               }}
             >
-              <button
-                onClick={() => setSelectedCat("all")}
+              <div style={{ padding: "16px 20px 8px" }}>
+                <p style={{ margin: 0, fontSize: 14, fontWeight: 700, color: "#111" }}>
+                  Menú Disponible
+                </p>
+              </div>
+              {/* Categorías */}
+              <div
                 style={{
-                  padding: "6px 16px",
-                  borderRadius: 20,
-                  border: "1.5px solid",
-                  borderColor: selectedCat === "all" ? "#111" : "#e5e7eb",
-                  background: selectedCat === "all" ? "#111" : "#fff",
-                  color: selectedCat === "all" ? "#fff" : "#6b7280",
-                  fontSize: 12,
-                  fontWeight: 600,
-                  cursor: "pointer",
-                  whiteSpace: "nowrap",
+                  padding: "0 20px 12px",
+                  display: "flex",
+                  gap: 8,
+                  overflowX: "auto",
+                  flexShrink: 0,
                 }}
               >
-                Todos
-              </button>
-              {categories.map((cat) => (
                 <button
-                  key={cat._id}
-                  onClick={() => setSelectedCat(cat._id)}
+                  onClick={() => setSelectedCat("all")}
                   style={{
                     padding: "6px 16px",
                     borderRadius: 20,
                     border: "1.5px solid",
-                    borderColor: selectedCat === cat._id ? "#111" : "#e5e7eb",
-                    background: selectedCat === cat._id ? "#111" : "#fff",
-                    color: selectedCat === cat._id ? "#fff" : "#6b7280",
+                    borderColor: selectedCat === "all" ? "#111" : "#e5e7eb",
+                    background: selectedCat === "all" ? "#111" : "#fff",
+                    color: selectedCat === "all" ? "#fff" : "#6b7280",
                     fontSize: 12,
                     fontWeight: 600,
                     cursor: "pointer",
                     whiteSpace: "nowrap",
                   }}
                 >
-                  {cat.name}
+                  Todos
                 </button>
-              ))}
-            </div>
-            {/* Platillos */}
-            <div
-              style={{
-                flex: 1,
-                overflowY: "auto",
-                padding: "0 20px 16px",
-                display: "flex",
-                flexDirection: "column",
-                gap: 10,
-              }}
-            >
-              {loading ? (
-                <p style={{ color: "#9ca3af", fontSize: 13, textAlign: "center", padding: 32 }}>
-                  Cargando menú...
-                </p>
-              ) : filteredDishes.length === 0 ? (
-                <p style={{ color: "#9ca3af", fontSize: 13, textAlign: "center", padding: 32 }}>
-                  Sin platillos en esta categoría
-                </p>
-              ) : (
-                filteredDishes.map((dish) => {
-                  const qty        = getQty(dish._id);
-                  const stockIssue = getStockIssue(dish, qty);
-                  const isBlocked  = stockIssue !== null;
-                  return (
-                    <div
-                      key={dish._id}
-                      style={{
-                        display: "flex",
-                        alignItems: "center",
-                        gap: 12,
-                        padding: "12px",
-                        borderRadius: 12,
-                        border: isBlocked ? "1.5px solid #fecaca" : "1.5px solid #f3f4f6",
-                        background: isBlocked ? "#fff5f5" : qty > 0 ? "#f0fdf4" : "#fff",
-                        transition: "background 0.15s",
-                        opacity: isBlocked ? 0.75 : 1,
-                      }}
-                    >
+                {categories.map((cat) => (
+                  <button
+                    key={cat._id}
+                    onClick={() => setSelectedCat(cat._id)}
+                    style={{
+                      padding: "6px 16px",
+                      borderRadius: 20,
+                      border: "1.5px solid",
+                      borderColor: selectedCat === cat._id ? "#111" : "#e5e7eb",
+                      background: selectedCat === cat._id ? "#111" : "#fff",
+                      color: selectedCat === cat._id ? "#fff" : "#6b7280",
+                      fontSize: 12,
+                      fontWeight: 600,
+                      cursor: "pointer",
+                      whiteSpace: "nowrap",
+                    }}
+                  >
+                    {cat.name}
+                  </button>
+                ))}
+              </div>
+              {/* Platillos */}
+              <div
+                style={{
+                  flex: 1,
+                  overflowY: "auto",
+                  padding: "0 20px 16px",
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: 10,
+                }}
+              >
+                {loading ? (
+                  <p style={{ color: "#9ca3af", fontSize: 13, textAlign: "center", padding: 32 }}>
+                    Cargando menú...
+                  </p>
+                ) : filteredDishes.length === 0 ? (
+                  <p style={{ color: "#9ca3af", fontSize: 13, textAlign: "center", padding: 32 }}>
+                    Sin platillos en esta categoría
+                  </p>
+                ) : (
+                  filteredDishes.map((dish) => {
+                    const qty = getQty(dish._id);
+                    const stockIssue = getStockIssue(dish, qty);
+                    const isBlocked = stockIssue !== null;
+                    return (
                       <div
+                        key={dish._id}
                         style={{
-                          width: 64,
-                          height: 64,
-                          borderRadius: 10,
-                          flexShrink: 0,
-                          background: dish.image_url ? "transparent" : "#f3f4f6",
-                          overflow: "hidden",
                           display: "flex",
                           alignItems: "center",
-                          justifyContent: "center",
+                          gap: 12,
+                          padding: "12px",
+                          borderRadius: 12,
+                          border: isBlocked ? "1.5px solid #fecaca" : "1.5px solid #f3f4f6",
+                          background: isBlocked ? "#fff5f5" : qty > 0 ? "#f0fdf4" : "#fff",
+                          transition: "background 0.15s",
+                          opacity: isBlocked ? 0.75 : 1,
                         }}
                       >
-                        {dish.image_url ? (
-                          <img
-                            src={dish.image_url}
-                            alt={dish.name}
-                            style={{ width: "100%", height: "100%", objectFit: "cover" }}
-                          />
-                        ) : (
-                          <span style={{ fontSize: 24 }}>🍽</span>
-                        )}
-                      </div>
-                      <div style={{ flex: 1, minWidth: 0 }}>
-                        <p style={{ margin: 0, fontSize: 14, fontWeight: 700, color: "#111" }}>
-                          {dish.name}
-                        </p>
-                        {dish.description && (
-                          <p
-                            style={{
-                              margin: "2px 0 0",
-                              fontSize: 11,
-                              color: "#9ca3af",
-                              overflow: "hidden",
-                              textOverflow: "ellipsis",
-                              whiteSpace: "nowrap",
-                            }}
-                          >
-                            {dish.description}
-                          </p>
-                        )}
-                        <p
-                          style={{ margin: "4px 0 0", fontSize: 14, fontWeight: 700, color: "#ea580c" }}
-                        >
-                          {formatBOB(dish.price)}
-                        </p>
-                        {isBlocked && (
-                          <p
-                            style={{
-                              margin: "4px 0 0",
-                              fontSize: 11,
-                              fontWeight: 700,
-                              color: "#dc2626",
-                              background: "#fee2e2",
-                              border: "1px solid #fecaca",
-                              borderRadius: 6,
-                              padding: "2px 8px",
-                              display: "inline-block",
-                            }}
-                          >
-                            {stockIssue!.reason}
-                          </p>
-                        )}
-                      </div>
-                      {isBlocked ? (
                         <div
                           style={{
-                            width: 32,
-                            height: 32,
-                            borderRadius: "50%",
-                            border: "2px solid #fecaca",
-                            background: "#fee2e2",
+                            width: 64,
+                            height: 64,
+                            borderRadius: 10,
+                            flexShrink: 0,
+                            background: dish.image_url ? "transparent" : "#f3f4f6",
+                            overflow: "hidden",
                             display: "flex",
                             alignItems: "center",
                             justifyContent: "center",
-                            fontSize: 14,
-                            flexShrink: 0,
                           }}
                         >
-                          🚫
+                          {dish.image_url ? (
+                            <img
+                              src={dish.image_url}
+                              alt={dish.name}
+                              style={{ width: "100%", height: "100%", objectFit: "cover" }}
+                            />
+                          ) : (
+                            <span style={{ fontSize: 24 }}>🍽</span>
+                          )}
                         </div>
-                      ) : qty === 0 ? (
-                        <button
-                          onClick={() => addToCart(dish)}
-                          style={{
-                            width: 32,
-                            height: 32,
-                            borderRadius: "50%",
-                            border: "none",
-                            background: "#ea580c",
-                            color: "#fff",
-                            fontSize: 20,
-                            cursor: "pointer",
-                            display: "flex",
-                            alignItems: "center",
-                            justifyContent: "center",
-                            flexShrink: 0,
-                          }}
-                        >
-                          +
-                        </button>
-                      ) : (
-                        <div
-                          style={{
-                            display: "flex",
-                            alignItems: "center",
-                            gap: 8,
-                            flexShrink: 0,
-                          }}
-                        >
-                          <button
-                            onClick={() => removeFromCart(dish._id)}
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <p style={{ margin: 0, fontSize: 14, fontWeight: 700, color: "#111" }}>
+                            {dish.name}
+                          </p>
+                          {dish.description && (
+                            <p
+                              style={{
+                                margin: "2px 0 0",
+                                fontSize: 11,
+                                color: "#9ca3af",
+                                overflow: "hidden",
+                                textOverflow: "ellipsis",
+                                whiteSpace: "nowrap",
+                              }}
+                            >
+                              {dish.description}
+                            </p>
+                          )}
+                          <p
+                            style={{ margin: "4px 0 0", fontSize: 14, fontWeight: 700, color: "#ea580c" }}
+                          >
+                            {formatBOB(dish.price)}
+                          </p>
+                          {isBlocked && (
+                            <p
+                              style={{
+                                margin: "4px 0 0",
+                                fontSize: 11,
+                                fontWeight: 700,
+                                color: "#dc2626",
+                                background: "#fee2e2",
+                                border: "1px solid #fecaca",
+                                borderRadius: 6,
+                                padding: "2px 8px",
+                                display: "inline-block",
+                              }}
+                            >
+                              {stockIssue!.reason}
+                            </p>
+                          )}
+                        </div>
+                        {isBlocked ? (
+                          <div
                             style={{
-                              width: 28,
-                              height: 28,
+                              width: 32,
+                              height: 32,
                               borderRadius: "50%",
-                              border: "1.5px solid #e5e7eb",
-                              background: "#fff",
-                              cursor: "pointer",
-                              fontSize: 16,
+                              border: "2px solid #fecaca",
+                              background: "#fee2e2",
                               display: "flex",
                               alignItems: "center",
                               justifyContent: "center",
-                            }}
-                          >
-                            −
-                          </button>
-                          <span
-                            style={{
                               fontSize: 14,
-                              fontWeight: 700,
-                              minWidth: 20,
-                              textAlign: "center",
+                              flexShrink: 0,
                             }}
                           >
-                            {qty}
-                          </span>
+                            🚫
+                          </div>
+                        ) : qty === 0 ? (
                           <button
                             onClick={() => addToCart(dish)}
                             style={{
-                              width: 28,
-                              height: 28,
+                              width: 32,
+                              height: 32,
                               borderRadius: "50%",
                               border: "none",
                               background: "#ea580c",
                               color: "#fff",
+                              fontSize: 20,
                               cursor: "pointer",
-                              fontSize: 16,
                               display: "flex",
                               alignItems: "center",
                               justifyContent: "center",
+                              flexShrink: 0,
                             }}
                           >
                             +
                           </button>
-                        </div>
-                      )}
-                    </div>
-                  );
-                })
-              )}
-            </div>
-          </div>
-
-          {/* ── Orden actual ── */}
-          <div
-            style={{ width: 280, display: "flex", flexDirection: "column", flexShrink: 0 }}
-          >
-            <div style={{ padding: "16px 20px 8px" }}>
-              <p style={{ margin: 0, fontSize: 14, fontWeight: 700, color: "#111" }}>
-                {mode === "add" ? "Ítems a agregar" : "Orden Actual"}
-              </p>
-            </div>
-            <div style={{ flex: 1, overflowY: "auto", padding: "0 20px" }}>
-              {cart.length === 0 ? (
+                        ) : (
+                          <div
+                            style={{
+                              display: "flex",
+                              alignItems: "center",
+                              gap: 8,
+                              flexShrink: 0,
+                            }}
+                          >
+                            <button
+                              onClick={() => removeFromCart(dish._id)}
+                              style={{
+                                width: 28,
+                                height: 28,
+                                borderRadius: "50%",
+                                border: "1.5px solid #e5e7eb",
+                                background: "#fff",
+                                cursor: "pointer",
+                                fontSize: 16,
+                                display: "flex",
+                                alignItems: "center",
+                                justifyContent: "center",
+                              }}
+                            >
+                              −
+                            </button>
+                            <span
+                              style={{
+                                fontSize: 14,
+                                fontWeight: 700,
+                                minWidth: 20,
+                                textAlign: "center",
+                              }}
+                            >
+                              {qty}
+                            </span>
+                            <button
+                              onClick={() => addToCart(dish)}
+                              style={{
+                                width: 28,
+                                height: 28,
+                                borderRadius: "50%",
+                                border: "none",
+                                background: "#ea580c",
+                                color: "#fff",
+                                cursor: "pointer",
+                                fontSize: 16,
+                                display: "flex",
+                                alignItems: "center",
+                                justifyContent: "center",
+                              }}
+                            >
+                              +
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })
+                )}
+              </div>
+              {isMobile && cart.length > 0 && (
                 <div
                   style={{
-                    textAlign: "center",
-                    padding: "48px 16px",
-                    border: "2px dashed #e5e7eb",
-                    borderRadius: 12,
-                    color: "#d1d5db",
+                    padding: "12px 16px",
+                    borderTop: "1px solid #f3f4f6",
+                    background: "#fff",
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "center",
+                    flexShrink: 0,
                   }}
                 >
-                  <div style={{ fontSize: 36, marginBottom: 8 }}>📋</div>
-                  <p style={{ margin: 0, fontSize: 13 }}>
-                    Selecciona platillos del menú
-                  </p>
+                  <div>
+                    <p style={{ margin: 0, fontSize: 11, color: "#888" }}>Total provisional</p>
+                    <p style={{ margin: 0, fontSize: 15, fontWeight: 800, color: "#ea580c" }}>
+                      {formatBOB(total)}
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => setMobileTab("cart")}
+                    style={{
+                      background: "#ea580c",
+                      color: "#fff",
+                      border: "none",
+                      borderRadius: 10,
+                      padding: "10px 18px",
+                      fontSize: 13,
+                      fontWeight: 700,
+                      cursor: "pointer",
+                    }}
+                  >
+                    🛒 Ver Pedido ({cart.reduce((sum, i) => sum + i.quantity, 0)})
+                  </button>
                 </div>
-              ) : (
-                <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                  {cart.map((item) => (
-                    <div
-                      key={item.dish._id}
-                      style={{
-                        padding: "10px 12px",
-                        background: "#f9fafb",
-                        borderRadius: 10,
-                        border: "1px solid #f3f4f6",
-                      }}
-                    >
+              )}
+            </div>
+          )}
+
+          {/* ── Orden actual ── */}
+          {(!isMobile || mobileTab === "cart") && (
+            <div
+              style={{
+                width: isMobile ? "100%" : 280,
+                display: "flex",
+                flexDirection: "column",
+                flexShrink: 0,
+                height: "100%",
+                overflow: "hidden",
+              }}
+            >
+              {isMobile && (
+                <div style={{ padding: "12px 16px 0", flexShrink: 0 }}>
+                  <button
+                    onClick={() => {
+                      setMobileTab("menu");
+                      setError("");
+                    }}
+                    style={{
+                      background: "none",
+                      border: "1px solid #e5e7eb",
+                      borderRadius: 8,
+                      padding: "6px 12px",
+                      fontSize: 12,
+                      fontWeight: 600,
+                      color: "#374151",
+                      cursor: "pointer",
+                    }}
+                  >
+                    ← Volver al Menú
+                  </button>
+                </div>
+              )}
+              <div style={{ padding: "16px 20px 8px" }}>
+                <p style={{ margin: 0, fontSize: 14, fontWeight: 700, color: "#111" }}>
+                  {mode === "add" ? "Ítems a agregar" : "Orden Actual"}
+                </p>
+              </div>
+              <div style={{ flex: 1, overflowY: "auto", padding: "0 20px" }}>
+                {cart.length === 0 ? (
+                  <div
+                    style={{
+                      textAlign: "center",
+                      padding: "48px 16px",
+                      border: "2px dashed #e5e7eb",
+                      borderRadius: 12,
+                      color: "#d1d5db",
+                    }}
+                  >
+                    <div style={{ fontSize: 36, marginBottom: 8 }}>📋</div>
+                    <p style={{ margin: 0, fontSize: 13 }}>
+                      Selecciona platillos del menú
+                    </p>
+                  </div>
+                ) : (
+                  <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                    {cart.map((item) => (
                       <div
+                        key={item.dish._id}
                         style={{
-                          display: "flex",
-                          justifyContent: "space-between",
-                          alignItems: "flex-start",
+                          padding: "10px 12px",
+                          background: "#f9fafb",
+                          borderRadius: 10,
+                          border: "1px solid #f3f4f6",
                         }}
                       >
-                        <div style={{ flex: 1, minWidth: 0 }}>
-                          <p
+                        <div
+                          style={{
+                            display: "flex",
+                            justifyContent: "space-between",
+                            alignItems: "flex-start",
+                          }}
+                        >
+                          <div style={{ flex: 1, minWidth: 0 }}>
+                            <p
+                              style={{
+                                margin: 0,
+                                fontSize: 13,
+                                fontWeight: 600,
+                                color: "#111",
+                              }}
+                            >
+                              {item.quantity}x {item.dish.name}
+                            </p>
+                            <p
+                              style={{
+                                margin: "2px 0 0",
+                                fontSize: 12,
+                                color: "#ea580c",
+                                fontWeight: 600,
+                              }}
+                            >
+                              {formatBOB(item.dish.price * item.quantity)}
+                            </p>
+                          </div>
+                          <button
+                            onClick={() =>
+                              setCart((prev) =>
+                                prev.filter((i) => i.dish._id !== item.dish._id)
+                              )
+                            }
                             style={{
-                              margin: 0,
-                              fontSize: 13,
-                              fontWeight: 600,
-                              color: "#111",
+                              border: "none",
+                              background: "none",
+                              cursor: "pointer",
+                              color: "#9ca3af",
+                              fontSize: 14,
+                              padding: "0 0 0 8px",
                             }}
                           >
-                            {item.quantity}x {item.dish.name}
-                          </p>
-                          <p
-                            style={{
-                              margin: "2px 0 0",
-                              fontSize: 12,
-                              color: "#ea580c",
-                              fontWeight: 600,
-                            }}
-                          >
-                            {formatBOB(item.dish.price * item.quantity)}
-                          </p>
+                            ✕
+                          </button>
                         </div>
-                        <button
-                          onClick={() =>
+                        <input
+                          type="text"
+                          placeholder="Notas (opcional)..."
+                          value={item.notes}
+                          onChange={(e) =>
                             setCart((prev) =>
-                              prev.filter((i) => i.dish._id !== item.dish._id)
+                              prev.map((i) =>
+                                i.dish._id === item.dish._id
+                                  ? { ...i, notes: e.target.value }
+                                  : i
+                              )
                             )
                           }
                           style={{
-                            border: "none",
-                            background: "none",
-                            cursor: "pointer",
-                            color: "#9ca3af",
-                            fontSize: 14,
-                            padding: "0 0 0 8px",
+                            marginTop: 6,
+                            width: "100%",
+                            padding: "5px 8px",
+                            fontSize: 11,
+                            border: "1px solid #e5e7eb",
+                            borderRadius: 6,
+                            outline: "none",
+                            color: "#374151",
+                            boxSizing: "border-box",
                           }}
-                        >
-                          ✕
-                        </button>
+                        />
                       </div>
-                      <input
-                        type="text"
-                        placeholder="Notas (opcional)..."
-                        value={item.notes}
-                        onChange={(e) =>
-                          setCart((prev) =>
-                            prev.map((i) =>
-                              i.dish._id === item.dish._id
-                                ? { ...i, notes: e.target.value }
-                                : i
-                            )
-                          )
-                        }
-                        style={{
-                          marginTop: 6,
-                          width: "100%",
-                          padding: "5px 8px",
-                          fontSize: 11,
-                          border: "1px solid #e5e7eb",
-                          borderRadius: 6,
-                          outline: "none",
-                          color: "#374151",
-                          boxSizing: "border-box",
-                        }}
-                      />
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-            <div style={{ padding: "16px 20px", borderTop: "1px solid #f3f4f6" }}>
-              {error && (
-                <p
+                    ))}
+                  </div>
+                )}
+              </div>
+              <div style={{ padding: "16px 20px", borderTop: "1px solid #f3f4f6" }}>
+                {error && (
+                  <p
+                    style={{
+                      margin: "0 0 10px",
+                      fontSize: 12,
+                      color: "#dc2626",
+                      background: "#fef2f2",
+                      padding: "8px 10px",
+                      borderRadius: 8,
+                    }}
+                  >
+                    {error}
+                  </p>
+                )}
+                {cart.length > 0 && (
+                  <div
+                    style={{ display: "flex", justifyContent: "space-between", marginBottom: 12 }}
+                  >
+                    <span style={{ fontSize: 13, color: "#6b7280" }}>Total a agregar</span>
+                    <span style={{ fontSize: 16, fontWeight: 800, color: "#111" }}>
+                      {formatBOB(total)}
+                    </span>
+                  </div>
+                )}
+                <button
+                  onClick={handleSubmit}
+                  disabled={submitting || cart.length === 0}
                   style={{
-                    margin: "0 0 10px",
-                    fontSize: 12,
-                    color: "#dc2626",
-                    background: "#fef2f2",
-                    padding: "8px 10px",
-                    borderRadius: 8,
+                    width: "100%",
+                    padding: "13px",
+                    borderRadius: 12,
+                    border: "none",
+                    background:
+                      cart.length === 0 ? "#e5e7eb" : submitting ? "#94a3b8" : "#ea580c",
+                    color: cart.length === 0 ? "#9ca3af" : "#fff",
+                    fontSize: 14,
+                    fontWeight: 700,
+                    cursor: cart.length === 0 || submitting ? "not-allowed" : "pointer",
                   }}
                 >
-                  {error}
-                </p>
-              )}
-              {cart.length > 0 && (
-                <div
-                  style={{ display: "flex", justifyContent: "space-between", marginBottom: 12 }}
-                >
-                  <span style={{ fontSize: 13, color: "#6b7280" }}>Total a agregar</span>
-                  <span style={{ fontSize: 16, fontWeight: 800, color: "#111" }}>
-                    {formatBOB(total)}
-                  </span>
-                </div>
-              )}
-              <button
-                onClick={handleSubmit}
-                disabled={submitting || cart.length === 0}
-                style={{
-                  width: "100%",
-                  padding: "13px",
-                  borderRadius: 12,
-                  border: "none",
-                  background:
-                    cart.length === 0 ? "#e5e7eb" : submitting ? "#94a3b8" : "#ea580c",
-                  color: cart.length === 0 ? "#9ca3af" : "#fff",
-                  fontSize: 14,
-                  fontWeight: 700,
-                  cursor: cart.length === 0 || submitting ? "not-allowed" : "pointer",
-                }}
-              >
-                {submitting
-                  ? "Enviando..."
-                  : mode === "add"
-                  ? "Agregar a Orden"
-                  : "Enviar a Cocina"}
-              </button>
+                  {submitting
+                    ? "Enviando..."
+                    : mode === "add"
+                      ? "Agregar a Orden"
+                      : "Enviar a Cocina"}
+                </button>
             </div>
           </div>
+          )}
         </div>
       </div>
     </div>
   );
 }
 
-// ─── Page principal ───────────────────────────────────────────────
-export default function MeseroPage() {
+      // ─── Page principal ───────────────────────────────────────────────
+      export default function MeseroPage() {
   const router = useRouter();
-  const { user, loading: userLoading, logout } = useAuth(ALLOWED_ROLES);
+      const {user, loading: userLoading, logout } = useAuth(ALLOWED_ROLES);
 
-  const [tables, setTables]             = useState<Table[]>([]);
-  const [activeOrders, setActiveOrders] = useState<ActiveOrder[]>([]);
-  const [tableOrderStates, setTableOrderStates] = useState<Record<string, TableOrderState>>({});
+      const [tables, setTables]             = useState<Table[]>([]);
+      const [isMobile, setIsMobile]         = useState(false);
 
-  const [loadingData, setLoadingData]   = useState(true);
-  const [actionLoading, setActionLoading] = useState(false);
-  const [selectedTable, setSelectedTable] = useState<Table | null>(null);
+  useEffect(() => {
+    const check = () => setIsMobile(window.innerWidth < 768);
+      check();
+      window.addEventListener("resize", check);
+    return () => window.removeEventListener("resize", check);
+  }, []);
+      const [activeOrders, setActiveOrders] = useState<ActiveOrder[]>([]);
+      const [tableOrderStates, setTableOrderStates] = useState<Record<string, TableOrderState>>({ });
 
-  // ── Nuevo: tabla seleccionada para agregar a su orden ──────────
-  const [addToTable, setAddToTable]     = useState<Table | null>(null);
+        const [loadingData, setLoadingData]   = useState(true);
+        const [actionLoading, setActionLoading] = useState(false);
+        const [selectedTable, setSelectedTable] = useState<Table | null>(null);
 
-  const [toast, setToast]               = useState("");
-  const [refreshKey, setRefreshKey]     = useState(0);
-  const [comandaOrderId, setComandaOrderId]         = useState<string | null>(null);
-  const [comandaTableNumber, setComandaTableNumber] = useState<number | null>(null);
-  const [inventoryAlertas, setInventoryAlertas]     = useState<InventoryAlerta[] | null>(null);
+        // ── Nuevo: tabla seleccionada para agregar a su orden ──────────
+        const [addToTable, setAddToTable]     = useState<Table | null>(null);
+
+        const [toast, setToast]               = useState("");
+        const [refreshKey, setRefreshKey]     = useState(0);
+        const [comandaOrderId, setComandaOrderId]         = useState<string | null>(null);
+        const [comandaTableNumber, setComandaTableNumber] = useState<number | null>(null);
+        const [inventoryAlertas, setInventoryAlertas]     = useState<InventoryAlerta[] | null>(null);
 
   const showToast = useCallback((msg: string) => {
-    setToast(msg);
+          setToast(msg);
     setTimeout(() => setToast(""), 3000);
   }, []);
 
   const fetchData = useCallback(async () => {
     const token = localStorage.getItem("token");
-    const headers: Record<string, string> = token ? { Authorization: `Bearer ${token}` } : {};
-    try {
+        const headers: Record<string, string> = token ? {Authorization: `Bearer ${token}` } : { };
+        try {
       const [tablesRes, ordersRes, tableStatesRes] = await Promise.all([
         fetch("/api/tables"),
-        fetch("/api/orders/active",   { headers }),
-        fetch("/api/orders/by-table", { headers }),
-      ]);
+        fetch("/api/orders/active",   {headers}),
+        fetch("/api/orders/by-table", {headers}),
+        ]);
 
-      const tablesRaw      = await tablesRes.json();
-      const ordersData     = await ordersRes.json();
-      const tableStatesRaw = await tableStatesRes.json();
+        const tablesRaw      = await tablesRes.json();
+        const ordersData     = await ordersRes.json();
+        const tableStatesRaw = await tableStatesRes.json();
 
-      setTables(Array.isArray(tablesRaw) ? tablesRaw : []);
+        setTables(Array.isArray(tablesRaw) ? tablesRaw : []);
 
-      if (ordersData.ok) {
-        setActiveOrders(ordersData.data);
+        if (ordersData.ok) {
+          setActiveOrders(ordersData.data);
         setRefreshKey((k) => k + 1);
       }
 
-      if (tableStatesRaw.ok) {
-        setTableOrderStates(tableStatesRaw.data);
+        if (tableStatesRaw.ok) {
+          setTableOrderStates(tableStatesRaw.data);
       }
-    } catch { /* silencioso */ }
-    finally { setLoadingData(false); }
+    } catch { /* silencioso */}
+        finally {setLoadingData(false); }
   }, []);
 
   useEffect(() => {
     if (userLoading || !user) return;
-    fetchData();
-    let pusherInstance: InstanceType<typeof import("pusher-js")["default"]> | null = null;
-    let mounted = true;
+        fetchData();
+        let pusherInstance: InstanceType<typeof import("pusher-js")["default"]> | null = null;
+        let mounted = true;
 
     const setup = async () => {
       const { default: Pusher } = await import("pusher-js/with-encryption");
-      if (!mounted) return;
-      pusherInstance = new Pusher(process.env.NEXT_PUBLIC_PUSHER_KEY!, {
-        cluster: process.env.NEXT_PUBLIC_PUSHER_CLUSTER!,
+        if (!mounted) return;
+        pusherInstance = new Pusher(process.env.NEXT_PUBLIC_PUSHER_KEY!, {
+          cluster: process.env.NEXT_PUBLIC_PUSHER_CLUSTER!,
         forceTLS: true,
       });
-      const channel = pusherInstance.subscribe("restaurant");
+        const channel = pusherInstance.subscribe("restaurant");
       channel.bind("order:new", () => { if (mounted) fetchData(); });
-      channel.bind("order:updated", (data: { newStatus: string }) => {
+        channel.bind("order:updated", (data: {newStatus: string }) => {
         if (!mounted) return;
         fetchData();
         if (data.newStatus === "ready") showToast("🔔 ¡Una orden está lista para servir!");
       });
       channel.bind("table:updated",        () => { if (mounted) fetchData(); });
       channel.bind("table:bill_requested", () => { if (mounted) fetchData(); });
-      channel.bind("inventory:alert", (data: { alertas: InventoryAlerta[] }) => {
+        channel.bind("inventory:alert", (data: {alertas: InventoryAlerta[] }) => {
         if (!mounted) return;
         if (data.alertas?.length > 0) {
           setInventoryAlertas(data.alertas);
@@ -1433,85 +1519,85 @@ export default function MeseroPage() {
       });
     };
 
-    setup();
+        setup();
     return () => {
-      mounted = false;
-      pusherInstance?.unsubscribe("restaurant");
-      pusherInstance?.disconnect();
+          mounted = false;
+        pusherInstance?.unsubscribe("restaurant");
+        pusherInstance?.disconnect();
     };
   }, [userLoading, user, fetchData, showToast]);
 
   const handleMarkServed = async (orderId: string) => {
-    setActionLoading(true);
-    try {
+          setActionLoading(true);
+        try {
       const res = await fetch("/api/Kitchen", {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ orderId, newStatus: "delivered" }),
+          method: "PATCH",
+        headers: {"Content-Type": "application/json" },
+        body: JSON.stringify({orderId, newStatus: "delivered" }),
       });
-      const data = await res.json();
-      if (!data.ok) { showToast("❌ " + data.message); return; }
-      showToast("✓ Orden marcada como entregada");
-      await fetchData();
+        const data = await res.json();
+        if (!data.ok) {showToast("❌ " + data.message); return; }
+        showToast("✓ Orden marcada como entregada");
+        await fetchData();
     } catch {
-      showToast("❌ Error al actualizar");
+          showToast("❌ Error al actualizar");
     } finally {
-      setActionLoading(false);
+          setActionLoading(false);
     }
   };
 
   const handleRequestBill = async (tableId: string) => {
-    setActionLoading(true);
-    try {
+          setActionLoading(true);
+        try {
       const res = await fetch(`/api/tables/${tableId}`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ status: "Cuenta solicitada" }),
+          method: "PUT",
+        headers: {"Content-Type": "application/json" },
+        body: JSON.stringify({status: "Cuenta solicitada" }),
       });
-      const data = await res.json();
-      if (!data.error) {
-        showToast("🧾 Cuenta solicitada al cajero");
+        const data = await res.json();
+        if (!data.error) {
+          showToast("🧾 Cuenta solicitada al cajero");
         await fetchData();
         await fetch("/api/notify", {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ event: "table:bill_requested", tableId }),
+        headers: {"Content-Type": "application/json" },
+        body: JSON.stringify({event: "table:bill_requested", tableId }),
         });
       } else {
-        showToast("❌ " + data.error);
+          showToast("❌ " + data.error);
       }
     } catch {
-      showToast("❌ Error al solicitar cuenta");
+          showToast("❌ Error al solicitar cuenta");
     } finally {
-      setActionLoading(false);
+          setActionLoading(false);
     }
   };
 
   const handleViewComanda = (tableId: string) => {
     const tableState = tableOrderStates[tableId];
-    if (!tableState?.activeOrderId) {
-      showToast("❌ No hay orden activa para esta mesa");
-      return;
+        if (!tableState?.activeOrderId) {
+          showToast("❌ No hay orden activa para esta mesa");
+        return;
     }
     const table = tables.find((t) => t._id === tableId);
-    setComandaOrderId(tableState.activeOrderId);
-    setComandaTableNumber(table?.number ?? null);
+        setComandaOrderId(tableState.activeOrderId);
+        setComandaTableNumber(table?.number ?? null);
   };
 
   // ── Nuevo handler: abrir modal en modo "agregar" ───────────────
   const handleAddToOrder = (tableId: string) => {
     const tableState = tableOrderStates[tableId];
-    if (!tableState?.activeOrderId) {
-      showToast("❌ No hay orden activa para esta mesa");
-      return;
+        if (!tableState?.activeOrderId) {
+          showToast("❌ No hay orden activa para esta mesa");
+        return;
     }
     const table = tables.find((t) => t._id === tableId);
-    if (table) setAddToTable(table);
+        if (table) setAddToTable(table);
   };
 
-  const visibleOrders = activeOrders.filter(
+        const visibleOrders = activeOrders.filter(
     (o) => !["paid", "cancelled"].includes(o.status)
-  );
+        );
 
   const occupiedCount  = tables.filter((t) => ["Ocupada", "Cuenta solicitada"].includes(t.status)).length;
   const reservedCount  = tables.filter((t) => t.status === "Reservada").length;
@@ -1519,367 +1605,370 @@ export default function MeseroPage() {
   const activeOrdersCount = activeOrders.filter((o) => ["pending", "in_kitchen"].includes(o.status)).length;
   const readyCount     = activeOrders.filter((o) => o.status === "ready").length;
 
-  if (userLoading)
-    return (
-      <div
-        style={{
-          minHeight: "100vh",
-          background: "#f9fafb",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-        }}
-      >
-        <p style={{ color: "#6b7280", fontSize: 14 }}>Verificando sesión...</p>
-      </div>
-    );
-  if (!user) return null;
-
-  return (
-    <div style={{ minHeight: "100vh", background: "#f9fafb", fontFamily: "'Georgia', serif" }}>
-      {/* Header */}
-      <div
-        style={{
-          background: "#fff",
-          borderBottom: "1.5px solid #f3f4f6",
-          padding: "14px 24px",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "space-between",
-          position: "sticky",
-          top: 0,
-          zIndex: 100,
-          boxShadow: "0 1px 4px rgba(0,0,0,0.06)",
-        }}
-      >
-        <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
-          <div
-            style={{
-              width: 40,
-              height: 40,
-              borderRadius: 12,
-              background: "#ea580c",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              fontSize: 20,
-            }}
-          >
-            🍽
-          </div>
-          <div>
-            <p style={{ margin: 0, fontSize: 17, fontWeight: 800, color: "#111" }}>
-              Panel de Mesero
-            </p>
-            <p style={{ margin: 0, fontSize: 12, color: "#9ca3af" }}>
-              Gestión de Mesas y Órdenes
-            </p>
-          </div>
-        </div>
-        <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
-          <div style={{ textAlign: "right" }}>
-            <p style={{ margin: 0, fontSize: 13, fontWeight: 600, color: "#111" }}>
-              {user.name}
-            </p>
-            <p style={{ margin: 0, fontSize: 11, color: "#9ca3af" }}>Mesero</p>
-          </div>
-          <button
-            onClick={() => logout()}
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: 6,
-              padding: "8px 14px",
-              borderRadius: 10,
-              border: "1.5px solid #e5e7eb",
-              background: "#fff",
-              fontSize: 13,
-              fontWeight: 600,
-              color: "#374151",
-              cursor: "pointer",
-            }}
-          >
-            <span>→</span> Salir
-          </button>
-        </div>
-      </div>
-
-      {/* Banner alerta inventario */}
-      {inventoryAlertas && inventoryAlertas.length > 0 && (
-        <InventoryAlertBanner
-          alertas={inventoryAlertas}
-          onClose={() => setInventoryAlertas(null)}
-        />
-      )}
-
-      {/* Toast */}
-      {toast && (
+        if (userLoading)
+        return (
         <div
           style={{
-            position: "fixed",
-            top: 20,
-            left: "50%",
-            transform: "translateX(-50%)",
-            zIndex: 9999,
-            background: "#111",
-            color: "#fff",
-            padding: "12px 24px",
-            borderRadius: 10,
-            fontSize: 13,
-            fontWeight: 600,
-            boxShadow: "0 8px 32px rgba(0,0,0,0.25)",
-            whiteSpace: "nowrap",
-          }}
-        >
-          {toast}
-        </div>
-      )}
-
-      <div
-        style={{
-          maxWidth: 1280,
-          margin: "0 auto",
-          padding: "24px 24px 48px",
-          display: "flex",
-          gap: 24,
-          alignItems: "flex-start",
-        }}
-      >
-        <div style={{ flex: 1, minWidth: 0 }}>
-          {/* Mesas */}
-          <div
-            style={{
-              background: "#fff",
-              borderRadius: 20,
-              border: "1.5px solid #f3f4f6",
-              padding: "24px",
-              marginBottom: 24,
-            }}
-          >
-            <h2 style={{ margin: "0 0 4px", fontSize: 16, fontWeight: 800, color: "#111" }}>
-              Mesas del Restaurante
-            </h2>
-            <p style={{ margin: "0 0 20px", fontSize: 13, color: "#9ca3af" }}>
-              Selecciona una mesa libre para tomar una orden
-            </p>
-            {loadingData ? (
-              <p style={{ color: "#9ca3af", fontSize: 13, textAlign: "center", padding: 32 }}>
-                Cargando mesas...
-              </p>
-            ) : (
-              <div
-                style={{
-                  display: "grid",
-                  gridTemplateColumns: "repeat(auto-fill, minmax(160px, 1fr))",
-                  gap: 14,
-                }}
-              >
-                {tables.map((table) => (
-                  <TableCard
-                    key={table._id}
-                    table={table}
-                    tableOrderState={tableOrderStates[table._id]}
-                    onClick={() => setSelectedTable(table)}
-                    onRequestBill={handleRequestBill}
-                    onViewComanda={handleViewComanda}
-                    onAddToOrder={handleAddToOrder}
-                  />
-                ))}
-              </div>
-            )}
-          </div>
-
-          {/* Órdenes activas */}
-          <div
-            style={{
-              background: "#fff",
-              borderRadius: 20,
-              border: "1.5px solid #f3f4f6",
-              padding: "24px",
-            }}
-          >
-            <h2 style={{ margin: "0 0 4px", fontSize: 16, fontWeight: 800, color: "#111" }}>
-              Mis Órdenes
-            </h2>
-            <p style={{ margin: "0 0 20px", fontSize: 13, color: "#9ca3af" }}>
-              Órdenes que tomaste en este turno
-            </p>
-
-            {loadingData ? (
-              <p style={{ color: "#9ca3af", fontSize: 13, textAlign: "center", padding: 32 }}>
-                Cargando órdenes...
-              </p>
-            ) : visibleOrders.length === 0 ? (
-              <div
-                style={{
-                  textAlign: "center",
-                  padding: "40px 16px",
-                  border: "2px dashed #e5e7eb",
-                  borderRadius: 14,
-                }}
-              >
-                <div style={{ fontSize: 36, marginBottom: 10 }}>📋</div>
-                <p style={{ margin: 0, fontSize: 14, fontWeight: 600, color: "#6b7280" }}>
-                  No tienes órdenes activas
-                </p>
-                <p style={{ margin: "6px 0 0", fontSize: 12, color: "#9ca3af" }}>
-                  Las nuevas órdenes aparecerán aquí automáticamente
-                </p>
-              </div>
-            ) : (
-              <div
-                key={refreshKey}
-                style={{ display: "flex", flexDirection: "column", gap: 12 }}
-              >
-                {visibleOrders.map((order) => (
-                  <ActiveOrderCard
-                    key={`${order._id}-${order.status}`}
-                    order={order}
-                    onMarkServed={handleMarkServed}
-                    onRequestBill={handleRequestBill}
-                    loading={actionLoading}
-                  />
-                ))}
-              </div>
-            )}
-          </div>
-        </div>
-
-        {/* Sidebar */}
-        <div
-          style={{
-            width: 280,
-            flexShrink: 0,
+            minHeight: "100vh",
+            background: "#f9fafb",
             display: "flex",
-            flexDirection: "column",
-            gap: 16,
+            alignItems: "center",
+            justifyContent: "center",
           }}
         >
+          <p style={{ color: "#6b7280", fontSize: 14 }}>Verificando sesión...</p>
+        </div>
+        );
+        if (!user) return null;
+
+        return (
+        <div style={{ minHeight: "100vh", background: "#f9fafb", fontFamily: "'Georgia', serif" }}>
+          {/* Header */}
           <div
             style={{
               background: "#fff",
-              borderRadius: 20,
-              border: "1.5px solid #f3f4f6",
-              padding: "20px 24px",
+              borderBottom: "1.5px solid #f3f4f6",
+              padding: isMobile ? "10px 16px" : "14px 24px",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              position: "sticky",
+              top: 0,
+              zIndex: 100,
+              boxShadow: "0 1px 4px rgba(0,0,0,0.06)",
             }}
           >
-            <h3 style={{ margin: "0 0 16px", fontSize: 15, fontWeight: 800, color: "#111" }}>
-              Resumen del Turno
-            </h3>
-            {[
-              { label: "Mesas Ocupadas",      value: `${occupiedCount}/${tables.length}`, color: "#111" },
-              { label: "Mis Órdenes Activas", value: activeOrdersCount,                  color: "#111" },
-              { label: "Listas para Servir",  value: readyCount, color: readyCount > 0 ? "#16a34a" : "#111" },
-            ].map((item) => (
+            <div style={{ display: "flex", alignItems: "center", gap: isMobile ? 8 : 14 }}>
               <div
-                key={item.label}
+                style={{
+                  width: isMobile ? 32 : 40,
+                  height: isMobile ? 32 : 40,
+                  borderRadius: 12,
+                  background: "#ea580c",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  fontSize: isMobile ? 16 : 20,
+                }}
+              >
+                🍽
+              </div>
+              <div>
+                <p style={{ margin: 0, fontSize: isMobile ? 15 : 17, fontWeight: 800, color: "#111" }}>
+                  Panel de Mesero
+                </p>
+                {!isMobile && (
+                  <p style={{ margin: 0, fontSize: 12, color: "#9ca3af" }}>
+                    Gestión de Mesas y Órdenes
+                  </p>
+                )}
+              </div>
+            </div>
+            <div style={{ display: "flex", alignItems: "center", gap: isMobile ? 8 : 16 }}>
+              <div style={{ textAlign: "right" }}>
+                <p style={{ margin: 0, fontSize: isMobile ? 12 : 13, fontWeight: 600, color: "#111" }}>
+                  {user.name}
+                </p>
+                {!isMobile && <p style={{ margin: 0, fontSize: 11, color: "#9ca3af" }}>Mesero</p>}
+              </div>
+              <button
+                onClick={() => logout()}
                 style={{
                   display: "flex",
-                  justifyContent: "space-between",
                   alignItems: "center",
-                  padding: "10px 0",
-                  borderBottom: "1px solid #f9fafb",
+                  gap: 4,
+                  padding: isMobile ? "6px 10px" : "8px 14px",
+                  borderRadius: 10,
+                  border: "1.5px solid #e5e7eb",
+                  background: "#fff",
+                  fontSize: isMobile ? 12 : 13,
+                  fontWeight: 600,
+                  color: "#374151",
+                  cursor: "pointer",
                 }}
               >
-                <span style={{ fontSize: 13, color: "#6b7280" }}>{item.label}</span>
-                <span style={{ fontSize: 16, fontWeight: 800, color: item.color }}>
-                  {item.value}
-                </span>
-              </div>
-            ))}
+                <span>→</span> {!isMobile && "Salir"}
+              </button>
+            </div>
           </div>
+
+          {/* Banner alerta inventario */}
+          {inventoryAlertas && inventoryAlertas.length > 0 && (
+            <InventoryAlertBanner
+              alertas={inventoryAlertas}
+              onClose={() => setInventoryAlertas(null)}
+            />
+          )}
+
+          {/* Toast */}
+          {toast && (
+            <div
+              style={{
+                position: "fixed",
+                top: 20,
+                left: "50%",
+                transform: "translateX(-50%)",
+                zIndex: 9999,
+                background: "#111",
+                color: "#fff",
+                padding: "12px 24px",
+                borderRadius: 10,
+                fontSize: 13,
+                fontWeight: 600,
+                boxShadow: "0 8px 32px rgba(0,0,0,0.25)",
+                whiteSpace: "nowrap",
+              }}
+            >
+              {toast}
+            </div>
+          )}
 
           <div
             style={{
-              background: "#fff",
-              borderRadius: 20,
-              border: "1.5px solid #f3f4f6",
-              padding: "20px 24px",
+              maxWidth: 1280,
+              margin: "0 auto",
+              padding: isMobile ? "16px 12px 32px" : "24px 24px 48px",
+              display: "flex",
+              flexDirection: isMobile ? "column" : "row",
+              gap: isMobile ? 16 : 24,
+              alignItems: isMobile ? "stretch" : "flex-start",
             }}
           >
-            <h3 style={{ margin: "0 0 16px", fontSize: 15, fontWeight: 800, color: "#111" }}>
-              Estado de Mesas
-            </h3>
-            {[
-              { label: `Disponible (${availableCount})`, dot: "#22c55e" },
-              { label: `Ocupada (${occupiedCount})`,     dot: "#f97316" },
-              { label: `Reservada (${reservedCount})`,   dot: "#3b82f6" },
-            ].map((item) => (
+            <div style={{ flex: 1, minWidth: 0 }}>
+              {/* Mesas */}
               <div
-                key={item.label}
-                style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 10 }}
+                style={{
+                  background: "#fff",
+                  borderRadius: 20,
+                  border: "1.5px solid #f3f4f6",
+                  padding: "24px",
+                  marginBottom: 24,
+                }}
               >
-                <div
-                  style={{
-                    width: 12,
-                    height: 12,
-                    borderRadius: "50%",
-                    background: item.dot,
-                    flexShrink: 0,
-                  }}
-                />
-                <span style={{ fontSize: 13, color: "#374151" }}>{item.label}</span>
+                <h2 style={{ margin: "0 0 4px", fontSize: 16, fontWeight: 800, color: "#111" }}>
+                  Mesas del Restaurante
+                </h2>
+                <p style={{ margin: "0 0 20px", fontSize: 13, color: "#9ca3af" }}>
+                  Selecciona una mesa libre para tomar una orden
+                </p>
+                {loadingData ? (
+                  <p style={{ color: "#9ca3af", fontSize: 13, textAlign: "center", padding: 32 }}>
+                    Cargando mesas...
+                  </p>
+                ) : (
+                  <div
+                    style={{
+                      display: "grid",
+                      gridTemplateColumns: "repeat(auto-fill, minmax(160px, 1fr))",
+                      gap: 14,
+                    }}
+                  >
+                    {tables.map((table) => (
+                      <TableCard
+                        key={table._id}
+                        table={table}
+                        tableOrderState={tableOrderStates[table._id]}
+                        onClick={() => setSelectedTable(table)}
+                        onRequestBill={handleRequestBill}
+                        onViewComanda={handleViewComanda}
+                        onAddToOrder={handleAddToOrder}
+                      />
+                    ))}
+                  </div>
+                )}
               </div>
-            ))}
+
+              {/* Órdenes activas */}
+              <div
+                style={{
+                  background: "#fff",
+                  borderRadius: 20,
+                  border: "1.5px solid #f3f4f6",
+                  padding: "24px",
+                }}
+              >
+                <h2 style={{ margin: "0 0 4px", fontSize: 16, fontWeight: 800, color: "#111" }}>
+                  Mis Órdenes
+                </h2>
+                <p style={{ margin: "0 0 20px", fontSize: 13, color: "#9ca3af" }}>
+                  Órdenes que tomaste en este turno
+                </p>
+
+                {loadingData ? (
+                  <p style={{ color: "#9ca3af", fontSize: 13, textAlign: "center", padding: 32 }}>
+                    Cargando órdenes...
+                  </p>
+                ) : visibleOrders.length === 0 ? (
+                  <div
+                    style={{
+                      textAlign: "center",
+                      padding: "40px 16px",
+                      border: "2px dashed #e5e7eb",
+                      borderRadius: 14,
+                    }}
+                  >
+                    <div style={{ fontSize: 36, marginBottom: 10 }}>📋</div>
+                    <p style={{ margin: 0, fontSize: 14, fontWeight: 600, color: "#6b7280" }}>
+                      No tienes órdenes activas
+                    </p>
+                    <p style={{ margin: "6px 0 0", fontSize: 12, color: "#9ca3af" }}>
+                      Las nuevas órdenes aparecerán aquí automáticamente
+                    </p>
+                  </div>
+                ) : (
+                  <div
+                    key={refreshKey}
+                    style={{ display: "flex", flexDirection: "column", gap: 12 }}
+                  >
+                    {visibleOrders.map((order) => (
+                      <ActiveOrderCard
+                        key={`${order._id}-${order.status}`}
+                        order={order}
+                        onMarkServed={handleMarkServed}
+                        onRequestBill={handleRequestBill}
+                        loading={actionLoading}
+                      />
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Sidebar */}
+            <div
+              style={{
+                width: isMobile ? "100%" : 280,
+                flexShrink: 0,
+                display: "flex",
+                flexDirection: "column",
+                gap: 16,
+              }}
+            >
+              <div
+                style={{
+                  background: "#fff",
+                  borderRadius: 20,
+                  border: "1.5px solid #f3f4f6",
+                  padding: "20px 24px",
+                }}
+              >
+                <h3 style={{ margin: "0 0 16px", fontSize: 15, fontWeight: 800, color: "#111" }}>
+                  Resumen del Turno
+                </h3>
+                {[
+                  { label: "Mesas Ocupadas", value: `${occupiedCount}/${tables.length}`, color: "#111" },
+                  { label: "Mis Órdenes Activas", value: activeOrdersCount, color: "#111" },
+                  { label: "Listas para Servir", value: readyCount, color: readyCount > 0 ? "#16a34a" : "#111" },
+                ].map((item) => (
+                  <div
+                    key={item.label}
+                    style={{
+                      display: "flex",
+                      justifyContent: "space-between",
+                      alignItems: "center",
+                      padding: "10px 0",
+                      borderBottom: "1px solid #f9fafb",
+                    }}
+                  >
+                    <span style={{ fontSize: 13, color: "#6b7280" }}>{item.label}</span>
+                    <span style={{ fontSize: 16, fontWeight: 800, color: item.color }}>
+                      {item.value}
+                    </span>
+                  </div>
+                ))}
+              </div>
+
+              <div
+                style={{
+                  background: "#fff",
+                  borderRadius: 20,
+                  border: "1.5px solid #f3f4f6",
+                  padding: "20px 24px",
+                }}
+              >
+                <h3 style={{ margin: "0 0 16px", fontSize: 15, fontWeight: 800, color: "#111" }}>
+                  Estado de Mesas
+                </h3>
+                {[
+                  { label: `Disponible (${availableCount})`, dot: "#22c55e" },
+                  { label: `Ocupada (${occupiedCount})`, dot: "#f97316" },
+                  { label: `Reservada (${reservedCount})`, dot: "#3b82f6" },
+                ].map((item) => (
+                  <div
+                    key={item.label}
+                    style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 10 }}
+                  >
+                    <div
+                      style={{
+                        width: 12,
+                        height: 12,
+                        borderRadius: "50%",
+                        background: item.dot,
+                        flexShrink: 0,
+                      }}
+                    />
+                    <span style={{ fontSize: 13, color: "#374151" }}>{item.label}</span>
+                  </div>
+                ))}
+              </div>
+
+              <button
+                onClick={() => router.push("/dashboard")}
+                style={{
+                  width: "100%",
+                  padding: "12px",
+                  borderRadius: 12,
+                  border: "1.5px solid #e5e7eb",
+                  background: "#fff",
+                  fontSize: 13,
+                  fontWeight: 600,
+                  color: "#374151",
+                  cursor: "pointer",
+                }}
+              >
+                ← Volver al Dashboard
+              </button>
+            </div>
           </div>
 
-          <button
-            onClick={() => router.push("/dashboard")}
-            style={{
-              width: "100%",
-              padding: "12px",
-              borderRadius: 12,
-              border: "1.5px solid #e5e7eb",
-              background: "#fff",
-              fontSize: 13,
-              fontWeight: 600,
-              color: "#374151",
-              cursor: "pointer",
-            }}
-          >
-            ← Volver al Dashboard
-          </button>
+          {/* Modal nueva orden */}
+          {selectedTable && (
+            <OrderModal
+              table={selectedTable}
+              mode="new"
+              onClose={() => setSelectedTable(null)}
+              onOrderCreated={() => {
+                showToast("✓ Orden enviada a cocina");
+                fetchData();
+              }}
+            />
+          )}
+
+          {/* Modal agregar a orden existente */}
+          {addToTable && (
+            <OrderModal
+              table={addToTable}
+              mode="add"
+              existingOrderId={tableOrderStates[addToTable._id]?.activeOrderId ?? undefined}
+              onClose={() => setAddToTable(null)}
+              onOrderCreated={() => {
+                showToast("✓ Ítems agregados a la orden");
+                fetchData();
+              }}
+            />
+          )}
+
+          {/* Comanda */}
+          {comandaOrderId && (
+            <ComandaMeseroModal
+              orderId={comandaOrderId}
+              tableNumber={comandaTableNumber}
+              onClose={() => {
+                setComandaOrderId(null);
+                setComandaTableNumber(null);
+              }}
+            />
+          )}
         </div>
-      </div>
-
-      {/* Modal nueva orden */}
-      {selectedTable && (
-        <OrderModal
-          table={selectedTable}
-          mode="new"
-          onClose={() => setSelectedTable(null)}
-          onOrderCreated={() => {
-            showToast("✓ Orden enviada a cocina");
-            fetchData();
-          }}
-        />
-      )}
-
-      {/* Modal agregar a orden existente */}
-      {addToTable && (
-        <OrderModal
-          table={addToTable}
-          mode="add"
-          existingOrderId={tableOrderStates[addToTable._id]?.activeOrderId ?? undefined}
-          onClose={() => setAddToTable(null)}
-          onOrderCreated={() => {
-            showToast("✓ Ítems agregados a la orden");
-            fetchData();
-          }}
-        />
-      )}
-
-      {/* Comanda */}
-      {comandaOrderId && (
-        <ComandaMeseroModal
-          orderId={comandaOrderId}
-          tableNumber={comandaTableNumber}
-          onClose={() => {
-            setComandaOrderId(null);
-            setComandaTableNumber(null);
-          }}
-        />
-      )}
-    </div>
-  );
+        );
 }

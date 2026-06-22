@@ -1,6 +1,8 @@
 // src/app/api/auth/verify/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { verifyToken } from "@/lib/jwt";
+import { connectDB } from "@/lib/db";
+import User from "@/models/User";
 
 export async function GET(req: NextRequest) {
   const authHeader = req.headers.get("authorization");
@@ -15,8 +17,25 @@ export async function GET(req: NextRequest) {
   const token = authHeader.split(" ")[1];
 
   try {
-    verifyToken(token);
-    return NextResponse.json({ ok: true }, { status: 200 });
+    const decoded = verifyToken(token);
+    await connectDB();
+    const dbUser = await User.findById(decoded.userId).select("-password");
+    
+    if (!dbUser) {
+      return NextResponse.json(
+        { ok: false, message: "Usuario no encontrado" },
+        { status: 401 }
+      );
+    }
+
+    if (!dbUser.activo) {
+      return NextResponse.json(
+        { ok: false, message: "Usuario inactivo" },
+        { status: 401 }
+      );
+    }
+
+    return NextResponse.json({ ok: true, user: dbUser }, { status: 200 });
   } catch (error: unknown) {
     const isExpired =
       error instanceof Error && error.name === "TokenExpiredError";

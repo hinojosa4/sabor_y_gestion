@@ -1,5 +1,5 @@
 // src/components/clientScreen/ConsumoHistory.tsx
-import React from "react";
+import React, { useState, useEffect } from "react";
 import { Receipt } from "lucide-react";
 import { OrderCard, Order } from "./OrderCard";
 
@@ -9,8 +9,16 @@ interface ConsumoHistoryProps {
 }
 
 export function ConsumoHistory({ orders, onViewOrder }: ConsumoHistoryProps) {
+    const [isMobile, setIsMobile] = useState(false);
+    useEffect(() => {
+        const check = () => setIsMobile(window.innerWidth < 640);
+        check();
+        window.addEventListener("resize", check);
+        return () => window.removeEventListener("resize", check);
+    }, []);
+
     return (
-        <section style={styles.section}>
+        <section style={{ ...styles.section, padding: isMobile ? "1rem" : "2rem" }}>
             <header style={styles.header}>
                 <div style={styles.titleRow}>
                     <Receipt size={22} color="#111827" />
@@ -19,7 +27,7 @@ export function ConsumoHistory({ orders, onViewOrder }: ConsumoHistoryProps) {
                 <p style={styles.subtitle}>Haz clic en cualquier orden para ver los detalles completos</p>
             </header>
 
-            <div style={styles.grid}>
+            <div style={{ ...styles.grid, gridTemplateColumns: isMobile ? "1fr" : "repeat(auto-fit, minmax(280px, 1fr))" }}>
                 {orders.map((o) => (
                     <OrderCard key={o._id || o.id} order={o} onView={onViewOrder} />
                 ))}

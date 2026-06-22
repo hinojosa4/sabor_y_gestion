@@ -83,20 +83,7 @@ export default function Home() {
           Descubre nuestros platos del día, consulta la disponibilidad y haz tu reserva en segundos. Todo desde aquí.
         </p>
 
-        <div className="cta-buttons" style={{display:'flex',gap:12,justifyContent:'center',flexWrap:'wrap'}}>
-          <button
-            className="cta-primary"
-            style={{padding:'13px 32px',background:'#e85d26',color:'#fff',border:'none',borderRadius:10,fontSize:15,fontWeight:500,cursor:'pointer',fontFamily:"'DM Sans',sans-serif",transition:'all .2s',letterSpacing:'0.2px'}}
-          >
-            Ver el menú
-          </button>
-          <button
-            className="cta-secondary"
-            style={{padding:'13px 32px',background:'#fff',color:'#333',border:'1.5px solid #e0e0e0',borderRadius:10,fontSize:15,fontWeight:500,cursor:'pointer',fontFamily:"'DM Sans',sans-serif",transition:'all .2s'}}
-          >
-            Reservar mesa
-          </button>
-        </div>
+
       </section>
 
       {/* Features */}

@@ -13,7 +13,7 @@ const Counter =
 
 export async function getNextDailyNumber(): Promise<number> {
   await connectDB();
-  const today = new Date().toISOString().slice(0, 10); // "2025-06-04"
+  const today = new Date().toLocaleDateString('sv-SE', { timeZone: 'America/La_Paz' });
   const doc = await Counter.findByIdAndUpdate(
     today,
     { $inc: { seq: 1 } },

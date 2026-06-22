@@ -3,6 +3,9 @@ import { connectDB } from "@/lib/db";
 import Order from "@/models/Order";
 import OrderItem from "@/models/OrderItem";
 import Table from "@/models/Table";
+import Payment from "@/models/Payment";
+import User from "@/models/User";
+import { getOpenOperationalCashShift } from "@/lib/cashRegister";
 import "@/models/Ingredient";
 import { verifyToken } from "@/lib/jwt";
 import { pusherServer } from "@/lib/pusher";
@@ -114,7 +117,9 @@ export async function PATCH(req: NextRequest, { params }: Params) {
       cancelled:  [],
     };
 
-    const currentOrder = await Order.findById(id).select("status").lean();
+    const currentOrder = await Order.findById(id)
+      .select("status service_type total_amount delivery_fee payment_method customer_id user_id")
+      .lean();
     if (!currentOrder) {
       return NextResponse.json({ ok: false, message: "Orden no encontrada" }, { status: 404 });
     }
@@ -130,7 +135,12 @@ export async function PATCH(req: NextRequest, { params }: Params) {
       return NextResponse.json({ ok: false, message: friendlyMsg }, { status: 400 });
     }
 
-    const update: Record<string, unknown> = { status };
+    let targetStatus = status;
+    if (status === "delivered" && currentOrder.service_type === "delivery") {
+      targetStatus = "paid";
+    }
+
+    const update: Record<string, unknown> = { status: targetStatus };
     if (["picked_up", "in_transit"].includes(status) && userRol === "delivery") {
       update.driver_id = payload.userId;
     }
@@ -140,8 +150,85 @@ export async function PATCH(req: NextRequest, { params }: Params) {
       return NextResponse.json({ ok: false, message: "Orden no encontrada" }, { status: 404 });
     }
 
-    await pusherServer.trigger("delivery", "order:status_updated", { orderId: id, status });
-    await pusherServer.trigger("restaurant", "order:status_updated", { orderId: id, status });
+    if (targetStatus === "paid") {
+      const existingPayment = await Payment.findOne({ order_id: id, status: "completed" });
+      if (!existingPayment) {
+        let method: "cash" | "qr" | "card" = "cash";
+        if (currentOrder.payment_method === "QR / Transferencia") {
+          method = "qr";
+        } else if (currentOrder.payment_method && currentOrder.payment_method.includes("Tarjeta")) {
+          method = "card";
+        }
+
+        let shiftFields = {};
+        try {
+          const cashShift = await getOpenOperationalCashShift();
+          if (cashShift.ok) {
+            shiftFields = {
+              shiftName: cashShift.shift.shiftName,
+              shiftDate: cashShift.shift.shiftDate,
+              shiftStart: cashShift.shift.shiftStart,
+              shiftEnd: cashShift.shift.shiftEnd,
+            };
+          }
+        } catch (err) {
+          console.error("Error al obtener turno de caja en auto-delivery-payment:", err);
+        }
+
+        let customerEmail = "invitado@sabor.com";
+        const customerId = currentOrder.customer_id || currentOrder.user_id || null;
+        if (customerId) {
+          const userObj = await User.findById(customerId).select("email").lean();
+          if (userObj?.email) {
+            customerEmail = userObj.email;
+          }
+        }
+
+        const subtotal = currentOrder.total_amount - (currentOrder.delivery_fee || 0);
+
+        const payment = await Payment.create({
+          order_id: id,
+          amount: currentOrder.total_amount,
+          subtotal,
+          discount_percent: 0,
+          discount_amount: 0,
+          loyalty_tier_name: null,
+          method,
+          status: "completed",
+          customer_id: customerId,
+          customer_email: customerEmail,
+          timestamp: new Date(),
+          ...shiftFields,
+        });
+
+        await pusherServer.trigger("restaurant", "payment:completed", {
+          paymentId: payment._id.toString(),
+          orderId: id,
+          method,
+          amount: currentOrder.total_amount,
+          subtotal,
+          discountPercent: 0,
+          discountAmount: 0,
+          tableId: null,
+          customer: customerId
+            ? {
+                id: customerId.toString(),
+                name: "Cliente",
+                email: customerEmail,
+                type: "registered",
+              }
+            : {
+                id: null,
+                name: null,
+                email: customerEmail,
+                type: "guest",
+              },
+        });
+      }
+    }
+
+    await pusherServer.trigger("delivery", "order:status_updated", { orderId: id, status: targetStatus });
+    await pusherServer.trigger("restaurant", "order:status_updated", { orderId: id, status: targetStatus });
 
     return NextResponse.json({ ok: true, message: "Estado actualizado", data: order });
   } catch (error) {
