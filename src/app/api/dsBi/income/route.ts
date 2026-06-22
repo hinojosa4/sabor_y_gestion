@@ -45,13 +45,19 @@ export async function GET(req: NextRequest) {
             endDate = new Date(Date.UTC(today.getFullYear(), today.getMonth(), today.getDate(), 23, 59, 59, 999));
         }
 
-        // Pagos completados en el período
+        // 🔥 MODIFICADO: Incluir órdenes 'paid' y 'delivered'
+        const orders = await Order.find({
+            status: { $in: ['paid', 'delivered'] },
+            createdAt: { $gte: startDate, $lte: endDate }
+        }).lean();
+
+        // 🔥 NUEVO: Obtener pagos solo para desglose de métodos de pago
         const payments = await Payment.find({
             status: 'completed',
             timestamp: { $gte: startDate, $lte: endDate }
         }).lean();
 
-        // Pagos del período comparativo
+        // Pagos del período comparativo (para comparación)
         let comparePayments: Array<{ amount: number; timestamp: Date }> = [];
         if (compareStartDate && compareEndDate) {
             comparePayments = await Payment.find({
@@ -60,16 +66,17 @@ export async function GET(req: NextRequest) {
             }).lean();
         }
 
-        // Órdenes pagadas en el período
-        const orders = await Order.find({
-            status: 'paid',
-            updatedAt: { $gte: startDate, $lte: endDate }
-        }).lean();
+        // 🔥 NUEVO: Cálculo de ingresos desde orders (no desde payments)
+        let totalSales = 0;
+        orders.forEach(o => {
+            totalSales += o.total_amount || 0;
+        });
 
+        // Desglose por método de pago (desde payments)
         const cashTotal = payments.filter(p => p.method === 'cash').reduce((s, p) => s + p.amount, 0);
         const qrTotal = payments.filter(p => p.method === 'qr').reduce((s, p) => s + p.amount, 0);
-        const totalSales = cashTotal + qrTotal;
 
+        // Comparación (usando payments)
         let compareTotal = 0;
         if (comparePayments.length) {
             compareTotal = comparePayments.reduce((s, p) => s + p.amount, 0);
@@ -77,15 +84,15 @@ export async function GET(req: NextRequest) {
 
         const tablesServed = new Set(orders.filter(o => o.table_id).map(o => o.table_id.toString())).size;
 
-        // Ingresos agrupados por día (UTC)
+        // 🔥 NUEVO: Ingresos agrupados por día (desde orders)
         const dailyIncome: Record<string, number> = {};
-        payments.forEach(p => {
-            const date = p.timestamp;
+        orders.forEach(o => {
+            const date = o.createdAt;
             const dateKey = `${date.getUTCFullYear()}-${String(date.getUTCMonth() + 1).padStart(2, '0')}-${String(date.getUTCDate()).padStart(2, '0')}`;
-            dailyIncome[dateKey] = (dailyIncome[dateKey] || 0) + p.amount;
+            dailyIncome[dateKey] = (dailyIncome[dateKey] || 0) + (o.total_amount || 0);
         });
 
-        // Ingresos comparativos por día
+        // Ingresos comparativos por día (desde payments, para comparación)
         const compareDailyIncome: Record<string, number> = {};
         comparePayments.forEach(p => {
             const date = p.timestamp;
@@ -93,15 +100,16 @@ export async function GET(req: NextRequest) {
             compareDailyIncome[dateKey] = (compareDailyIncome[dateKey] || 0) + p.amount;
         });
 
-        // Ingresos por mes (para vista anual)
+        // Ingresos por mes (desde orders)
         const monthlyIncome: Record<string, number> = {};
-        payments.forEach(p => {
-            const date = p.timestamp;
+        orders.forEach(o => {
+            const date = o.createdAt;
             const monthKey = `${date.getUTCFullYear()}-${String(date.getUTCMonth() + 1).padStart(2, '0')}`;
-            monthlyIncome[monthKey] = (monthlyIncome[monthKey] || 0) + p.amount;
+            monthlyIncome[monthKey] = (monthlyIncome[monthKey] || 0) + (o.total_amount || 0);
         });
 
         return NextResponse.json({
+            // 🔥 totalSales ahora viene de orders
             totalSales,
             cashTotal,
             qrTotal,
