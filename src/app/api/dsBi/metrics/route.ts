@@ -17,23 +17,24 @@ export async function GET(req: NextRequest) {
         let startDate: Date;
         let endDate: Date;
 
-        // Fechas en UTC (misma lógica que income)
+        // Ajustar fechas a la zona horaria de Bolivia (UTC-4)
         if (type === 'day' && value) {
-            const [year, month, day] = value.split('-');
-            startDate = new Date(Date.UTC(parseInt(year), parseInt(month) - 1, parseInt(day), 0, 0, 0));
-            endDate = new Date(Date.UTC(parseInt(year), parseInt(month) - 1, parseInt(day), 23, 59, 59, 999));
+            const [year, month, day] = value.split('-').map(Number);
+            startDate = new Date(Date.UTC(year, month - 1, day, 4, 0, 0, 0));
+            endDate = new Date(startDate.getTime() + 24 * 60 * 60 * 1000 - 1);
         } else if (type === 'month' && value) {
-            const [year, month] = value.split('-');
-            startDate = new Date(Date.UTC(parseInt(year), parseInt(month) - 1, 1, 0, 0, 0));
-            endDate = new Date(Date.UTC(parseInt(year), parseInt(month), 0, 23, 59, 59, 999));
+            const [year, month] = value.split('-').map(Number);
+            startDate = new Date(Date.UTC(year, month - 1, 1, 4, 0, 0, 0));
+            endDate = new Date(Date.UTC(year, month, 1, 3, 59, 59, 999));
         } else if (type === 'year' && value) {
             const year = parseInt(value);
-            startDate = new Date(Date.UTC(year, 0, 1, 0, 0, 0));
-            endDate = new Date(Date.UTC(year, 11, 31, 23, 59, 59, 999));
+            startDate = new Date(Date.UTC(year, 0, 1, 4, 0, 0, 0));
+            endDate = new Date(Date.UTC(year + 1, 0, 1, 3, 59, 59, 999));
         } else {
-            const today = new Date();
-            startDate = new Date(Date.UTC(today.getFullYear(), today.getMonth(), today.getDate(), 0, 0, 0));
-            endDate = new Date(Date.UTC(today.getFullYear(), today.getMonth(), today.getDate(), 23, 59, 59, 999));
+            const boliviaDateStr = new Date().toLocaleDateString('sv-SE', { timeZone: 'America/La_Paz' });
+            const [year, month, day] = boliviaDateStr.split('-').map(Number);
+            startDate = new Date(Date.UTC(year, month - 1, day, 4, 0, 0, 0));
+            endDate = new Date(startDate.getTime() + 24 * 60 * 60 * 1000 - 1);
         }
 
         // Obtener pagos del período (una sola consulta)
@@ -50,19 +51,47 @@ export async function GET(req: NextRequest) {
 
         // 1. Top Meseros (usando agregación)
         const topWaitersAgg = await Order.aggregate([
-            { $match: { status: 'paid', updatedAt: { $gte: startDate, $lte: endDate }, waiter_id: { $exists: true, $ne: null } } },
-            { $lookup: { from: 'payments', localField: '_id', foreignField: 'order_id', as: 'payment' } },
+            { $match: { status: 'paid', updatedAt: { $gte: startDate, $lte: endDate }, mesero_id: { $exists: true, $nin: [null, "unknown", "self"] } } },
+            {
+                $lookup: {
+                    from: 'payments',
+                    let: { orderIdStr: { $toString: '$_id' } },
+                    pipeline: [
+                        {
+                            $match: {
+                                $expr: {
+                                    $and: [
+                                        { $eq: ['$order_id', '$$orderIdStr'] },
+                                        { $eq: ['$status', 'completed'] }
+                                    ]
+                                }
+                            }
+                        }
+                    ],
+                    as: 'payment'
+                }
+            },
             { $unwind: '$payment' },
-            { $match: { 'payment.status': 'completed' } },
-            { $group: { _id: '$waiter_id', total: { $sum: '$payment.amount' } } },
-            { $lookup: { from: 'users', localField: '_id', foreignField: '_id', as: 'waiter' } },
+            { $group: { _id: '$mesero_id', total: { $sum: '$payment.amount' }, count: { $sum: 1 } } },
+            {
+                $addFields: {
+                    waiterObjectId: {
+                        $cond: {
+                            if: { $regexMatch: { input: "$_id", regex: "^[0-9a-fA-F]{24}$" } },
+                            then: { $toObjectId: "$_id" },
+                            else: null
+                        }
+                    }
+                }
+            },
+            { $lookup: { from: 'users', localField: 'waiterObjectId', foreignField: '_id', as: 'waiter' } },
             { $unwind: { path: '$waiter', preserveNullAndEmptyArrays: true } },
-            { $project: { name: '$waiter.name', total: 1 } },
+            { $project: { name: '$waiter.name', total: 1, count: 1 } },
             { $sort: { total: -1 } },
-            { $limit: 5 }
+            { $limit: 10 }
         ]);
 
-        const topWaiters = topWaitersAgg.map(w => ({ id: w._id, name: w.name || 'Desconocido', total: w.total }));
+        const topWaiters = topWaitersAgg.map(w => ({ id: w._id, name: w.name || 'Desconocido', total: w.total, count: w.count || 0 }));
 
         // 2. Top Platos (usando agregación con colección dishes)
         if (!mongoose.connection.db) {
@@ -92,26 +121,37 @@ export async function GET(req: NextRequest) {
             total: d.total
         }));
 
-        // 3. Día con más ventas y hora pico (desde payments)
+        const getBoliviaDateKey = (date: Date) => {
+            return new Date(date.getTime() - 4 * 60 * 60 * 1000).toISOString().slice(0, 10);
+        };
+
+        const getBoliviaHourKey = (date: Date) => {
+            const hourBolivia = new Date(date.getTime() - 4 * 60 * 60 * 1000).getUTCHours();
+            return `${hourBolivia}:00`;
+        };
+
+        // 3. Día con más ventas y hora pico (desde payments en hora de Bolivia)
         const daySales: Record<string, number> = {};
         const hourSales: Record<string, number> = {};
 
         payments.forEach(p => {
-            const date = p.timestamp;
-            const dayKey = `${date.getUTCFullYear()}-${date.getUTCMonth() + 1}-${date.getUTCDate()}`;
-            const hourKey = `${date.getUTCHours()}:00`;
+            const dayKey = getBoliviaDateKey(p.timestamp);
+            const hourKey = getBoliviaHourKey(p.timestamp);
             daySales[dayKey] = (daySales[dayKey] || 0) + p.amount;
             hourSales[hourKey] = (hourSales[hourKey] || 0) + p.amount;
         });
 
         const bestDay = Object.entries(daySales).sort((a, b) => b[1] - a[1])[0];
-        let peakHour = Object.entries(hourSales).sort((a, b) => b[1] - a[1])[0];
-        if (peakHour) {
-            const hourUTC = parseInt(peakHour[0].split(':')[0]);
-            let hourBolivia = hourUTC - 4;
-            if (hourBolivia < 0) hourBolivia += 24;
-            peakHour = [`${hourBolivia}:00`, peakHour[1]];
-        }
+        const peakHour = Object.entries(hourSales).sort((a, b) => b[1] - a[1])[0];
+
+        // Generar flujo de ingresos por hora del día (24 horas en hora de Bolivia)
+        const hourlyData = Array.from({ length: 24 }, (_, i) => {
+            const hourKey = `${i}:00`;
+            return {
+                hour: `${String(i).padStart(2, '0')}:00`,
+                amount: hourSales[hourKey] || 0
+            };
+        });
 
         // 4. Top Mesas (usando agregación con tabla tables)
         const tables = await Table.find({}).lean();
@@ -173,6 +213,7 @@ export async function GET(req: NextRequest) {
             topDishes,
             bestDay: bestDay ? { date: bestDay[0], amount: bestDay[1] } : null,
             peakHour: peakHour ? { hour: peakHour[0], amount: peakHour[1] } : null,
+            hourlyData,
             topTables,
             cancellationRate,
             totalOrders,

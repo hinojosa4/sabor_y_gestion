@@ -4,6 +4,21 @@ Plataforma modular y escalable para la administración integral de restaurantes 
 
 ---
 
+## 🛠️ Tecnologías Utilizadas
+
+El proyecto está construido con un stack moderno y eficiente para garantizar velocidad, escalabilidad y una experiencia de usuario fluida:
+
+* **Frontend & Backend (Fullstack):** [Next.js (App Router)](https://nextjs.org/) (React 19, TypeScript)
+* **Base de Datos:** [MongoDB](https://www.mongodb.com/) con [Mongoose](https://mongoosejs.com/) como ODM.
+* **Tiempo Real (WebSockets):** [Pusher Channels](https://pusher.com/) para notificaciones instantáneas de pedidos en cocina y caja.
+* **Estilos:** [Tailwind CSS v4](https://tailwindcss.com/) para un diseño responsivo y moderno.
+* **Aplicación Móvil y PWA:** [Capacitor JS](https://capacitorjs.com/) para compilar la aplicación nativa en dispositivos Android, y soporte de **PWA (Progressive Web App)** mediante `@ducanh2912/next-pwa` para instalación directa desde el navegador y capacidades offline.
+* **Mapas y Geolocalización:** [Leaflet](https://leafletjs.com/) y [React Leaflet](https://react-leaflet.js.org/) para el rastreo del delivery en tiempo real.
+* **Gráficas:** [Recharts](https://recharts.org/) para la visualización de métricas en el panel de administración.
+* **Seguridad y Envío de Correos:** JSON Web Tokens (JWT) con bcryptjs para autenticación, y Nodemailer para notificaciones automáticas vía email.
+
+---
+
 ## 🗺️ Arquitectura del Proyecto y Flujo de Trabajo
 
 El sistema está desarrollado con **Next.js (App Router)** y sigue una arquitectura limpia que separa la interfaz de usuario, la lógica de negocio y las configuraciones del servidor. 
@@ -162,3 +177,22 @@ Remove-Item -Recurse -Force .next
 # Reiniciar servidor
 npm run dev
 ```
+
+---
+
+## 🔄 Integración y Despliegue Continuo (CI/CD)
+
+El proyecto cuenta con un flujo automatizado de integración y despliegue continuo para asegurar la calidad de cada entrega:
+
+### ⚙️ Integración Continua (CI) — GitHub Actions
+Cada vez que se realiza un **Push** o un **Pull Request** hacia las ramas `dev` o `main`, se ejecuta el flujo automatizado definido en [.github/workflows/ci.yml](file:///.github/workflows/ci.yml), el cual realiza las siguientes validaciones:
+1. Instala las dependencias del proyecto (`npm install`).
+2. Ejecuta `npm run check` (Linting con ESLint, validación estática de tipos TypeScript con `tsc`, y compilación del build de producción).
+
+> [!IMPORTANT]
+> No se permite realizar fusiones (merge) en las ramas protegidas si las pruebas del CI no se superan con éxito.
+
+### 🚀 Despliegue Continuo (CD) — Vercel
+* **Entornos de Previsualización (Preview URLs):** Cada Pull Request genera un enlace único de pruebas temporal de Vercel, ideal para pruebas de interfaz (QA) previas a la fusión.
+* **Entorno de Pruebas (Staging):** Los cambios fusionados en la rama `dev` se despliegan automáticamente a un entorno de pruebas.
+* **Entorno de Producción:** Al fusionar cambios en `main`, Vercel realiza el despliegue automático a producción.

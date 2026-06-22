@@ -1,10 +1,19 @@
 import './globals.css'
-import type { Metadata } from 'next'
+import type { Metadata, Viewport } from 'next'
 import { Inter } from 'next/font/google'
 
 export const metadata: Metadata = {
   title: 'Sabor & Gestión',
   description: 'Sistema Integral de Gestión Gastronómica',
+  manifest: '/manifest.json',
+}
+
+export const viewport: Viewport = {
+  themeColor: '#e85d26',
+  width: 'device-width',
+  initialScale: 1,
+  maximumScale: 1,
+  userScalable: false,
 }
 
 const inter = Inter({

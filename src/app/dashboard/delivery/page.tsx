@@ -206,7 +206,32 @@ function ActiveOrderCard({
           </div>
           <div className={styles.infoList}>
             <div className={styles.infoRow}><User size={16} className={styles.iconGray} /><span>{customerName(order.user_id)}</span></div>
-            {order.delivery_phone && <div className={styles.infoRow}><Phone size={16} className={styles.iconGray} /><span>{order.delivery_phone}</span></div>}
+            {order.delivery_phone && (
+              <div className={styles.infoRow} style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <Phone size={16} className={styles.iconGray} />
+                <span>{order.delivery_phone}</span>
+                <a 
+                  href={`tel:${order.delivery_phone}`}
+                  style={{
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: "4px",
+                    padding: "3px 8px",
+                    backgroundColor: "#22c55e",
+                    color: "#ffffff",
+                    borderRadius: "6px",
+                    fontSize: "11px",
+                    fontWeight: 700,
+                    textDecoration: "none",
+                    marginLeft: "8px",
+                    border: "none",
+                    cursor: "pointer"
+                  }}
+                >
+                  📞 Llamar
+                </a>
+              </div>
+            )}
             {order.delivery_address && <div className={styles.infoRow}><MapPin size={16} className={styles.iconGray} /><span>{order.delivery_address}</span></div>}
           </div>
           {order.notes && (

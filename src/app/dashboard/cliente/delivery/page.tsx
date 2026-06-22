@@ -317,8 +317,12 @@ export default function DeliveryPage() {
   };
 
   // ── Helpers de UI ──────────────────────────────────────────────────────────
+  const isPhoneValid = /^\+?[0-9]{7,12}$/.test(phone.trim().replace(/\s+/g, ''));
+
   const canConfirm =
     address.trim().length > 0 &&
+    phone.trim().length > 0 &&
+    isPhoneValid &&
     !submitting &&
     deliveryFee !== null &&     // no fuera de rango
     geoStatus !== "requesting" &&
@@ -478,14 +482,19 @@ export default function DeliveryPage() {
             />
 
             {/* Teléfono */}
-            <label style={s.label}>Teléfono de contacto (opcional)</label>
+            <label style={s.label}>Teléfono de contacto *</label>
             <input
               style={s.input}
-              placeholder="Ej: +591 70000000"
+              placeholder="Ej: 70000000"
               value={phone}
-              onChange={(e) => setPhone(e.target.value)}
+              onChange={(e) => setPhone(e.target.value.replace(/[^0-9+ ]/g, ''))}
               disabled={submitting}
             />
+            {phone.trim() && !/^\+?[0-9]{7,12}$/.test(phone.trim().replace(/\s+/g, '')) && (
+              <span style={{ fontSize: '0.75rem', color: '#dc2626', marginTop: '-4px', display: 'block' }}>
+                El número de teléfono debe tener entre 7 y 12 dígitos (ej: 70000000).
+              </span>
+            )}
 
             {/* Forma de pago */}
             <label style={s.label}>Forma de pago *</label>
