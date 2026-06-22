@@ -1,5 +1,5 @@
 // src/components/clientScreen/delivery/DeliveryHeader.tsx
-import React from "react";
+import React, { useState, useEffect } from "react";
 import { Truck, Store, ArrowLeft } from "lucide-react";
 
 interface DeliveryHeaderProps {
@@ -13,8 +13,16 @@ export function DeliveryHeader({
     onComerEnRestaurante,
     onLogout,
 }: DeliveryHeaderProps) {
+    const [isMobile, setIsMobile] = useState(false);
+    useEffect(() => {
+        const check = () => setIsMobile(window.innerWidth < 640);
+        check();
+        window.addEventListener("resize", check);
+        return () => window.removeEventListener("resize", check);
+    }, []);
+
     return (
-        <header style={styles.header}>
+        <header style={{ ...styles.header, padding: isMobile ? "0.75rem 1rem" : "1rem 2rem" }}>
             <div style={styles.left}>
                 <div style={styles.iconBox}>
                     <Truck size={22} color="#ffffff" />
@@ -26,13 +34,13 @@ export function DeliveryHeader({
             </div>
 
             <div style={styles.right}>
-                <button style={styles.outlineBtn} onClick={onComerEnRestaurante}>
+                <button style={styles.outlineBtn} onClick={onComerEnRestaurante} title="Ver mis datos">
                     <Store size={16} />
-                    <span>Ver mis datos</span>
+                    {!isMobile && <span>Ver mis datos</span>}
                 </button>
-                <button style={styles.outlineBtn} onClick={onLogout}>
+                <button style={styles.outlineBtn} onClick={onLogout} title="Salir">
                     <ArrowLeft size={16} />
-                    <span>Salir</span>
+                    {!isMobile && <span>Salir</span>}
                 </button>
             </div>
         </header>

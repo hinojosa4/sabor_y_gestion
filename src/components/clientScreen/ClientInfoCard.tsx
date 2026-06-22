@@ -20,8 +20,16 @@ interface ClientInfoCardProps {
 }
 
 export function ClientInfoCard({ data }: ClientInfoCardProps) {
+    const [isMobile, setIsMobile] = React.useState(false);
+    React.useEffect(() => {
+        const check = () => setIsMobile(window.innerWidth < 640);
+        check();
+        window.addEventListener("resize", check);
+        return () => window.removeEventListener("resize", check);
+    }, []);
+
     return (
-        <section style={styles.wrapper}>
+        <section style={{ ...styles.wrapper, padding: isMobile ? "1rem 1rem 0" : "1rem 2rem 0" }}>
             <div style={styles.gradientCard}>
                 <div style={styles.gradientLeft}>
                     <div style={styles.avatarCircle}>

@@ -64,6 +64,14 @@ function categoryNameOf(dish: ApiDish, categories: ApiCategory[]): string {
 export default function DeliveryPage() {
   const router = useRouter();
   const { loading: authLoading, logout } = useAuth(CLIENTE);
+  const [isMobile, setIsMobile] = useState(false);
+
+  useEffect(() => {
+    const check = () => setIsMobile(window.innerWidth < 768);
+    check();
+    window.addEventListener("resize", check);
+    return () => window.removeEventListener("resize", check);
+  }, []);
 
   const [categories, setCategories]   = useState<ApiCategory[]>([]);
   const [apiDishes, setApiDishes]     = useState<ApiDish[]>([]);
@@ -345,7 +353,13 @@ export default function DeliveryPage() {
         </div>
       )}
 
-      <div style={s.layout}>
+      <div style={{
+        ...s.layout,
+        display: isMobile ? "flex" : "grid",
+        flexDirection: isMobile ? "column" : undefined,
+        gridTemplateColumns: isMobile ? undefined : "minmax(0,1fr) 360px",
+        padding: isMobile ? "1rem" : "1.5rem 2rem",
+      }}>
         <div style={s.menuColumn}>
           <DeliveryEstimateBanner />
           {loadingData ? (
@@ -361,7 +375,10 @@ export default function DeliveryPage() {
               {filteredDishes.length === 0 ? (
                 <div style={s.centered}>No hay platos en esta categoría.</div>
               ) : (
-                <div style={s.dishGrid}>
+                <div style={{
+                  ...s.dishGrid,
+                  gridTemplateColumns: isMobile ? "repeat(auto-fill,minmax(140px,1fr))" : "repeat(auto-fill,minmax(260px,1fr))"
+                }}>
                   {filteredDishes.map((dish) => <DishCard key={dish.id} dish={dish} onAdd={handleAdd} />)}
                 </div>
               )}
@@ -369,7 +386,11 @@ export default function DeliveryPage() {
           )}
         </div>
 
-        <aside style={s.sidebar}>
+        <aside style={{
+          ...s.sidebar,
+          width: isMobile ? "100%" : undefined,
+          position: isMobile ? "static" : "sticky",
+        }}>
           <OrderCart
             items={cart}
             shippingFee={deliveryFee}
@@ -384,10 +405,59 @@ export default function DeliveryPage() {
         </aside>
       </div>
 
+      {/* Floating Action Bar on Mobile */}
+      {isMobile && cart.length > 0 && !showOrderForm && (
+        <div style={{
+          position: "fixed",
+          bottom: 20,
+          left: "50%",
+          transform: "translateX(-50%)",
+          width: "min(340px, 90vw)",
+          background: "#f97316",
+          color: "#fff",
+          borderRadius: 12,
+          padding: "12px 18px",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          boxShadow: "0 8px 32px rgba(249, 115, 22, 0.35)",
+          zIndex: 99,
+        }}>
+          <div>
+            <p style={{ margin: 0, fontSize: 11, color: "rgba(255,255,255,0.8)" }}>Tu pedido ({cart.reduce((sum, it) => sum + it.quantity, 0)} items)</p>
+            <p style={{ margin: 0, fontSize: 15, fontWeight: 700 }}>Bs. {cartSubtotalAfterDiscount.toFixed(2)}</p>
+          </div>
+          <button
+            onClick={() => setShowOrderForm(true)}
+            style={{
+              background: "#fff",
+              color: "#f97316",
+              border: "none",
+              borderRadius: 8,
+              padding: "8px 14px",
+              fontSize: 13,
+              fontWeight: 700,
+              cursor: "pointer",
+            }}
+          >
+            Confirmar pedido
+          </button>
+        </div>
+      )}
+
       {/* ── Modal de confirmación ─────────────────────────────────────────── */}
       {showOrderForm && (
-        <div style={s.overlay} onClick={handleCloseModal}>
-          <div style={s.modal} onClick={(e) => e.stopPropagation()}>
+        <div style={{
+          ...s.overlay,
+          alignItems: isMobile ? "flex-end" : "center",
+          padding: isMobile ? 0 : "1rem",
+        }} onClick={handleCloseModal}>
+          <div style={{
+            ...s.modal,
+            borderRadius: isMobile ? "16px 16px 0 0" : 16,
+            maxHeight: isMobile ? "94vh" : "90vh",
+            padding: isMobile ? "1.25rem" : "1.75rem",
+          }} onClick={(e) => e.stopPropagation()}>
             <h3 style={s.modalTitle}>Confirmar pedido</h3>
 
             {/* Resumen de productos */}
