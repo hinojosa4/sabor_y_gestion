@@ -17,7 +17,9 @@ import {
     Legend,
     ResponsiveContainer,
     Area,
-    ComposedChart
+    ComposedChart,
+    Cell,
+    LabelList
 } from 'recharts';
 
 interface IncomeReport {
@@ -142,11 +144,10 @@ const getLocalDate = () => {
 export default function DashboardBIPage() {
     const { user, loading: userLoading } = useAuth(ADMIN);
     const [activeTab, setActiveTab] = useState('resumen');
-    const [periodType, setPeriodType] = useState<'day' | 'month' | 'year'>('day');
-    const [selectedDay, setSelectedDay] = useState(getLocalDate);
-    const [selectedMonth, setSelectedMonth] = useState(`${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, '0')}`);
-    const [selectedYear, setSelectedYear] = useState(new Date().getFullYear().toString());
-    const [compare] = useState<'none' | 'previous_month' | 'previous_year'>('none');
+    const [startDate, setStartDate] = useState(getLocalDate);
+    const [endDate, setEndDate] = useState(getLocalDate);
+    const [compare] = useState<'none' | 'previous_period'>('none');
+    const [waitersLimit, setWaitersLimit] = useState<number>(5);
     const [report, setReport] = useState<IncomeReport | null>(null);
     const [metrics, setMetrics] = useState<MetricsData | null>(null);
     const [loading, setLoading] = useState(false);
@@ -165,18 +166,11 @@ export default function DashboardBIPage() {
     };
 
     // ========== FETCH FUNCTIONS ==========
+    // ========== FETCH FUNCTIONS ==========
     const fetchReport = useCallback(async () => {
         setLoading(true);
-        let params = '';
-        if (periodType === 'day') params = `type=day&value=${selectedDay}`;
-        if (periodType === 'month') {
-            params = `type=month&value=${selectedMonth}`;
-            if (compare === 'previous_month') params += '&compare=previous_month';
-        }
-        if (periodType === 'year') {
-            params = `type=year&value=${selectedYear}`;
-            if (compare === 'previous_year') params += '&compare=previous_year';
-        }
+        let params = `startDate=${startDate}&endDate=${endDate}`;
+        if (compare === 'previous_period') params += '&compare=previous_period';
 
         try {
             const res = await fetch(`/api/dsBi/income?${params}`);
@@ -187,14 +181,11 @@ export default function DashboardBIPage() {
         } finally {
             setLoading(false);
         }
-    }, [periodType, selectedDay, selectedMonth, selectedYear, compare]);
+    }, [startDate, endDate, compare]);
 
     const fetchMetrics = useCallback(async () => {
         setMetricsLoading(true);
-        let params = '';
-        if (periodType === 'day') params = `type=day&value=${selectedDay}`;
-        if (periodType === 'month') params = `type=month&value=${selectedMonth}`;
-        if (periodType === 'year') params = `type=year&value=${selectedYear}`;
+        const params = `startDate=${startDate}&endDate=${endDate}`;
 
         try {
             const res = await fetch(`/api/dsBi/metrics?${params}`);
@@ -205,7 +196,7 @@ export default function DashboardBIPage() {
         } finally {
             setMetricsLoading(false);
         }
-    }, [periodType, selectedDay, selectedMonth, selectedYear]);
+    }, [startDate, endDate]);
 
     useEffect(() => {
         fetchReport();
@@ -213,33 +204,36 @@ export default function DashboardBIPage() {
     }, [fetchReport, fetchMetrics]);
 
     // ========== RENDER CHART ==========
+    const formatMonthKey = (monthKey: string) => {
+        const [year, month] = monthKey.split('-');
+        return `${parseInt(month)}/${year}`;
+    };
+
     const getChartData = () => {
         if (!report) return [];
 
-        if (periodType === 'year') {
-            return Object.entries(report.monthlyIncome || {}).map(([month, amount]) => ({
-                name: month,
+        const start = new Date(startDate);
+        const end = new Date(endDate);
+        const diffTime = Math.abs(end.getTime() - start.getTime());
+        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1;
+
+        if (diffDays > 31) {
+            // Agrupar por mes
+            const data: Array<{ name: string; ingresos: number; rawMonth?: string; rawDate?: string; comparativo?: number }> = Object.entries(report.monthlyIncome || {}).map(([month, amount]) => ({
+                name: formatMonthKey(month),
+                rawMonth: month,
                 ingresos: amount,
             }));
-        } else if (periodType === 'month') {
-            const [year, month] = selectedMonth.split('-');
-            const data = Object.entries(report.dailyIncome || {})
-                .filter(([date]) => {
-                    const [dateYear, dateMonth] = date.split('-');
-                    return dateYear === year && dateMonth === month;
-                })
-                .map(([date, amount]) => ({
-                    name: formatDateKey(date),
-                    ingresos: amount,
-                }));
-
-            data.sort((a, b) => {
-                const [dayA, monthA, yearA] = a.name.split('/');
-                const [dayB, monthB, yearB] = b.name.split('/');
-                const dateA = new Date(parseInt(yearA), parseInt(monthA) - 1, parseInt(dayA));
-                const dateB = new Date(parseInt(yearB), parseInt(monthB) - 1, parseInt(dayB));
-                return dateA.getTime() - dateB.getTime();
-            });
+            data.sort((a, b) => (a.rawMonth || '').localeCompare(b.rawMonth || ''));
+            return data;
+        } else {
+            // Agrupar por día
+            const data: Array<{ name: string; ingresos: number; rawMonth?: string; rawDate?: string; comparativo?: number }> = Object.entries(report.dailyIncome || {}).map(([date, amount]) => ({
+                name: formatDateKey(date),
+                rawDate: date,
+                ingresos: amount,
+            }));
+            data.sort((a, b) => (a.rawDate || '').localeCompare(b.rawDate || ''));
 
             if (report.compareDailyIncome && Object.keys(report.compareDailyIncome).length > 0) {
                 return data.map(item => ({
@@ -251,7 +245,6 @@ export default function DashboardBIPage() {
             }
             return data;
         }
-        return [];
     };
 
     const renderChart = () => {
@@ -316,13 +309,37 @@ export default function DashboardBIPage() {
 
     const renderWaitersChart = () => {
         if (!metrics?.topWaiters || metrics.topWaiters.length === 0) return <p style={{ textAlign: "center", padding: "2rem" }}>No hay datos para mostrar</p>;
-        const data = [...metrics.topWaiters].sort((a, b) => b.total - a.total);
+        const data = [...metrics.topWaiters].sort((a, b) => b.total - a.total).slice(0, waitersLimit);
+        // Altura dinámica: 48px por cada mesero para dar suficiente aire
+        const chartHeight = Math.max(180, data.length * 48);
         return (
-            <ResponsiveContainer width="100%" height={300}>
-                <BarChart data={data} layout="vertical" margin={{ left: 50, right: 20 }}>
+            <ResponsiveContainer width="100%" height={chartHeight}>
+                <BarChart data={data} layout="vertical" margin={{ left: 20, right: 70, top: 10, bottom: 10 }}>
                     <CartesianGrid strokeDasharray="3 3" horizontal={false} />
-                    <XAxis type="number" tickFormatter={(v) => `Bs${v}`} />
-                    <YAxis dataKey="name" type="category" width={80} style={{ fontSize: '0.75rem' }} />
+                    <XAxis type="number" tickFormatter={(v) => `Bs${v}`} style={{ fontSize: '0.75rem' }} />
+                    <YAxis
+                        dataKey="name"
+                        type="category"
+                        width={140}
+                        style={{ fontSize: '0.8rem', fontWeight: 500 }}
+                        tick={({ x, y, payload }) => {
+                            const index = data.findIndex(d => d.name === payload.value);
+                            const rank = index + 1;
+                            let emoji = "";
+                            if (rank === 1) emoji = "🥇 ";
+                            else if (rank === 2) emoji = "🥈 ";
+                            else if (rank === 3) emoji = "🥉 ";
+                            else emoji = `#${rank} `;
+                            
+                            return (
+                                <g transform={`translate(${x},${y})`}>
+                                    <text x={-5} y={0} dy={4} textAnchor="end" fill="var(--foreground)" style={{ fontSize: '0.8rem', fontWeight: rank <= 3 ? 600 : 400 }}>
+                                        {emoji}{payload.value}
+                                    </text>
+                                </g>
+                            );
+                        }}
+                    />
                     <Tooltip formatter={(value, name, entry) => {
                         const count = entry?.payload?.count || 0;
                         return [
@@ -330,7 +347,21 @@ export default function DashboardBIPage() {
                             'Total Facturado'
                         ];
                     }} />
-                    <Bar dataKey="total" name="Total Facturado" fill="#8884d8" radius={[0, 4, 4, 0]} />
+                    <Bar dataKey="total" name="Total Facturado" maxBarSize={30} radius={[0, 4, 4, 0]}>
+                        {data.map((entry, index) => {
+                            let barColor = "#a78bfa"; // Violeta suave por defecto
+                            if (index === 0) barColor = "#e85d26"; // 1º: Naranja marca
+                            else if (index === 1) barColor = "#f97316"; // 2º: Naranja medio
+                            else if (index === 2) barColor = "#fbbf24"; // 3º: Oro
+                            return <Cell key={`cell-${index}`} fill={barColor} />;
+                        })}
+                        <LabelList
+                            dataKey="total"
+                            position="right"
+                            formatter={(v: any) => formatCurrency(Number(v))}
+                            style={{ fontSize: '0.75rem', fill: 'var(--foreground)', fontWeight: 500 }}
+                        />
+                    </Bar>
                 </BarChart>
             </ResponsiveContainer>
         );
@@ -493,45 +524,27 @@ export default function DashboardBIPage() {
 
             {/* Filtros */}
             <div style={filterBarStyle}>
-                <div style={{ display: "flex", gap: "0.5rem", alignItems: "center", flexWrap: "wrap" }}>
-                    <select
-                        value={periodType}
-                        onChange={(e) => setPeriodType(e.target.value as 'day' | 'month' | 'year')}
-                        style={selectStyle}
-                    >
-                        <option value="day">Día</option>
-                        <option value="month">Mes</option>
-                        <option value="year">Año</option>
-                    </select>
-
-                    {periodType === 'day' && (
+                <div style={{ display: "flex", gap: "1rem", alignItems: "center", flexWrap: "wrap" }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+                        <span style={{ fontSize: "0.875rem", color: "var(--muted-foreground)", fontWeight: 500 }}>Desde:</span>
                         <input
                             type="date"
-                            value={selectedDay}
-                            onChange={(e) => setSelectedDay(e.target.value)}
+                            value={startDate}
+                            onChange={(e) => setStartDate(e.target.value)}
                             style={selectStyle}
                         />
-                    )}
+                    </div>
 
-                    {periodType === 'month' && (
+                    <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+                        <span style={{ fontSize: "0.875rem", color: "var(--muted-foreground)", fontWeight: 500 }}>Hasta:</span>
                         <input
-                            type="month"
-                            value={selectedMonth}
-                            onChange={(e) => setSelectedMonth(e.target.value)}
+                            type="date"
+                            value={endDate}
+                            onChange={(e) => setEndDate(e.target.value)}
                             style={selectStyle}
+                            min={startDate}
                         />
-                    )}
-
-                    {periodType === 'year' && (
-                        <input
-                            type="number"
-                            value={selectedYear}
-                            onChange={(e) => setSelectedYear(e.target.value)}
-                            style={selectStyle}
-                            min={2020}
-                            max={new Date().getFullYear()}
-                        />
-                    )}
+                    </div>
 
                     <button onClick={() => { fetchReport(); fetchMetrics(); }} style={buttonStyle}>
                         <Calendar size={16} /> Consultar
@@ -608,13 +621,13 @@ export default function DashboardBIPage() {
                                 </div>
 
                                 {/* Gráfico */}
-                                {periodType === 'day' ? (
+                                {startDate === endDate ? (
                                     <div style={{ ...cardStyle, textAlign: "center", padding: "3rem" }}>
                                         <p style={{ margin: "1rem 0", color: "var(--muted-foreground)", fontSize: "1rem" }}>
-                                            📊 Vista de día: No hay gráfico disponible para un solo día.
+                                            📊 Consulta de un solo día: No hay gráfico de tendencia disponible para un solo día.
                                         </p>
                                         <p style={{ margin: "1rem 0", color: "var(--muted-foreground)", fontSize: "0.875rem" }}>
-                                            Selecciona un <strong>mes</strong> o <strong>año</strong> para ver tendencias y gráficos.
+                                            Selecciona un rango de fechas diferente en **Desde** y **Hasta** para ver gráficos y tendencias.
                                         </p>
                                     </div>
                                 ) : (
@@ -639,29 +652,46 @@ export default function DashboardBIPage() {
                                 {/* Tabla de ingresos */}
                                 <div style={cardStyle}>
                                     <h2 style={{ fontSize: "1.125rem", fontWeight: "bold", marginBottom: "1rem" }}>
-                                        {periodType === 'year' ? 'Ingresos por Mes' : 'Ingresos por Día'}
+                                        {(() => {
+                                            const start = new Date(startDate);
+                                            const end = new Date(endDate);
+                                            const diffDays = Math.ceil(Math.abs(end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)) + 1;
+                                            return diffDays > 31 ? 'Ingresos por Mes' : 'Ingresos por Día';
+                                        })()}
                                     </h2>
                                     <div style={{ overflowX: "auto" }}>
                                         <table style={{ width: "100%", borderCollapse: "collapse" }}>
                                             <thead>
                                                 <tr>
                                                     <th style={{ textAlign: "left", padding: "0.75rem", borderBottom: `1px solid var(--border)`, fontWeight: "bold" }}>
-                                                        {periodType === 'year' ? 'Mes' : 'Fecha'}
+                                                        {(() => {
+                                                            const start = new Date(startDate);
+                                                            const end = new Date(endDate);
+                                                            const diffDays = Math.ceil(Math.abs(end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)) + 1;
+                                                            return diffDays > 31 ? 'Mes' : 'Fecha';
+                                                        })()}
                                                     </th>
                                                     <th style={{ textAlign: "right", padding: "0.75rem", borderBottom: `1px solid var(--border)`, fontWeight: "bold" }}>Total</th>
                                                 </tr>
                                             </thead>
                                             <tbody>
-                                                {Object.entries(periodType === 'year' ? (report?.monthlyIncome || {}) : (report?.dailyIncome || {})).map(([key, amount]) => (
-                                                    <tr key={key}>
-                                                        <td style={{ padding: "0.5rem 0.75rem", borderBottom: `1px solid var(--border)` }}>
-                                                            {periodType === 'year' ? key : formatDateKey(key)}
-                                                        </td>
-                                                        <td style={{ textAlign: "right", padding: "0.5rem 0.75rem", borderBottom: `1px solid var(--border)` }}>
-                                                            {formatCurrency(amount as number)}
-                                                        </td>
-                                                    </tr>
-                                                ))}
+                                                {(() => {
+                                                    const start = new Date(startDate);
+                                                    const end = new Date(endDate);
+                                                    const diffDays = Math.ceil(Math.abs(end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)) + 1;
+                                                    const sortedEntries = Object.entries(diffDays > 31 ? (report?.monthlyIncome || {}) : (report?.dailyIncome || {}));
+                                                    sortedEntries.sort((a, b) => a[0].localeCompare(b[0]));
+                                                    return sortedEntries.map(([key, amount]) => (
+                                                        <tr key={key}>
+                                                            <td style={{ padding: "0.5rem 0.75rem", borderBottom: `1px solid var(--border)` }}>
+                                                                {diffDays > 31 ? formatMonthKey(key) : formatDateKey(key)}
+                                                            </td>
+                                                            <td style={{ textAlign: "right", padding: "0.5rem 0.75rem", borderBottom: `1px solid var(--border)` }}>
+                                                                {formatCurrency(amount as number)}
+                                                            </td>
+                                                        </tr>
+                                                    ));
+                                                })()}
                                             </tbody>
                                         </table>
                                     </div>
@@ -669,11 +699,7 @@ export default function DashboardBIPage() {
 
                                 <div style={{ ...cardStyle, textAlign: "center" }}>
                                     <p style={{ fontSize: "0.875rem", color: "var(--muted-foreground)" }}>
-                                        Período: {periodType === 'day'
-                                            ? `${formatDateKey(selectedDay)} - ${formatDateKey(selectedDay)}`
-                                            : periodType === 'month'
-                                                ? `${formatDateKey(`${selectedMonth}-01`)} - ${formatDateKey(`${selectedMonth}-${new Date(parseInt(selectedMonth.split('-')[0]), parseInt(selectedMonth.split('-')[1]), 0).getDate()}`)}`
-                                                : `${formatDateKey(`${selectedYear}-01-01`)} - ${formatDateKey(`${selectedYear}-12-31`)}`}
+                                        Período: {formatDateKey(startDate)} - {formatDateKey(endDate)}
                                     </p>
                                     <p style={{ fontSize: "0.875rem", color: "var(--muted-foreground)" }}>
                                         Pedidos pagados: {report?.ordersCount || 0}
@@ -858,10 +884,23 @@ export default function DashboardBIPage() {
                                 
                                 {/* Gráfico de barras del ranking */}
                                 <div style={cardStyle}>
-                                    <h3 style={{ fontSize: "1rem", fontWeight: "bold", marginBottom: "1.5rem" }}>
-                                        📊 Ventas Totales por Mesero
-                                    </h3>
-                                    <div style={{ width: "100%", height: 320 }}>
+                                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1.5rem", flexWrap: "wrap", gap: "10px" }}>
+                                        <h3 style={{ fontSize: "1rem", fontWeight: "bold", margin: 0 }}>
+                                            📊 Ventas Totales por Mesero
+                                        </h3>
+                                        <div style={{ display: "flex", gap: "0.25rem" }}>
+                                            {[5, 10].map((limit) => (
+                                                <button
+                                                    key={limit}
+                                                    onClick={() => setWaitersLimit(limit)}
+                                                    style={chartTypeButtonStyle(waitersLimit === limit)}
+                                                >
+                                                    Top {limit}
+                                                </button>
+                                            ))}
+                                        </div>
+                                    </div>
+                                    <div style={{ width: "100%" }}>
                                         {renderWaitersChart()}
                                     </div>
                                 </div>

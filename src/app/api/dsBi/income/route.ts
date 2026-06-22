@@ -10,6 +10,8 @@ export async function GET(req: NextRequest) {
         const type = searchParams.get('type');
         const value = searchParams.get('value');
         const compare = searchParams.get('compare');
+        const startDateParam = searchParams.get('startDate');
+        const endDateParam = searchParams.get('endDate');
 
         let startDate: Date;
         let endDate: Date;
@@ -17,7 +19,20 @@ export async function GET(req: NextRequest) {
         let compareEndDate: Date | null = null;
 
         // Ajustar fechas a la zona horaria de Bolivia (UTC-4)
-        if (type === 'day' && value) {
+        if (startDateParam && endDateParam) {
+            const [sYear, sMonth, sDay] = startDateParam.split('-').map(Number);
+            startDate = new Date(Date.UTC(sYear, sMonth - 1, sDay, 4, 0, 0, 0));
+
+            const [eYear, eMonth, eDay] = endDateParam.split('-').map(Number);
+            const endStart = new Date(Date.UTC(eYear, eMonth - 1, eDay, 4, 0, 0, 0));
+            endDate = new Date(endStart.getTime() + 24 * 60 * 60 * 1000 - 1);
+
+            if (compare === 'previous_period') {
+                const durationMs = endDate.getTime() - startDate.getTime() + 1;
+                compareStartDate = new Date(startDate.getTime() - durationMs);
+                compareEndDate = new Date(endDate.getTime() - durationMs);
+            }
+        } else if (type === 'day' && value) {
             const [year, month, day] = value.split('-').map(Number);
             startDate = new Date(Date.UTC(year, month - 1, day, 4, 0, 0, 0));
             endDate = new Date(startDate.getTime() + 24 * 60 * 60 * 1000 - 1);
@@ -151,10 +166,10 @@ export async function GET(req: NextRequest) {
             compareDailyIncome,
             monthlyIncome,
             period: {
-                startDate: type === 'day' ? value : startDate.toISOString().split('T')[0],
-                endDate: type === 'day' ? value : endDate.toISOString().split('T')[0],
-                compareStartDate: compareStartDate ? (type === 'day' ? value : compareStartDate.toISOString().split('T')[0]) : null,
-                compareEndDate: compareEndDate ? (type === 'day' ? value : compareEndDate.toISOString().split('T')[0]) : null
+                startDate: getBoliviaDateKey(startDate),
+                endDate: getBoliviaDateKey(endDate),
+                compareStartDate: compareStartDate ? getBoliviaDateKey(compareStartDate) : null,
+                compareEndDate: compareEndDate ? getBoliviaDateKey(compareEndDate) : null
             }
         });
     } catch (error) {
