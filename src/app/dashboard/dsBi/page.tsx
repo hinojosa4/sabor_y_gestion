@@ -165,6 +165,30 @@ export default function DashboardBIPage() {
         setExpandedMesa(expandedMesa === tableId ? null : tableId);
     };
 
+    const handleStartDateChange = (val: string) => {
+        const today = getLocalDate();
+        let newStart = val;
+        if (newStart > today) {
+            newStart = today;
+        }
+        setStartDate(newStart);
+        if (newStart > endDate) {
+            setEndDate(newStart);
+        }
+    };
+
+    const handleEndDateChange = (val: string) => {
+        const today = getLocalDate();
+        let newEnd = val;
+        if (newEnd > today) {
+            newEnd = today;
+        }
+        if (newEnd < startDate) {
+            newEnd = startDate;
+        }
+        setEndDate(newEnd);
+    };
+
     // ========== FETCH FUNCTIONS ==========
     // ========== FETCH FUNCTIONS ==========
     const fetchReport = useCallback(async () => {
@@ -530,7 +554,8 @@ export default function DashboardBIPage() {
                         <input
                             type="date"
                             value={startDate}
-                            onChange={(e) => setStartDate(e.target.value)}
+                            onChange={(e) => handleStartDateChange(e.target.value)}
+                            max={getLocalDate()}
                             style={selectStyle}
                         />
                     </div>
@@ -540,9 +565,10 @@ export default function DashboardBIPage() {
                         <input
                             type="date"
                             value={endDate}
-                            onChange={(e) => setEndDate(e.target.value)}
-                            style={selectStyle}
+                            onChange={(e) => handleEndDateChange(e.target.value)}
                             min={startDate}
+                            max={getLocalDate()}
+                            style={selectStyle}
                         />
                     </div>
 
