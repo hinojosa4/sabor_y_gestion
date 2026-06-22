@@ -7,7 +7,7 @@ export interface AuthUser {
   _id: string;
   name: string;
   email: string;
-  rol: "admin" | "cajero" | "cocinero" | "mesero" | "cliente";
+  rol: "admin" | "cajero" | "cocinero" | "mesero" | "cliente" | "delivery";
   activo: boolean;
 }
 
@@ -57,6 +57,7 @@ export function useAuth(allowedRoles?: AuthUser["rol"][]) {
         cocinero: "/dashboard/cocinero",
         mesero: "/dashboard/mesero",
         cliente: "/dashboard/cliente",
+        delivery: "/dashboard/delivery",
       };
       router.replace(routes[parsed.rol] ?? "/login");
       return;
@@ -77,7 +78,17 @@ export function useAuth(allowedRoles?: AuthUser["rol"][]) {
           logout();
           return;
         }
-        setUser(parsed);
+        try {
+          const data = await res.json();
+          if (data.ok && data.user) {
+            localStorage.setItem("user", JSON.stringify(data.user));
+            setUser(data.user);
+          } else {
+            setUser(parsed);
+          }
+        } catch {
+          setUser(parsed);
+        }
       })
       .catch(() => {
         // Error de red — no cerrar sesión, mostrar lo que hay en localStorage

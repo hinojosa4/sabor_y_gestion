@@ -1,5 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { X, Printer, CreditCard } from 'lucide-react';
+import { DollarSign, X, Printer } from 'lucide-react';
+import { QRCodeSVG } from 'qrcode.react';
+import { formatOrderLabel } from '@/lib/orderDisplay';
 
 interface PreinvoiceItem {
   dish: {
@@ -15,7 +17,7 @@ interface PreinvoiceModalProps {
   onClose: () => void;
   tableId: string;
   tableNumber: number;
-  onPay?: () => void;
+  onPay: (orderId: string, total: number) => void;
   onPrint?: () => void;
 }
 
@@ -74,6 +76,13 @@ const tableInfoStyle: React.CSSProperties = {
   color: "var(--muted-foreground)",
 };
 
+const orderInfoStyle: React.CSSProperties = {
+  margin: "-0.5rem 0 1rem",
+  fontSize: "0.875rem",
+  fontWeight: 700,
+  color: "var(--foreground)",
+};
+
 const loadingContainerStyle: React.CSSProperties = {
   textAlign: "center",
   padding: "2rem",
@@ -115,28 +124,18 @@ const totalsContainerStyle: React.CSSProperties = {
   marginTop: "0.5rem",
 };
 
-const totalRowStyle: React.CSSProperties = {
-  display: "flex",
-  justifyContent: "space-between",
-  fontSize: "0.875rem",
-  marginBottom: "0.5rem",
-};
-
 const grandTotalStyle: React.CSSProperties = {
   display: "flex",
   justifyContent: "space-between",
   fontWeight: "var(--font-weight-medium)",
   fontSize: "1.125rem",
-  marginTop: "0.5rem",
-  paddingTop: "0.5rem",
-  borderTop: `1px solid var(--border)`,
 };
 
 const actionsStyle: React.CSSProperties = {
   display: "flex",
-  justifyContent: "flex-end",
+  justifyContent: "space-between",
   gap: "0.5rem",
-  marginTop: "1rem",
+  marginTop: "1.5rem",
 };
 
 const buttonOutlineStyle: React.CSSProperties = {
@@ -169,37 +168,40 @@ const buttonGreenStyle: React.CSSProperties = {
   gap: "0.5rem",
 };
 
-export function PreinvoiceModal({ 
-  isOpen, 
-  onClose, 
-  tableId, 
-  tableNumber, 
+export function PreinvoiceModal({
+  isOpen,
+  onClose,
+  tableId,
+  tableNumber,
   onPay
 }: PreinvoiceModalProps) {
   const [items, setItems] = useState<PreinvoiceItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [subtotal, setSubtotal] = useState(0);
-  const [iva, setIva] = useState(0);
   const [total, setTotal] = useState(0);
   const printRef = useRef<HTMLDivElement>(null);
+  const [orderId, setOrderId] = useState('');
+  const [dailyNumber, setDailyNumber] = useState<number | null>(null);
 
   useEffect(() => {
     if (isOpen && tableId) {
-      fetchPreinvoice();
+        fetchPreinvoice();
     }
-  }, [isOpen, tableId]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+}, [isOpen, tableId]);
 
   const fetchPreinvoice = async () => {
     setLoading(true);
     try {
       const res = await fetch(`/api/orders/preinvoice/${tableId}`);
       const data = await res.json();
-      
+
       if (data.items) {
         setItems(data.items);
         setSubtotal(data.subtotal || 0);
-        setIva(data.iva || 0);
         setTotal(data.total || 0);
+        setOrderId(data.orderId || '');
+        setDailyNumber(data.dailyNumber ?? null);
       }
     } catch (error) {
       console.error('Error:', error);
@@ -214,6 +216,12 @@ export function PreinvoiceModal({
       currency: 'BOB'
     }).format(amount);
   };
+
+  const calculatedSubtotal = items.reduce((sum, item) => {
+    return sum + (item.dish?.price || 0) * item.quantity;
+  }, 0);
+  const displaySubtotal = calculatedSubtotal || subtotal;
+  const displayTotal = displaySubtotal || total;
 
   const handlePrint = () => {
     if (printRef.current) {
@@ -241,6 +249,7 @@ export function PreinvoiceModal({
           </div>
 
           <p style={tableInfoStyle}>Mesa {tableNumber}</p>
+          {orderId && <p style={orderInfoStyle}>{formatOrderLabel(orderId, dailyNumber)}</p>}
 
           {loading ? (
             <div style={loadingContainerStyle}>
@@ -266,34 +275,41 @@ export function PreinvoiceModal({
               </div>
 
               <div style={totalsContainerStyle}>
-                <div style={totalRowStyle}>
-                  <span>Subtotal</span>
-                  <span>{formatCurrency(subtotal)}</span>
-                </div>
-                <div style={totalRowStyle}>
-                  <span>IVA (13%)</span>
-                  <span>{formatCurrency(iva)}</span>
-                </div>
                 <div style={grandTotalStyle}>
                   <span>Total</span>
-                  <span>{formatCurrency(total)}</span>
+                  <span>{formatCurrency(displayTotal)}</span>
                 </div>
+              </div>
+
+
+              <div style={{ display: "flex", flexDirection: "column", alignItems: "center", marginTop: "1.5rem" }}>
+                <QRCodeSVG
+                  value={`${window.location.origin}/pago-qr/${orderId}`}
+                  size={150}
+                />
+                <p style={{ marginTop: "0.5rem", fontSize: "0.875rem" }}>
+                  Escanea el código QR para pagar
+                </p>
               </div>
 
               <div style={actionsStyle}>
                 <button onClick={onClose} style={buttonOutlineStyle}>
                   Cerrar
                 </button>
-                <button onClick={handlePrint} style={buttonOutlineStyle}>
-                  <Printer size={16} />
-                  Imprimir
-                </button>
-                {onPay && (
-                  <button onClick={onPay} style={buttonGreenStyle}>
-                    <CreditCard size={16} />
-                    Cobrar
+
+                <div style={{ display: "flex", gap: "0.5rem" }}>
+                  <button onClick={handlePrint} style={buttonOutlineStyle}>
+                    <Printer size={16} />
+                    Imprimir
                   </button>
-                )}
+
+                  {onPay && (
+                    <button onClick={() => onPay(orderId, displayTotal)} style={buttonGreenStyle}>
+                      <DollarSign size={16} />
+                      Cobrar
+                    </button>
+                  )}
+                </div>
               </div>
             </>
           )}
@@ -308,17 +324,18 @@ export function PreinvoiceModal({
       </div>
 
       {/* Contenido para impresión (oculto) */}
-      <div ref={printRef} style={{ display: 'none' }}>
+      <div ref={printRef} style={{ position: 'absolute', top: '-9999px', left: '-9999px' }}>
         <div style={{ padding: '2rem', fontFamily: 'sans-serif' }}>
           <h2 style={{ textAlign: 'center', marginBottom: '1rem' }}>Pre-factura</h2>
           <p style={{ marginBottom: '1rem' }}>Mesa {tableNumber}</p>
+          {orderId && <p style={{ marginBottom: '1rem' }}><strong>{formatOrderLabel(orderId, dailyNumber)}</strong></p>}
           <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: '1rem' }}>
             <thead>
               <tr style={{ borderBottom: '1px solid #ccc' }}>
                 <th style={{ textAlign: 'left', padding: '0.5rem 0' }}>Plato</th>
                 <th style={{ textAlign: 'center', padding: '0.5rem 0' }}>Cantidad</th>
                 <th style={{ textAlign: 'right', padding: '0.5rem 0' }}>Precio</th>
-                <th style={{ textAlign: 'right', padding: '0.5rem 0' }}>Subtotal</th>
+                <th style={{ textAlign: 'right', padding: '0.5rem 0' }}>Total</th>
               </tr>
             </thead>
             <tbody>
@@ -333,10 +350,20 @@ export function PreinvoiceModal({
             </tbody>
           </table>
           <div style={{ marginTop: '1rem', textAlign: 'right' }}>
-            <p>Subtotal: {formatCurrency(subtotal)}</p>
-            <p>IVA (13%): {formatCurrency(iva)}</p>
-            <p><strong>Total: {formatCurrency(total)}</strong></p>
+            <p><strong>Total: {formatCurrency(displayTotal)}</strong></p>
           </div>
+
+          <div style={{ marginTop: "1rem" }}>
+            <QRCodeSVG
+              value={`${window.location.origin}/pago-qr/${orderId}`}
+              size={200}
+              style={{ display: "block", margin: "0 auto" }}
+            />
+            <p style={{ textAlign: "center", fontSize: "0.7rem", marginTop: "0.5rem" }}>
+              Escanea para pagar
+            </p>
+          </div>
+
           <p style={{ marginTop: '2rem', textAlign: 'center', fontSize: '0.8rem', color: '#666' }}>
             Restaurante - Gracias por su visita
           </p>

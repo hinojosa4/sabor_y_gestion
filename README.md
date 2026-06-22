@@ -1,26 +1,63 @@
-## git  Arquitectura del Proyecto
+# Sabor & Gestión
 
-El proyecto sigue una arquitectura modular y escalable, separando la lógica de negocio de la interfaz de usuario y las configuraciones del servidor.
+Plataforma modular y escalable para la administración integral de restaurantes y cafeterías, diseñada para coordinar pedidos, cobros, cocina y segmentación de clientes en tiempo real.
 
-## 📁 Estructura
+---
+
+## 🛠️ Tecnologías Utilizadas
+
+El proyecto está construido con un stack moderno y eficiente para garantizar velocidad, escalabilidad y una experiencia de usuario fluida:
+
+* **Frontend & Backend (Fullstack):** [Next.js (App Router)](https://nextjs.org/) (React 19, TypeScript)
+* **Base de Datos:** [MongoDB](https://www.mongodb.com/) con [Mongoose](https://mongoosejs.com/) como ODM.
+* **Tiempo Real (WebSockets):** [Pusher Channels](https://pusher.com/) para notificaciones instantáneas de pedidos en cocina y caja.
+* **Estilos:** [Tailwind CSS v4](https://tailwindcss.com/) para un diseño responsivo y moderno.
+* **Aplicación Móvil y PWA:** [Capacitor JS](https://capacitorjs.com/) para compilar la aplicación nativa en dispositivos Android, y soporte de **PWA (Progressive Web App)** mediante `@ducanh2912/next-pwa` para instalación directa desde el navegador y capacidades offline.
+* **Mapas y Geolocalización:** [Leaflet](https://leafletjs.com/) y [React Leaflet](https://react-leaflet.js.org/) para el rastreo del delivery en tiempo real.
+* **Gráficas:** [Recharts](https://recharts.org/) para la visualización de métricas en el panel de administración.
+* **Seguridad y Envío de Correos:** JSON Web Tokens (JWT) con bcryptjs para autenticación, y Nodemailer para notificaciones automáticas vía email.
+
+---
+
+## 🗺️ Arquitectura del Proyecto y Flujo de Trabajo
+
+El sistema está desarrollado con **Next.js (App Router)** y sigue una arquitectura limpia que separa la interfaz de usuario, la lógica de negocio y las configuraciones del servidor. 
+
+La sincronización en tiempo real entre los diferentes roles (clientes, meseros, cocina y cajeros) se realiza a través de WebSockets (Pusher):
+
+```mermaid
+graph TD
+    Client[Panel de Cliente] -->|Pide Delivery/Mesa| API[Next.js API Routes]
+    Waiter[Panel de Mesero] -->|Solicita Cuenta| API
+    API -->|Guarda Estado| DB[(MongoDB Mongoose)]
+    API -->|Dispara Evento| Pusher{Pusher WebSockets}
+    Pusher -->|Notificación en tiempo real| Chef[Panel de Cocina]
+    Pusher -->|Notificación en tiempo real| Cashier[Panel de Cajero]
+```
+
+---
+
+## 📁 Estructura del Código
 
 ```bash
 src/
-├─ app/                 # El corazón de Next.js (App Router)
+├─ app/                 # Rutas de la aplicación Next.js (App Router)
 │  ├─ api/              # Endpoints del Backend (Serverless Functions)
 │  │  ├─ auth/          # Lógica de autenticación (JWT, Login)
 │  │  ├─ users/         # CRUD de usuarios y empleados
-│  │  ├─ categories/    # Gestión de categorías de la cafetería
-│  │  └─ dishes/        # Gestión del menú de platos
+│  │  ├─ categories/    # Gestión de categorías del menú
+│  │  ├─ dishes/        # Gestión del menú de platos
+│  │  └─ admin/         # Rutas de administración y segmentación
 │  ├─ login/            # Vista de inicio de sesión
-│  ├─ dashboard/        # Panel principal de administración
-│  ├─ layout.tsx        # Estructura base de la aplicación
+│  ├─ dashboard/        # Panel principal de administración y roles
+│  ├─ layout.tsx        # Estructura y envolturas base de la aplicación
 │  └─ page.tsx          # Página de inicio (Landing/Root)
 │
 ├─ components/          # Componentes de React reutilizables
 │  ├─ ui/               # Botones, inputs, modales (piezas básicas)
 │  ├─ forms/            # Formularios complejos (Login, registro de platos)
-│  └─ layout/           # Barras laterales, navegación, headers
+│  ├─ layout/           # Barras laterales, navegación, headers
+│  └─ clientScreen/     # Vistas y paneles específicos para el rol Cliente
 │
 ├─ features/            # Lógica de negocio específica por módulo
 │  ├─ auth/             # Hooks y lógica de autenticación
@@ -32,9 +69,10 @@ src/
 │  ├─ db.ts             # Configuración y conexión a MongoDB (Mongoose)
 │  └─ utils.ts          # Funciones auxiliares generales
 │
-├─ models/              # Esquemas de Mongoose (Base de Datos)
+├─ models/              # Esquemas de Mongoose (Modelos de Base de Datos)
 │  ├─ User.ts           # Modelo de Usuario (Roles, contraseñas)
 │  ├─ Category.ts       # Modelo de Categoría
+│  ├─ LoyaltyTier.ts    # Modelo de Reglas de Segmentación
 │  └─ Dish.ts           # Modelo de Plato/Producto
 │
 ├─ validations/         # Esquemas de validación de datos
@@ -46,43 +84,115 @@ src/
 └─ tests/               # Suite de pruebas
    ├─ unit/             # Pruebas de funciones aisladas
    └─ integration/      # Pruebas de flujo completo
+```
 
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+---
 
-## Getting Started
+## 🐳 Base de Datos Local con Docker
 
-First, run the development server:
+Para levantar una instancia local de MongoDB de manera rápida sin necesidad de instalar el servicio en tu sistema operativo principal, puedes ejecutar el siguiente comando si tienes **Docker** instalado:
+
+```bash
+docker run -d \
+  --name sabor-db \
+  -p 27017:27017 \
+  -v sabor_data:/data/db \
+  mongo:latest
+```
+
+Esto habilitará una base de datos local en `mongodb://localhost:27017` lista para conectar con el servidor de desarrollo.
+
+---
+
+## 🚀 Guía de Desarrollo Local
+
+### 1. Iniciar el servidor de desarrollo
+Ejecuta el servidor de desarrollo local utilizando tu gestor de paquetes preferido:
 
 ```bash
 npm run dev
-# or
+# o bien
 yarn dev
-# or
+# o bien
 pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Abre [http://localhost:3000](http://localhost:3000) en tu navegador para interactuar con la aplicación.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+### 2. Control de Calidad Obligatorio
+Antes de realizar un commit o abrir un Pull Request, es obligatorio ejecutar la suite de calidad local para evitar subir código con errores de sintaxis o tipado:
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+```bash
+npm run check
+```
 
-## Learn More
+Este script ejecuta secuencialmente:
+- **Linting (`npm run lint`):** Verificación de estilo y sintaxis mediante ESLint.
+- **Type-Checking (`npm run type-check`):** Verificación estática de tipos de TypeScript.
+- **Build de Producción (`npm run build`):** Simulación de compilación productiva de Next.js.
 
-To learn more about Next.js, take a look at the following resources:
+---
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## 🏗️ Compilación y Simulación de Producción
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+Para validar cómo se comportará la aplicación final en el entorno de despliegue, puedes compilar e iniciar el servidor localmente en modo producción:
 
-## Deploy on Vercel
+```bash
+# Compilar el proyecto optimizado
+npm run build
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+# Iniciar el servidor compilado
+npm run start
+```
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+---
 
-antes de realizar un commit o push verifica con npm run check
+## 📝 Convención de Commits
 
+Para mantener el historial del repositorio legible y facilitar la creación automatizada de versiones, sigue la convención de **Conventional Commits** al crear tus mensajes:
+
+* **`feat:`** Nuevas características funcionales (ej. `feat: agregar validación de duplicados`).
+* **`fix:`** Corrección de fallos o errores de código (ej. `fix: resolver conflicto de fusión en PaymentModal`).
+* **`docs:`** Cambios únicamente en la documentación o el README (ej. `docs: actualizar readme con diagramas`).
+* **`style:`** Formateo estético de código que no altera el comportamiento (espaciado, comillas).
+* **`refactor:`** Reestructuración de código existente que no añade funciones ni corrige bugs.
+
+---
+
+## 🛠️ Solución de Problemas Comunes
+
+### Errores de Conexión en Tiempo Real (Sockets)
+Si experimentas retrasos o las actualizaciones instantáneas en las pantallas de cocina o cajero no se cargan, verifica que no tengas un firewall local bloqueando las peticiones salientes con el proveedor de sockets (Pusher).
+
+### Comportamiento Errático en Caliente (Hot Reload stuck)
+Si tras hacer un `git pull` o cambiar de rama el compilador muestra errores inconsistentes en el navegador, elimina la caché temporal de Next.js e inicia de nuevo:
+
+```bash
+# Limpiar caché de compilación en Linux/MacOS/GitBash
+rm -rf .next
+
+# En Windows PowerShell
+Remove-Item -Recurse -Force .next
+
+# Reiniciar servidor
+npm run dev
+```
+
+---
+
+## 🔄 Integración y Despliegue Continuo (CI/CD)
+
+El proyecto cuenta con un flujo automatizado de integración y despliegue continuo para asegurar la calidad de cada entrega:
+
+### ⚙️ Integración Continua (CI) — GitHub Actions
+Cada vez que se realiza un **Push** o un **Pull Request** hacia las ramas `dev` o `main`, se ejecuta el flujo automatizado definido en [.github/workflows/ci.yml](file:///.github/workflows/ci.yml), el cual realiza las siguientes validaciones:
+1. Instala las dependencias del proyecto (`npm install`).
+2. Ejecuta `npm run check` (Linting con ESLint, validación estática de tipos TypeScript con `tsc`, y compilación del build de producción).
+
+> [!IMPORTANT]
+> No se permite realizar fusiones (merge) en las ramas protegidas si las pruebas del CI no se superan con éxito.
+
+### 🚀 Despliegue Continuo (CD) — Vercel
+* **Entornos de Previsualización (Preview URLs):** Cada Pull Request genera un enlace único de pruebas temporal de Vercel, ideal para pruebas de interfaz (QA) previas a la fusión.
+* **Entorno de Pruebas (Staging):** Los cambios fusionados en la rama `dev` se despliegan automáticamente a un entorno de pruebas.
+* **Entorno de Producción:** Al fusionar cambios en `main`, Vercel realiza el despliegue automático a producción.

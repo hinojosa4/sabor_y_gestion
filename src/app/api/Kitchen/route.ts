@@ -2,22 +2,29 @@ import { NextRequest, NextResponse } from "next/server";
 import { connectDB } from "@/lib/db";
 import Order from "@/models/Order";
 import OrderItem from "@/models/OrderItem";
-import Ingredient from "@/models/Ingredient"; 
+import Ingredient from "@/models/Ingredient";
 import "@/models/Dish";
 import "@/models/Category";
 import mongoose, { Types } from "mongoose";
+import type { AnyBulkWriteOperation } from "mongoose";
 import Table from "@/models/Table";
 import { pusherServer } from "@/lib/pusher";
 
-// ── GET /api/orders/kitchen ───────────────────────────────────────────────────
+// ── GET /api/Kitchen ──────────────────────────────────────────────────────────
 export async function GET() {
   try {
     await connectDB();
+    // Incluir también órdenes delivered/ready que tengan items pending (segunda ronda)
+    const ordersWithPendingItems = await OrderItem.distinct("order_id", {
+      status: "pending",
+    });
+
     const orders = await Order.find({
-      status: { $in: ["pending", "in_kitchen", "ready"] },
-    })
-      .sort({ createdAt: 1 })
-      .lean();
+      $or: [
+        { status: { $in: ["pending", "in_kitchen", "ready"] } },
+        { _id: { $in: ordersWithPendingItems } }, // ← órdenes con items nuevos
+      ],
+    }).sort({ createdAt: 1 }).lean();
 
     const orderIds = orders.map((o) => o._id);
     const items = await OrderItem.find({ order_id: { $in: orderIds } })
@@ -29,10 +36,9 @@ export async function GET() {
       })
       .lean();
 
-    // Resolver números de mesa
-    const tableIds = [...new Set(orders.map(o => o.table_id).filter(Boolean))];
+    const tableIds = [...new Set(orders.map((o) => o.table_id).filter(Boolean))];
     const tables = await Table.find({ _id: { $in: tableIds } }).lean();
-    const tableMap = new Map(tables.map(t => [String(t._id), t.number]));
+    const tableMap = new Map(tables.map((t) => [String(t._id), t.number]));
 
     const itemsByOrder: Record<string, typeof items> = {};
     for (const item of items) {
@@ -51,13 +57,17 @@ export async function GET() {
   } catch (error) {
     console.error("Kitchen GET error:", error);
     return NextResponse.json(
-      { ok: false, message: "Error al obtener órdenes", error: error instanceof Error ? error.message : String(error) },
+      {
+        ok: false,
+        message: "Error al obtener órdenes",
+        error: error instanceof Error ? error.message : String(error),
+      },
       { status: 500 }
     );
   }
 }
 
-// ── PATCH /api/orders/kitchen ─────────────────────────────────────────────────
+// ── PATCH /api/Kitchen ────────────────────────────────────────────────────────
 export async function PATCH(req: NextRequest) {
   try {
     await connectDB();
@@ -90,7 +100,10 @@ export async function PATCH(req: NextRequest) {
     const validTransitions: Record<string, string[]> = {
       pending:    ["in_kitchen", "cancelled"],
       in_kitchen: ["ready", "cancelled"],
-      ready:      ["delivered"],
+      ready:      ["delivered", "picked_up", "in_kitchen"], 
+      delivered:  ["in_kitchen", "cancelled"], 
+      picked_up:  ["in_transit", "cancelled"],
+      in_transit: ["delivered", "cancelled"],
     };
 
     const order = await Order.findById(orderId);
@@ -104,15 +117,12 @@ export async function PATCH(req: NextRequest) {
     const allowed = validTransitions[order.status] ?? [];
     if (!allowed.includes(newStatus)) {
       return NextResponse.json(
-        {
-          ok: false,
-          message: `No se puede pasar de "${order.status}" a "${newStatus}"`,
-        },
+        { ok: false, message: `No se puede pasar de "${order.status}" a "${newStatus}"` },
         { status: 400 }
       );
     }
 
-    // ── Helper para obtener items con ingredientes ─────────────────────────────
+    // ── Helper: obtener items con ingredientes poblados ───────────────────────
     const getItemsWithIngredients = async () => {
       return OrderItem.find({ order_id: orderId }).populate({
         path: "dish_id",
@@ -126,13 +136,21 @@ export async function PATCH(req: NextRequest) {
       });
     };
 
-    // ── Al pasar a in_kitchen → descontar inventario ──────────────────────────
+    // ── in_kitchen → descontar inventario + alertas WebSocket ────────────────
+    // ── in_kitchen → descontar inventario + alertas WebSocket ────────────────
     if (newStatus === "in_kitchen") {
-      const items = await getItemsWithIngredients();
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const bulkOps: any[] = [];
+      const batchCutoff = new Date();
 
-      for (const item of items) {
+      const items = await getItemsWithIngredients();
+      type LeanOrderItem = { created_at: Date | string; [key: string]: unknown };
+      const currentBatchItems = items.filter(
+        (item) => new Date((item as LeanOrderItem).created_at) <= batchCutoff
+      );
+
+      const deductMap = new Map<string, number>();
+      const bulkOps: AnyBulkWriteOperation[] = [];
+
+      for (const item of currentBatchItems) {
         const dish = item.dish_id as {
           ingredients?: {
             ingredient_id: { _id: Types.ObjectId; currentStock: number };
@@ -145,18 +163,21 @@ export async function PATCH(req: NextRequest) {
           if (!ing.ingredient_id) continue;
 
           const deduct = ing.quantity * item.quantity;
+          const ingId = ing.ingredient_id._id.toString();
+
+          deductMap.set(ingId, (deductMap.get(ingId) ?? 0) + deduct);
 
           if (ing.ingredient_id.currentStock < deduct) {
             console.warn(
-              `Stock insuficiente para ingrediente ${ing.ingredient_id._id}: ` +
+              `Stock insuficiente para ingrediente ${ingId}: ` +
               `disponible ${ing.ingredient_id.currentStock}, necesario ${deduct}`
             );
           }
 
           bulkOps.push({
             updateOne: {
-              filter: { _id: new Types.ObjectId(ing.ingredient_id._id.toString()) },
-              update: { $inc: { currentStock: -deduct } }, // ← resta
+              filter: { _id: new Types.ObjectId(ingId) },
+              update: { $inc: { currentStock: -deduct } },
             },
           });
         }
@@ -166,17 +187,59 @@ export async function PATCH(req: NextRequest) {
         await Ingredient.bulkWrite(bulkOps);
       }
 
+      if (deductMap.size > 0) {
+        const affectedIds = Array.from(deductMap.keys());
+        const affectedIngredients = await Ingredient.find({
+          _id: { $in: affectedIds },
+        });
+
+        const alertas: Array<{
+          ingredientId: string;
+          name: string;
+          currentStock: number;
+          unit: string;
+          stockStatus: string;
+          minStock: number;
+          warningStock: number;
+        }> = [];
+
+        for (const ing of affectedIngredients) {
+          if (ing.stockStatus === "critical" || ing.stockStatus === "low") {
+            alertas.push({
+              ingredientId: String(ing._id),
+              name: ing.name,
+              currentStock: ing.currentStock,
+              unit: ing.unit,
+              stockStatus: ing.stockStatus,
+              minStock: ing.minStock,
+              warningStock: ing.warningStock,
+            });
+          }
+        }
+
+        if (alertas.length > 0) {
+          await pusherServer.trigger("restaurant", "inventory:alert", {
+            orderId,
+            alertas,
+            timestamp: new Date().toISOString(),
+          });
+        }
+      }
+
       await OrderItem.updateMany(
-        { order_id: orderId, status: "pending" },
+        {
+          order_id: orderId,
+          status: "pending",
+          created_at: { $lte: batchCutoff },
+        },
         { status: "in_kitchen" }
       );
     }
 
-    // ── Al cancelar desde in_kitchen → restaurar inventario ───────────────────
+    // ── cancelled desde in_kitchen → restaurar inventario ────────────────────
     if (newStatus === "cancelled" && order.status === "in_kitchen") {
       const items = await getItemsWithIngredients();
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const restoreBulkOps: any[] = [];
+      const restoreBulkOps: AnyBulkWriteOperation[] = [];
 
       for (const item of items) {
         const dish = item.dish_id as {
@@ -193,7 +256,7 @@ export async function PATCH(req: NextRequest) {
           restoreBulkOps.push({
             updateOne: {
               filter: { _id: new Types.ObjectId(ing.ingredient_id._id.toString()) },
-              update: { $inc: { currentStock: ing.quantity * item.quantity } }, // ← suma
+              update: { $inc: { currentStock: ing.quantity * item.quantity } },
             },
           });
         }
@@ -203,35 +266,59 @@ export async function PATCH(req: NextRequest) {
         await Ingredient.bulkWrite(restoreBulkOps);
       }
 
-      // Cancelar todos los items de la orden
-      await OrderItem.updateMany(
-        { order_id: orderId },
-        { status: "cancelled" }
-      );
+      await OrderItem.updateMany({ order_id: orderId }, { status: "cancelled" });
     }
 
-    // ── Al pasar a ready → marcar items como ready ────────────────────────────
+    // ── ready → marcar items in_kitchen como ready ────────────────────────────
     if (newStatus === "ready") {
       await OrderItem.updateMany(
         { order_id: orderId, status: "in_kitchen" },
         { status: "ready", prepared_at: new Date() }
       );
+
+      const pendingCount = await OrderItem.countDocuments({
+        order_id: orderId,
+        status: "pending",
+      });
+
+      if (pendingCount > 0) {
+        await pusherServer.trigger("restaurant", "order:updated", {
+          orderId,
+          newStatus: order.status,
+        });
+        return NextResponse.json({
+          ok: true,
+          message: `Listo. Quedan ${pendingCount} ítem(s) adicionales pendientes en cocina.`,
+          data: order,
+        });
+      }
     }
 
     order.status = newStatus;
     await order.save();
 
-        // Al final del PATCH, antes del return:
+    // ── Notificar cambio de estado de orden ───────────────────────────────────
     await pusherServer.trigger("restaurant", "order:updated", {
       orderId,
       newStatus,
     });
 
-    return NextResponse.json({
-      ok: true,
-      message: "Estado actualizado",
-      data: order,
-    });
+    if (order.user_id) {
+      await pusherServer.trigger(`client-${order.user_id}`, "order:status", {
+        orderId,
+        newStatus,
+        service_type: order.service_type,
+      });
+    }
+
+    if (order.service_type === "delivery" && newStatus === "ready") {
+      await pusherServer.trigger("delivery", "order:ready_for_pickup", {
+        orderId,
+        newStatus,
+      });
+    }
+
+    return NextResponse.json({ ok: true, message: "Estado actualizado", data: order });
   } catch (error) {
     console.error("Kitchen PATCH error:", error);
     return NextResponse.json(
