@@ -1,6 +1,7 @@
 import './globals.css'
 import type { Metadata, Viewport } from 'next'
 import { Inter } from 'next/font/google'
+import PWAInstallPrompt from '@/components/PWAInstallPrompt'
 
 export const metadata: Metadata = {
   title: 'Sabor & Gestión',
@@ -30,6 +31,7 @@ export default function RootLayout({
     <html className={inter.className} lang="es">
       <body className="antialiased" suppressHydrationWarning>
         {children}
+        <PWAInstallPrompt />
       </body>
     </html>
   )
