@@ -72,7 +72,7 @@ interface MetricsData {
     newCustomers?: number;
     recurringCustomers?: number;
     customerAvgSpent?: Array<{ email: string; avg: number; total: number; orders: number }>;
-    mostLoyal?: { email: string; count: number; total: number } | null;
+    mostLoyal?: { email: string; name?: string; count: number; total: number } | null;
     loyaltyData?: Array<{ email: string; points: number; tier: { name: string; color: string }; orders: number; total: number }>;
     customerLastVisit?: Record<string, string>;
     customerOrders?: Record<string, number>;
@@ -1382,7 +1382,7 @@ export default function DashboardBIPage() {
                                             <div>
                                                 <p style={{ fontSize: "0.75rem", color: "var(--muted-foreground)", margin: 0 }}>🏅 Cliente más fiel</p>
                                                 <p style={{ fontSize: "1.25rem", fontWeight: "bold", margin: 0 }}>
-                                                    {metrics.mostLoyal.email.split('@')[0]}
+                                                    {metrics.mostLoyal.name || metrics.mostLoyal.email.split('@')[0]}
                                                 </p>
                                                 <p style={{ fontSize: "0.875rem", color: "var(--muted-foreground)", margin: 0 }}>
                                                     {metrics.mostLoyal.count} pedidos · {formatCurrency(metrics.mostLoyal.total)}

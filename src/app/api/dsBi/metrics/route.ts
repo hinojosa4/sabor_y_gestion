@@ -239,19 +239,29 @@ export async function GET(req: NextRequest) {
         const customerSalesMap: Record<string, { name: string; email: string; total: number }> = {};
         for (const payment of payments) {
             if (payment.customer_email) {
-                if (!customerSalesMap[payment.customer_email]) {
-                    customerSalesMap[payment.customer_email] = {
+                const emailLower = payment.customer_email.toLowerCase();
+                if (!customerSalesMap[emailLower]) {
+                    customerSalesMap[emailLower] = {
                         name: payment.customer_email.split('@')[0],
                         email: payment.customer_email,
                         total: 0
                     };
                 }
-                customerSalesMap[payment.customer_email].total += payment.amount;
+                customerSalesMap[emailLower].total += payment.amount;
             }
         }
 
+        // Obtener nombres reales de la BD para los clientes
+        const customerEmails = Object.keys(customerSalesMap);
+        const dbUsers = await User.find({ email: { $in: customerEmails } }, { name: 1, email: 1 }).lean();
+        const userMap = new Map(dbUsers.map(u => [u.email.toLowerCase(), u.name]));
+
         const topCustomers = Object.entries(customerSalesMap)
-            .map(([email, data]) => ({ email, name: data.name, total: data.total }))
+            .map(([email, data]) => ({
+                email: data.email,
+                name: userMap.get(email) || data.name,
+                total: data.total
+            }))
             .sort((a, b) => b.total - a.total)
             .slice(0, 5);
 
@@ -360,14 +370,22 @@ export async function GET(req: NextRequest) {
         })).sort((a, b) => b.avg - a.avg).slice(0, 5);
 
         // Cliente más fiel (más pedidos)
-        const mostLoyal = Object.entries(customerOrders)
+        const mostLoyalRaw = Object.entries(customerOrders)
             .sort((a, b) => b[1] - a[1])
-            .slice(0, 1)
-            .map(([email, count]) => ({
+            .slice(0, 1)[0] || null;
+
+        let mostLoyal = null;
+        if (mostLoyalRaw) {
+            const email = mostLoyalRaw[0];
+            const count = mostLoyalRaw[1];
+            const emailLower = email.toLowerCase();
+            mostLoyal = {
                 email,
+                name: userMap.get(emailLower) || email.split('@')[0],
                 count,
                 total: customerTotalSpent[email] || 0
-            }))[0] || null;
+            };
+        }
 
         // Puntos de lealtad por cliente (desde users)
         const customerLoyalty = await User.find({
