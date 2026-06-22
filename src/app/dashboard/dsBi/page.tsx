@@ -382,6 +382,7 @@ export default function DashboardBIPage() {
                         <LabelList
                             dataKey="total"
                             position="right"
+                            // eslint-disable-next-line @typescript-eslint/no-explicit-any
                             formatter={(v: any) => formatCurrency(Number(v))}
                             style={{ fontSize: '0.75rem', fill: 'var(--foreground)', fontWeight: 500 }}
                         />
