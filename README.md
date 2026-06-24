@@ -88,19 +88,44 @@ src/
 
 ---
 
-## 🐳 Base de Datos Local con Docker
+## 🐳 Base de Datos Local con Docker Compose
 
-Para levantar una instancia local de MongoDB de manera rápida sin necesidad de instalar el servicio en tu sistema operativo principal, puedes ejecutar el siguiente comando si tienes **Docker** instalado:
+El proyecto incluye una configuración de **Docker Compose** para levantar una base de datos **MongoDB** local con Replica Set. Esto permite trabajar en desarrollo sin instalar MongoDB directamente en el sistema y mantiene soporte para transacciones.
 
+### 📋 Requisitos Previos
+* Tener [Docker Desktop](https://www.docker.com/products/docker-desktop/) instalado y ejecutándose en tu sistema.
+
+### 🚀 Pasos para Iniciar la Base de Datos Local
+Tus compañeros o tú pueden iniciar MongoDB local siguiendo estos pasos:
+
+1. **Crear tu archivo de configuración local:**
+   Copia el archivo de plantilla `.env.example` y nómbralo como `.env.local`:
+   ```bash
+   cp .env.example .env.local
+   ```
+   Asegúrate de que la variable `MONGO_URI` apunte a MongoDB local:
+   ```env
+   MONGO_URI=mongodb://localhost:27017/sabor-gestion?replicaSet=rs0
+   ```
+
+2. **Levantar los servicios de Docker:**
+   En la raíz del proyecto, ejecuta:
+   ```bash
+   docker compose up -d
+   ```
+   Esto descargará la imagen de MongoDB e iniciará la base de datos en `mongodb://localhost:27017`, con el Replica Set `rs0` inicializado automáticamente.
+
+3. **Iniciar la aplicación Next.js:**
+   Una vez que los contenedores estén activos, ejecuta:
+   ```bash
+   npm run dev
+   ```
+
+### 🛑 Detener los Servicios
+Cuando termines de trabajar, puedes apagar los contenedores para liberar memoria RAM ejecutando:
 ```bash
-docker run -d \
-  --name sabor-db \
-  -p 27017:27017 \
-  -v sabor_data:/data/db \
-  mongo:latest
+docker compose down
 ```
-
-Esto habilitará una base de datos local en `mongodb://localhost:27017` lista para conectar con el servidor de desarrollo.
 
 ---
 
