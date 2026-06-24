@@ -12,7 +12,7 @@ El proyecto está construido con un stack moderno y eficiente para garantizar ve
 * **Base de Datos:** [MongoDB](https://www.mongodb.com/) con [Mongoose](https://mongoosejs.com/) como ODM.
 * **Tiempo Real (WebSockets):** [Pusher Channels](https://pusher.com/) para notificaciones instantáneas de pedidos en cocina y caja.
 * **Estilos:** [Tailwind CSS v4](https://tailwindcss.com/) para un diseño responsivo y moderno.
-* **Aplicación Móvil y PWA:** [Capacitor JS](https://capacitorjs.com/) para compilar la aplicación nativa en dispositivos Android, y soporte de **PWA (Progressive Web App)** mediante `@ducanh2912/next-pwa` para instalación directa desde el navegador y capacidades offline.
+* **Aplicación PWA:** Soporte de **PWA (Progressive Web App)** mediante `@ducanh2912/next-pwa` para instalación directa desde el navegador y soporte offline.
 * **Mapas y Geolocalización:** [Leaflet](https://leafletjs.com/) y [React Leaflet](https://react-leaflet.js.org/) para el rastreo del delivery en tiempo real.
 * **Gráficas:** [Recharts](https://recharts.org/) para la visualización de métricas en el panel de administración.
 * **Seguridad y Envío de Correos:** JSON Web Tokens (JWT) con bcryptjs para autenticación, y Nodemailer para notificaciones automáticas vía email.
