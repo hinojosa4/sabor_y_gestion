@@ -12,7 +12,7 @@ El proyecto está construido con un stack moderno y eficiente para garantizar ve
 * **Base de Datos:** [MongoDB](https://www.mongodb.com/) con [Mongoose](https://mongoosejs.com/) como ODM.
 * **Tiempo Real (WebSockets):** [Pusher Channels](https://pusher.com/) para notificaciones instantáneas de pedidos en cocina y caja.
 * **Estilos:** [Tailwind CSS v4](https://tailwindcss.com/) para un diseño responsivo y moderno.
-* **Aplicación Móvil y PWA:** [Capacitor JS](https://capacitorjs.com/) para compilar la aplicación nativa en dispositivos Android, y soporte de **PWA (Progressive Web App)** mediante `@ducanh2912/next-pwa` para instalación directa desde el navegador y capacidades offline.
+* **Aplicación PWA:** Soporte de **PWA (Progressive Web App)** mediante `@ducanh2912/next-pwa` para instalación directa desde el navegador y soporte offline.
 * **Mapas y Geolocalización:** [Leaflet](https://leafletjs.com/) y [React Leaflet](https://react-leaflet.js.org/) para el rastreo del delivery en tiempo real.
 * **Gráficas:** [Recharts](https://recharts.org/) para la visualización de métricas en el panel de administración.
 * **Seguridad y Envío de Correos:** JSON Web Tokens (JWT) con bcryptjs para autenticación, y Nodemailer para notificaciones automáticas vía email.
@@ -88,19 +88,44 @@ src/
 
 ---
 
-## 🐳 Base de Datos Local con Docker
+## 🐳 Base de Datos Local con Docker Compose
 
-Para levantar una instancia local de MongoDB de manera rápida sin necesidad de instalar el servicio en tu sistema operativo principal, puedes ejecutar el siguiente comando si tienes **Docker** instalado:
+El proyecto incluye una configuración de **Docker Compose** para levantar una base de datos **MongoDB** local con Replica Set. Esto permite trabajar en desarrollo sin instalar MongoDB directamente en el sistema y mantiene soporte para transacciones.
 
+### 📋 Requisitos Previos
+* Tener [Docker Desktop](https://www.docker.com/products/docker-desktop/) instalado y ejecutándose en tu sistema.
+
+### 🚀 Pasos para Iniciar la Base de Datos Local
+Tus compañeros o tú pueden iniciar MongoDB local siguiendo estos pasos:
+
+1. **Crear tu archivo de configuración local:**
+   Copia el archivo de plantilla `.env.example` y nómbralo como `.env.local`:
+   ```bash
+   cp .env.example .env.local
+   ```
+   Asegúrate de que la variable `MONGO_URI` apunte a MongoDB local:
+   ```env
+   MONGO_URI=mongodb://localhost:27017/sabor-gestion?replicaSet=rs0
+   ```
+
+2. **Levantar los servicios de Docker:**
+   En la raíz del proyecto, ejecuta:
+   ```bash
+   docker compose up -d
+   ```
+   Esto descargará la imagen de MongoDB e iniciará la base de datos en `mongodb://localhost:27017`, con el Replica Set `rs0` inicializado automáticamente.
+
+3. **Iniciar la aplicación Next.js:**
+   Una vez que los contenedores estén activos, ejecuta:
+   ```bash
+   npm run dev
+   ```
+
+### 🛑 Detener los Servicios
+Cuando termines de trabajar, puedes apagar los contenedores para liberar memoria RAM ejecutando:
 ```bash
-docker run -d \
-  --name sabor-db \
-  -p 27017:27017 \
-  -v sabor_data:/data/db \
-  mongo:latest
+docker compose down
 ```
-
-Esto habilitará una base de datos local en `mongodb://localhost:27017` lista para conectar con el servidor de desarrollo.
 
 ---
 
