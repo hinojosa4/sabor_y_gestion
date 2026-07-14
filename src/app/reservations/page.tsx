@@ -265,6 +265,9 @@ export default function ReservationsPage() {
       const ch = pusherInstance.subscribe("restaurant");
       ch.bind("reservation:new",     () => { if (mounted) { refresh(); showSuccess("Nueva reserva recibida 🔔"); } });
       ch.bind("reservation:updated", () => { if (mounted) { refresh(); fetchTables(); } });
+      ch.bind("reservation:seated", (data: { tableNumber?: number; contactName: string }) => {
+        if (mounted) showSuccess(`🪑 Mesa ${data.tableNumber ?? "?"} ocupada — llegó ${data.contactName}`);
+      });
     };
     setup();
     return () => { mounted = false; pusherInstance?.unsubscribe("restaurant"); pusherInstance?.disconnect(); };

@@ -1,0 +1,8 @@
+{
+  "crons": [
+    {
+      "path": "/api/reservations/activate",
+      "schedule": "*/15 * * * *"
+    }
+  ]
+}

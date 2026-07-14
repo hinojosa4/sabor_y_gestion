@@ -66,6 +66,7 @@ export async function PATCH(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    console.log("🚨🚨🚨 ENTRÓ AL PATCH — VERSION NUEVA 🚨🚨🚨");
     await connectDB();
     const { id } = await params;
 
@@ -129,7 +130,7 @@ export async function PATCH(
           { status: 400 }
         );
       }
-      await Table.findByIdAndUpdate(table_id, { status: "Reservada" });
+      
     }
 
     if (status === "seated") {
@@ -161,6 +162,22 @@ export async function PATCH(
     await pusherServer.trigger("restaurant", "reservation:updated", {
       reservation: updated?.toObject(),
     });
+    console.log("✅ [PATCH] reservation:updated disparado"); // TEMPORAL
+
+      if (status === "seated" && oldStatus !== "seated") {
+        console.log("🟡 [PATCH] entrando al bloque de reservation:seated. status:", status, "oldStatus:", oldStatus); // TEMPORAL
+        const tableRef = updated?.table_id as { number?: number; location?: string } | null;
+        console.log("🟡 [PATCH] tableRef:", tableRef); // TEMPORAL
+        await pusherServer.trigger("restaurant", "reservation:seated", {
+          reservationId: id,
+          tableNumber: tableRef?.number,
+          contactName: `${reservation.contact_name} ${reservation.contact_lastname}`,
+          partySize: reservation.party_size,
+        });
+        console.log("✅ [PATCH] reservation:seated disparado"); // TEMPORAL
+      } else {
+        console.log("🔴 [PATCH] NO entró al bloque de seated. status:", status, "oldStatus:", oldStatus); // TEMPORAL
+    }
 
     // ── Notificar al cliente solo cuando cambia a confirmed o cancelled ────
     const notifyStatuses = ["confirmed", "cancelled"];
