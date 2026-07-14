@@ -4,6 +4,29 @@ import { connectDB } from '@/lib/db';
 import Table from '@/models/Table';
 import mongoose from 'mongoose';
 
+// Agregar arriba del archivo, junto a los demás imports
+import Reservation from "@/models/Reservation";
+
+    const ACTIVATION_WINDOW_HOURS = Number(process.env.RESERVATION_ACTIVATION_HOURS ?? 2);
+
+    async function activateDueReservations() {
+        const now = new Date();
+        const windowEnd = new Date(now.getTime() + ACTIVATION_WINDOW_HOURS * 60 * 60 * 1000);
+
+        const reservations = await Reservation.find({
+            status: "confirmed",
+            table_id: { $exists: true, $ne: null },
+            date: { $gte: now, $lte: windowEnd },
+        }).populate("table_id", "status");
+
+        for (const r of reservations) {
+            const t = r.table_id as unknown as { _id: string; status: string } | null;
+            if (t && t.status === "Libre") {
+            await Table.findByIdAndUpdate(t._id, { status: "Reservada" });
+            }
+        }
+    }
+
 // ✅ Definir tipo para el query
 interface TableQuery {
     restaurantId?: string | mongoose.Types.ObjectId;
@@ -12,6 +35,7 @@ interface TableQuery {
 export async function GET(request: Request) {
     try {
         await connectDB();
+        await activateDueReservations(); 
 
         const { searchParams } = new URL(request.url);
         const restaurantId = searchParams.get('restaurantId');
